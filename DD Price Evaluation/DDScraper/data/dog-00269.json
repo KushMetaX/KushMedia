@@ -1,0 +1,38 @@
+{
+  "dogNumber": 269,
+  "name": "Doginal Dog #269",
+  "inscriptionId": "ea2e56c7c7ba2387baac68ea4cfbb0e78312b76f1b41115d4be662140b298e63i0",
+  "inscriptionNumber": 61341604,
+  "imageUrl": "https://market.doginaldogs.com/dogs/269.png",
+  "isListed": true,
+  "price": {
+    "doge": 48000,
+    "usd": 4734.14,
+    "dogeUsdRate": 0.098628
+  },
+  "listingId": 4550,
+  "traits": {
+    "background": "Yellow",
+    "furColor": "Orange",
+    "furPattern": "Solid",
+    "head": "Small Ears",
+    "eyes": "Black",
+    "clothes": null,
+    "mouth": null,
+    "accessory": null
+  },
+  "colors": {
+    "background": "#ddb74a",
+    "fur": "#d67a33"
+  },
+  "rarityRank": 8502,
+  "rarityLabel": "Classic",
+  "traitCounts": {
+    "background": 1223,
+    "furColor": 653,
+    "furPattern": 965,
+    "head": 2613,
+    "eyes": 3288
+  },
+  "scrapedAt": "2026-04-17T01:25:48.770Z"
+}

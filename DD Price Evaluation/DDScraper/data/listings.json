@@ -1,0 +1,80 @@
+{
+  "scrapedAt": "2026-04-17T01:19:32.951Z",
+  "dogeUsdRate": 0.099346,
+  "totalListings": 213,
+  "filters": null,
+  "sortBy": "price",
+  "sortOrder": "asc",
+  "listings": [
+    {
+      "dogNumber": 269,
+      "name": "Doginal Dog #269",
+      "inscriptionId": "ea2e56c7c7ba2387baac68ea4cfbb0e78312b76f1b41115d4be662140b298e63i0",
+      "inscriptionNumber": 61341604,
+      "listingId": 4550,
+      "priceDoge": 48000,
+      "priceUsd": 4768.61,
+      "sellerAddress": "DQGgzUKd2ovAQXv662yKdEJyjz1zS77g7u",
+      "imageUrl": "https://market.doginaldogs.com/dogs/269.png",
+      "status": "active",
+      "createdAt": "2026-04-13T00:49:19.311Z",
+      "expiresAt": "2027-04-13T00:49:19.303Z"
+    },
+    {
+      "dogNumber": 9732,
+      "name": "Doginal Dog #9732",
+      "inscriptionId": "9bc60e04bedc9f86edd40d733a20aeaf4fb1cfc86ff4e05b67cbec2b9a37bd8di0",
+      "inscriptionNumber": 61355203,
+      "listingId": 4203,
+      "priceDoge": 48900,
+      "priceUsd": 4858.02,
+      "sellerAddress": "DRARfN8VPz8H32tCCLLq7SRUe7Tf1wuPKh",
+      "imageUrl": "https://market.doginaldogs.com/dogs/9732.png",
+      "status": "active",
+      "createdAt": "2026-03-28T19:14:19.334Z",
+      "expiresAt": "2027-03-28T19:14:19.326Z"
+    },
+    {
+      "dogNumber": 239,
+      "name": "Doginal Dog #239",
+      "inscriptionId": "de24aafa1e388c8df623098eed2d293f1b5e4471b42ac36ec1ef9febd6c8e405i0",
+      "inscriptionNumber": 61338729,
+      "listingId": 4513,
+      "priceDoge": 48999,
+      "priceUsd": 4867.85,
+      "sellerAddress": "DKBkWtjL7igTSroTWKYtei8Boxhd9tBrNT",
+      "imageUrl": "https://market.doginaldogs.com/dogs/239.png",
+      "status": "active",
+      "createdAt": "2026-04-11T14:02:58.350Z",
+      "expiresAt": "2027-04-11T14:02:58.342Z"
+    },
+    {
+      "dogNumber": 7201,
+      "name": "Doginal Dog #7201",
+      "inscriptionId": "5c5bb9bce2bfdc0db76aa4393a01a0f73ea0845a7deb2b1271299af88f430cb7i0",
+      "inscriptionNumber": 61349569,
+      "listingId": 4377,
+      "priceDoge": 49000,
+      "priceUsd": 4867.95,
+      "sellerAddress": "DQMgfWQ322XUq7UDiPHSmXhCYPSK7ckhgA",
+      "imageUrl": "https://market.doginaldogs.com/dogs/7201.png",
+      "status": "active",
+      "createdAt": "2026-04-03T16:26:26.323Z",
+      "expiresAt": "2027-04-03T16:26:26.315Z"
+    },
+    {
+      "dogNumber": 2873,
+      "name": "Doginal Dog #2873",
+      "inscriptionId": "303c420264f99a8de8c4db3ffae3f922fdca18cbc46167173454db5e4272d18ci0",
+      "inscriptionNumber": 61351735,
+      "listingId": 4609,
+      "priceDoge": 49000,
+      "priceUsd": 4867.95,
+      "sellerAddress": "DASUhKx7zBhmx26oaayqxDaGNLGNZMXHEt",
+      "imageUrl": "https://market.doginaldogs.com/dogs/2873.png",
+      "status": "active",
+      "createdAt": "2026-04-16T14:11:47.384Z",
+      "expiresAt": "2027-04-16T14:11:47.376Z"
+    }
+  ]
+}

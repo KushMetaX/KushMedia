@@ -1,0 +1,32 @@
+# =============================================================================
+# /server/ - hard deny (Wave 2 Server Hardening)
+# Even if the doc-root mapping is wrong upstream, every request that lands
+# inside this directory must 403. Defence-in-depth alongside the root
+# .htaccess RewriteRule and the .gitignore. Nothing in /server/ should
+# ever be served to a browser - the Node app is meant to be reverse-proxied,
+# not handed out as static files.
+# =============================================================================
+
+Options -Indexes -MultiViews
+
+# Block every file, every method, at every depth.
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+</IfModule>
+
+# Belt + suspenders: also rewrite to 403 for hosts where Require/Deny
+# can be bypassed by alias or DirectoryIndex tricks.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^.*$ - [F,L]
+</IfModule>
+
+# Strip the default-server X-Powered-By if anything ever does leak through.
+<IfModule mod_headers.c>
+  Header always unset X-Powered-By
+  Header unset X-Powered-By
+</IfModule>

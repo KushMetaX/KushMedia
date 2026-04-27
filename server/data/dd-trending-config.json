@@ -1,0 +1,32 @@
+{
+  "manualMultipliers": {
+    "head:Wizard": 1.5,
+    "head:Beret": 1.25,
+    "clothes:Suit": 1.5
+  },
+  "refusedOffers": {},
+  "autoTrend": {
+    "enabled": true,
+    "maxTraitCount": 800,
+    "minSaleCount": 2,
+    "minSalesPercent": 0.005,
+    "saleWeight": 0.06,
+    "salesPercentWeight": 10,
+    "listingWeight": 1.5,
+    "maxMultiplier": 2.5
+  },
+  "specialMultipliers": {
+    "colorMatch": { "enabled": true, "multiplier": 1.10 },
+    "minimalTiers": {
+      "black_classic_visor": { "enabled": true, "multiplier": 1.20 },
+      "black_classic": { "enabled": true, "multiplier": 1.15 },
+      "visor_minimal": { "enabled": true, "multiplier": 1.15 },
+      "ultra_clean": { "enabled": true, "multiplier": 1.10 },
+      "minimal_1": { "enabled": true, "multiplier": 1.05 },
+      "minimal_2": { "enabled": true, "multiplier": 1.01 }
+    },
+    "combos": []
+  },
+  "updatedAt": null,
+  "updatedBy": "system"
+}

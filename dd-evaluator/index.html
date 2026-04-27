@@ -1,0 +1,1946 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KushMetaX — DD Price Evaluator</title>
+  <meta name="description" content="Trait-weighted Doginal Dogs price evaluation powered by live market data.">
+  <link rel="icon" href="../assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="../assets/Kush.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Cormorant:ital,wght@0,500;0,600;0,700&family=Outfit:wght@400;500;600;700&family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css">
+  <style>
+    :root{
+      --eval-gold:#e8c547;
+      --eval-gold-soft:rgba(232,197,71,.2);
+      --eval-surface:rgba(20,18,16,.82);
+      --eval-grad-cta:linear-gradient(165deg, #f4e6a0 0%, #d4af37 42%, #9a7b18 100%);
+      --eval-vignette:radial-gradient(ellipse 100% 95% at 50% 36%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.38) 55%, rgba(0,0,0,0.9) 100%);
+    }
+    /* ===== Sticky footer layout ===== */
+    body{
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+      position:relative;
+      isolation:isolate;
+      color:#e8e4dc;
+      font-family:"Outfit",system-ui,-apple-system,sans-serif
+    }
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:-1;
+      pointer-events:none;
+      background:url("../assets/DDBG.png") center center / cover no-repeat;
+      filter:saturate(0.88) brightness(0.46)
+    }
+    body::after{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:-1;
+      pointer-events:none;
+      background:
+        var(--eval-vignette),
+        linear-gradient(200deg, rgba(0,0,0,0.48) 0%, rgba(12,8,2,0.12) 38%, rgba(0,0,0,0.5) 100%)
+    }
+    .page-body{flex:1;position:relative;z-index:0}
+
+    /* This page: override global .section padding and use a single even stack gap */
+    main.page-body > .dd-eval-page{
+      padding:1.5rem 0 2.5rem
+    }
+    @media (min-width: 768px) {
+      main.page-body > .dd-eval-page { padding:1.75rem 0 3rem; }
+    }
+    @media (min-width: 1024px) {
+      main.page-body > .dd-eval-page { padding:2rem 0 3.5rem; }
+    }
+
+    .eval-shell{
+      max-width:680px;
+      margin:0 auto;
+      padding:0 1rem;
+      display:flex;
+      flex-direction:column;
+      gap:1.25rem
+    }
+    /* Even vertical rhythm: shell gap only — no stacked margins on cards */
+    .eval-shell > .eval-tip-bar,
+    .eval-shell > .eval-title-card,
+    .eval-shell > .eval-market-pulse,
+    .eval-shell > .eval-search-card,
+    .eval-shell > .eval-status,
+    .eval-shell > #result,
+    .eval-shell > .eval-kennel,
+    .eval-shell > .eval-disclaimer{
+      margin:0
+    }
+    /* Card shells — shared inner padding */
+    .eval-block-card{
+      width:100%;
+      box-sizing:border-box;
+      padding:1.35rem 1.35rem 1.4rem
+    }
+    .eval-intro{
+      text-align:center;
+      margin:0
+    }
+    .eval-overline{
+      font-family:"Cinzel",serif;
+      font-size:.68rem;
+      text-transform:uppercase;
+      letter-spacing:.26em;
+      color:var(--eval-gold);
+      margin-bottom:.55rem;
+      font-weight:600
+    }
+    .eval-title{
+      font-family:"Cormorant",Georgia,serif;
+      font-size:clamp(1.65rem,4.5vw,2rem);
+      font-weight:700;
+      color:#faf8f2;
+      line-height:1.2;
+      letter-spacing:.015em
+    }
+    .eval-subtitle{
+      color:#a39e94;
+      font-size:.9rem;
+      margin-top:.5rem;
+      max-width:24rem;
+      margin-left:auto;
+      margin-right:auto;
+      line-height:1.55;
+      font-weight:400
+    }
+
+    /* Search stack: mode + hint + form in one card */
+    .eval-search-card.eval-block-card{
+      display:flex;
+      flex-direction:column;
+      gap:1.05rem
+    }
+
+    /* Search mode toggle — equal width segments, inactive = solid dark like cards */
+    .eval-mode-toggle{
+      display:flex;
+      justify-content:stretch;
+      width:100%;
+      gap:0;
+      margin:0
+    }
+    .eval-mode-btn{
+      flex:1 1 0;
+      min-width:0;
+      padding:.62rem .65rem;
+      text-align:center;
+      background:linear-gradient(180deg, #161412 0%, #0c0a08 100%);
+      border:1px solid rgba(212,175,55,.22);
+      color:#b5b0a4;
+      font-size:.8rem;
+      font-weight:600;
+      cursor:pointer;
+      transition:background .2s,border-color .2s,color .2s,box-shadow .2s
+    }
+    .eval-mode-btn:first-child{border-radius:.55rem 0 0 .55rem}
+    .eval-mode-btn:last-child{border-radius:0 .55rem .55rem 0}
+    .eval-mode-btn:not(:first-child):not(:last-child){border-radius:0}
+    .eval-mode-btn + .eval-mode-btn{margin-left:-1px}
+    .eval-mode-btn.active{
+      background:var(--eval-grad-cta);
+      color:#0d0a04;
+      border:1px solid rgba(212,175,55,.5);
+      box-shadow:0 2px 14px rgba(201,162,60,.3);
+      position:relative;
+      z-index:1
+    }
+    .eval-mode-btn:not(.active):hover{
+      background:linear-gradient(180deg, #1c1a16 0%, #12100d 100%);
+      color:#d8d3c8;
+      border-color:rgba(212,175,55,.3)
+    }
+    .eval-mode-hint{
+      text-align:center;
+      font-size:.72rem;
+      color:#8a857a;
+      margin:0;
+      line-height:1.45
+    }
+
+    /* Search bar */
+    .eval-form{
+      display:flex;
+      gap:.75rem;
+      flex-wrap:wrap;
+      width:100%;
+      align-items:stretch;
+      margin:0
+    }
+    .eval-input-wrap{position:relative;flex:1;min-width:200px;min-height:2.9rem}
+    .eval-input-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--eval-gold);font-weight:700;font-size:1.1rem;pointer-events:none;opacity:.9}
+    .eval-input{
+      width:100%;
+      height:100%;
+      min-height:2.9rem;
+      box-sizing:border-box;
+      padding:.85rem .85rem .85rem 2.1rem;
+      background:linear-gradient(180deg, #141210 0%, #0a0908 100%);
+      border:1px solid rgba(212,175,55,.28);
+      border-radius:.55rem;
+      color:#f2efe8;
+      font-size:.95rem;
+      outline:none;
+      transition:box-shadow .2s,border-color .2s,background .2s;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04)
+    }
+    .eval-input::placeholder{color:#6a655c}
+    .eval-input:focus{
+      box-shadow:0 0 0 2px rgba(212,175,55,.25), inset 0 1px 0 rgba(255,255,255,.06);
+      border-color:rgba(212,175,55,.5);
+      background:linear-gradient(180deg, #181614 0%, #0e0c0a 100%)
+    }
+    .eval-btn{
+      padding:.75rem 1.5rem;
+      min-height:2.9rem;
+      box-sizing:border-box;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      background:var(--eval-grad-cta);
+      color:#0b0904;
+      font-weight:700;
+      border:none;
+      border-radius:.55rem;
+      cursor:pointer;
+      font-size:.92rem;
+      white-space:nowrap;
+      box-shadow:0 4px 20px rgba(180,150,50,.32);
+      transition:filter .15s,transform .1s,box-shadow .2s
+    }
+    .eval-btn:hover{filter:brightness(1.06);box-shadow:0 6px 24px rgba(200,170,60,.4)}
+    .eval-btn:active{transform:scale(.98)}
+    .eval-btn:disabled{opacity:.45;pointer-events:none;box-shadow:none}
+
+    /* Status */
+    .eval-status{text-align:center;margin-top:0;min-height:2rem}
+    .eval-spinner{display:inline-flex;align-items:center;gap:.5rem;color:#888}
+    .eval-spinner svg{width:20px;height:20px;animation:evalSpin .8s linear infinite}
+    @keyframes evalSpin{to{transform:rotate(360deg)}}
+    .eval-error{display:inline-flex;align-items:center;gap:.5rem;background:rgba(200,50,50,.15);border:1px solid rgba(200,50,50,.35);color:#f88;padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem}
+
+    /* Result card */
+    .eval-card{
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
+      background:linear-gradient(165deg, rgba(28,26,22,.88) 0%, rgba(10,8,6,.82) 100%);
+      border:1px solid rgba(212,175,55,.18);
+      border-radius:1.1rem;
+      overflow:hidden;
+      margin-top:0;
+      box-shadow:0 12px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
+      animation:evalFadeUp .35s ease-out both
+    }
+    @keyframes evalFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+    .eval-banner{
+      display:flex;
+      align-items:center;
+      gap:1.5rem;
+      padding:1.5rem;
+      border-bottom:1px solid rgba(200,170,80,.12);
+      flex-wrap:wrap;
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
+      background:linear-gradient(180deg, rgba(32,28,22,.75) 0%, rgba(14,12,10,.65) 100%);
+      border-radius:1.1rem 1.1rem 0 0;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04)
+    }
+    .eval-dog-img{width:100px;height:100px;border-radius:.75rem;border:2px solid rgba(212,175,55,.35);object-fit:cover;background:#0d0d0d;animation:evalGlow 2s ease-in-out infinite}
+    @keyframes evalGlow{0%,100%{box-shadow:0 0 8px rgba(212,175,55,.2)}50%{box-shadow:0 0 20px rgba(212,175,55,.4)}}
+    .eval-dog-info{flex:1;min-width:0}
+    .eval-dog-name{font-size:1.15rem;font-weight:700;color:#faf8f2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .eval-dog-id{color:#666;font-size:.75rem;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:.25rem}
+    .eval-badges{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+    .eval-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:600}
+    .eval-badge-listed{background:rgba(50,180,80,.15);color:#5d5;border:1px solid rgba(50,180,80,.3)}
+    .eval-badge-unlisted{background:#1a1a1a;color:#777;border:1px solid #333}
+    .eval-badge-rarity{background:rgba(120,80,200,.15);color:#b8a0e0;border:1px solid rgba(120,80,200,.3)}
+    .eval-badge-special{background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.4)}
+
+    /* Price grid */
+    .eval-prices{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:1rem;
+      padding:1.5rem;
+      border-bottom:1px solid rgba(200,170,80,.1)
+    }
+    .eval-price-box{
+      text-align:center;
+      padding:1rem;
+      background:rgba(0,0,0,.25);
+      border-radius:.8rem;
+      border:1px solid rgba(200,170,80,.1)
+    }
+    .eval-price-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#666;margin-bottom:.35rem}
+    .eval-price-value{font-size:1.35rem;font-weight:700;color:var(--eval-gold)}
+    .eval-price-value.white{color:#fff}
+    .eval-price-sub{color:#555;font-size:.8rem;margin-top:.15rem}
+    .eval-price-note{color:#8d8d8d;font-size:.72rem;margin-top:.4rem}
+
+    .eval-wallet-meta{padding:1rem 1.5rem;border-bottom:1px solid #2a2a2a;display:flex;flex-wrap:wrap;gap:1rem;font-size:.74rem;color:#666}
+    .eval-wallet-empty{padding:1.25rem;border:1px dashed #333;border-radius:.8rem;background:#111;color:#777;text-align:center}
+    .eval-wallet-breakdown{margin-top:1rem;border:1px solid #2a2a2a;border-radius:.8rem;background:#0d0d0d;overflow:hidden}
+    .eval-wallet-breakdown-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:center;padding:.85rem 1rem;border-top:1px solid #222}
+    .eval-wallet-breakdown-row:first-child{border-top:0}
+    .eval-wallet-breakdown-row.total{background:rgba(212,175,55,.06)}
+    .eval-wallet-breakdown-label{display:flex;flex-direction:column;gap:.2rem;min-width:0;color:#fff;font-weight:600}
+    .eval-wallet-breakdown-note{color:#777;font-size:.72rem;font-weight:400}
+    .eval-wallet-breakdown-value{display:flex;flex-direction:column;align-items:flex-end;gap:.15rem;text-align:right;color:var(--eval-gold);font-weight:700;white-space:nowrap}
+    .eval-wallet-breakdown-value-sub{color:#666;font-size:.72rem;font-weight:400}
+    .eval-wallet-profile{margin-left:auto;display:flex;align-items:center;gap:1rem;justify-content:flex-end;min-width:230px;max-width:100%}
+    .eval-wallet-profile-copy{display:flex;flex-direction:column;align-items:flex-end;gap:.28rem;min-width:0;text-align:right}
+    .eval-wallet-rank-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.14em;color:#666}
+    .eval-wallet-rank-value{font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:700;line-height:1}
+    .eval-wallet-rank-value.unranked{font-family:inherit;font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:.12em}
+    .eval-wallet-owner-link{color:#fff;font-weight:700;text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .eval-wallet-owner-link:hover{opacity:.9}
+    .eval-wallet-handle{color:#888;font-size:.78rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .eval-wallet-tier-badge{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border-radius:999px;border:1px solid currentColor;font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;backdrop-filter:blur(6px)}
+    .eval-wallet-pfp-wrap{position:relative;flex:0 0 auto}
+    .eval-wallet-pfp{width:78px;height:78px;border-radius:999px;overflow:hidden;background:#0d0d0d;display:block}
+    .eval-wallet-pfp img{width:100%;height:100%;display:block;object-fit:cover;image-rendering:pixelated;background:#0d0d0d}
+    .eval-wallet-pfp-ring{position:absolute;inset:-5px;border-radius:999px;pointer-events:none}
+
+    /* Listing analysis */
+    .eval-listing{padding:1.5rem;border-bottom:1px solid #2a2a2a}
+    .eval-section-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:#666;font-weight:600;margin-bottom:.75rem}
+    .eval-listing-row{display:flex;flex-wrap:wrap;align-items:center;gap:1.25rem;font-size:.85rem}
+    .eval-listing-row span{color:#999}
+    .eval-listing-row strong{color:#fff}
+    .text-green{color:#5d5}
+    .text-red{color:#f66}
+    .text-yellow{color:#ed5}
+
+    /* Trait breakdown */
+    .eval-traits{padding:1.5rem}
+    .eval-trait-grid{display:grid;gap:.5rem}
+    .eval-trait-chip{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem .75rem;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:.4rem;font-size:.82rem;transition:background .15s}
+    .eval-trait-chip:hover{background:#1a1a1a}
+    .eval-trait-chip.top-sale-row{border-color:rgba(212,175,55,.4);background:rgba(212,175,55,.06)}
+    .eval-trait-key{color:#777;text-transform:capitalize;min-width:80px}
+    .eval-trait-val{color:#fff;font-weight:500;flex:1}
+    .eval-trait-floor{color:#666;font-size:.75rem;text-align:right;white-space:nowrap}
+    .eval-trait-floor.unlisted{color:#a78bfa}
+    .eval-trait-sale{color:#5d5;font-size:.7rem;font-weight:400}
+    .eval-trait-count{color:#555;font-size:.65rem}
+    .eval-top-sale-badge,.eval-trending-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;padding:3px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;line-height:1;vertical-align:middle;box-sizing:border-box}
+    .eval-top-sale-badge{background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.4)}
+    .eval-top-sale-badge svg{width:10px;height:10px;fill:#d4af37;flex-shrink:0}
+    .eval-trending-badge{background:rgba(255,100,50,.15);color:#ff6432;border:1px solid rgba(255,100,50,.4)}
+    .eval-rare-badge{display:inline-flex;align-items:center;border-radius:4px;padding:3px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;line-height:1;vertical-align:middle;box-sizing:border-box;background:rgba(93,221,93,.12);color:#8df58d;border:1px solid rgba(93,221,93,.35)}
+    .eval-trait-chip.trending-row{border-color:rgba(255,100,50,.3);background:rgba(255,100,50,.04)}
+    .eval-trait-meta{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.75rem;font-size:.72rem;color:#555}
+
+    /* Own sale highlight */
+    .eval-own-sale{padding:1rem 1.5rem;border-bottom:1px solid #2a2a2a;background:rgba(212,175,55,.04);display:flex;align-items:center;gap:1rem}
+    .eval-own-sale-media{flex:0 0 auto}
+    .eval-own-sale-media img{height:100px;width:auto;display:block}
+    .eval-own-sale-copy{display:flex;flex-direction:column;justify-content:center;gap:.2rem;min-width:0}
+    .eval-own-sale-label{font-size:.95rem;text-transform:uppercase;letter-spacing:.1em;color:#d4af37;font-weight:700;line-height:1.2}
+    .eval-own-sale-value{font-size:1.35rem;font-weight:700;color:#d4af37;line-height:1.1}
+
+    /* Timestamp */
+    .eval-timestamp{padding:0 1.5rem 1rem;text-align:right;font-size:.65rem;color:#444}
+
+    /* Disclaimer / methodology */
+    .eval-disclaimer{
+      margin-top:0;
+      border:1px solid rgba(212,175,55,.2);
+      border-radius:1rem;
+      background:linear-gradient(180deg, rgba(18,16,14,.9) 0%, rgba(8,6,4,.75) 100%);
+      overflow:hidden;
+      box-shadow:0 8px 32px rgba(0,0,0,.25)
+    }
+    .eval-disclaimer summary{
+      padding:.85rem 1.25rem;
+      font-size:.8rem;
+      font-weight:600;
+      color:#9a968c;
+      cursor:pointer;
+      list-style:none;
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+      user-select:none;
+      letter-spacing:.02em
+    }
+    .eval-disclaimer summary::-webkit-details-marker{display:none}
+    .eval-disclaimer summary::before{content:'\25B6';font-size:.55rem;color:#555;transition:transform .2s}
+    .eval-disclaimer[open] summary::before{transform:rotate(90deg)}
+    .eval-disclaimer summary:hover{color:#bbb}
+    .eval-disclaimer-body{padding:0 1.25rem 1.25rem;font-size:.78rem;line-height:1.6;color:#777}
+    .eval-disclaimer-body h4{color:#999;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;margin:1rem 0 .4rem}
+    .eval-disclaimer-body h4:first-child{margin-top:0}
+    .eval-disclaimer-body p{margin:0 0 .6rem}
+    .eval-disclaimer-body ul{margin:0 0 .6rem;padding-left:1.25rem}
+    .eval-disclaimer-body li{margin-bottom:.3rem}
+    .eval-disclaimer-body .accent{color:var(--eval-gold)}
+
+    @media(max-width:500px){
+      .eval-form{flex-direction:column}
+      .eval-form .eval-btn{width:100%}
+      .eval-mode-btn{
+        font-size:.72rem;
+        padding:.58rem .4rem
+      }
+      .eval-prices{grid-template-columns:1fr}
+      .eval-banner{flex-direction:column;text-align:center;align-items:center}
+      .eval-banner .eval-dog-img{margin:0 auto}
+      .eval-dog-info{text-align:center;width:100%}
+      .eval-dog-name{white-space:normal;word-break:break-word}
+      .eval-dog-id{white-space:normal;word-break:break-all}
+      .eval-badges{justify-content:center}
+      .eval-trait-chip{flex-wrap:wrap}
+      .eval-trait-floor{width:100%;text-align:left;white-space:normal}
+      .eval-trait-meta{justify-content:center}
+      .eval-listing-row{flex-direction:column;align-items:flex-start;gap:.5rem}
+      .eval-own-sale{align-items:center;gap:.75rem}
+      .eval-own-sale-media img{height:80px}
+      .eval-timestamp{text-align:center}
+      .eval-wallet-meta{justify-content:center}
+      .eval-wallet-breakdown-row{grid-template-columns:1fr;justify-items:center;text-align:center}
+      .eval-wallet-breakdown-label{align-items:center}
+      .eval-wallet-breakdown-value{align-items:center;text-align:center;white-space:normal}
+      .eval-wallet-profile{margin:0 auto;justify-content:center;min-width:0;width:100%}
+      .eval-wallet-profile-copy{align-items:center;text-align:center}
+    }
+
+    .eval-glass-panel{
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
+      background:linear-gradient(155deg, rgba(28,24,18,.88) 0%, rgba(12,10,8,.77) 100%);
+      border:1px solid rgba(212,175,55,.2);
+      border-radius:1.1rem;
+      box-shadow:0 10px 40px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,230,180,.05)
+    }
+
+    .eval-tip-bar{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:center;
+      gap:.65rem 1rem;
+      padding:.65rem 1rem;
+      margin:0
+    }
+    .eval-tip-heart{
+      color:#c94b6e;
+      display:inline-flex;
+      line-height:0
+    }
+    .eval-tip-heart svg{width:18px;height:18px;fill:currentColor}
+    .eval-tip-text{color:#b0aaa0;font-size:.88rem;letter-spacing:.03em;font-weight:500}
+    .eval-tip-cta{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:.45rem 1.15rem;
+      border:1px solid rgba(212,175,55,.5);
+      color:var(--eval-gold);
+      font-size:.8rem;
+      font-weight:700;
+      text-decoration:none;
+      border-radius:999px;
+      background:linear-gradient(180deg, rgba(40,32,20,.5) 0%, rgba(12,8,4,.4) 100%);
+      box-shadow:0 2px 12px rgba(0,0,0,.2);
+      transition:background .2s,border-color .2s,transform .1s,box-shadow .2s
+    }
+    button.eval-tip-cta{
+      font-family:inherit;
+      -webkit-appearance:none;
+      appearance:none;
+      margin:0;
+      cursor:pointer
+    }
+    .eval-tip-cta:hover{
+      background:linear-gradient(180deg, rgba(60,50,30,.6) 0%, rgba(20,16,10,.5) 100%);
+      box-shadow:0 4px 16px rgba(200,160,50,.12);
+      border-color:rgba(232,200,100,.5)
+    }
+    .eval-tip-cta:active{transform:scale(.98)}
+
+    .eval-tip-modal[hidden]{
+      display:none !important
+    }
+    .eval-tip-modal{
+      position:fixed;
+      inset:0;
+      z-index:20000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:1rem;
+      box-sizing:border-box
+    }
+    .eval-tip-modal-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(0,0,0,.82);
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+      cursor:pointer
+    }
+    .eval-tip-modal-panel{
+      position:relative;
+      z-index:1;
+      max-width:min(100%,24rem);
+      width:100%;
+      max-height:min(90vh,720px);
+      overflow:auto;
+      padding:1.35rem 1.2rem 1.25rem;
+      border-radius:14px;
+      background:linear-gradient(180deg, #121110 0%, #0a0908 100%);
+      border:1px solid rgba(212,175,55,.45);
+      box-shadow:0 24px 64px rgba(0,0,0,.65), 0 0 0 1px rgba(0,0,0,.5) inset, 0 1px 0 rgba(255,220,150,.08) inset
+    }
+    .eval-tip-modal-close{
+      position:absolute;
+      top:.5rem;
+      right:.5rem;
+      width:2rem;
+      height:2rem;
+      border:none;
+      border-radius:.45rem;
+      background:transparent;
+      color:#c8c4bc;
+      font-size:1.5rem;
+      line-height:1;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:0;
+      transition:color .15s,background .15s
+    }
+    .eval-tip-modal-close:hover{color:#fff;background:rgba(255,255,255,.06)}
+    .eval-tip-modal-title{
+      font-family:"Cormorant",Georgia,serif;
+      font-size:1.35rem;
+      font-weight:700;
+      color:var(--eval-gold);
+      margin:0 2rem .5rem 0;
+      line-height:1.2;
+      letter-spacing:.03em
+    }
+    .eval-tip-modal-msg{
+      font-size:.84rem;
+      color:#8f8a80;
+      line-height:1.5;
+      margin:0 0 1.05rem
+    }
+    .eval-tip-addr-list{
+      list-style:none;
+      margin:0;
+      padding:0;
+      display:flex;
+      flex-direction:column;
+      gap:.55rem
+    }
+    .eval-tip-addr-row{
+      display:grid;
+      grid-template-columns:3.1rem 1fr auto;
+      gap:.35rem .5rem;
+      align-items:center;
+      padding:.6rem .65rem;
+      background:#1e1e1c;
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:10px
+    }
+    .eval-tip-addr-label{
+      font-size:.75rem;
+      font-weight:700;
+      color:var(--eval-gold);
+      letter-spacing:.04em
+    }
+    .eval-tip-addr{
+      font-size:.64rem;
+      color:#e8e4dc;
+      word-break:break-all;
+      line-height:1.3;
+      display:block;
+      font-family:"Roboto Mono",ui-monospace,Consolas,monospace
+    }
+    .eval-tip-copy{
+      flex-shrink:0;
+      font-size:.72rem;
+      font-weight:700;
+      padding:.45rem .7rem;
+      border-radius:6px;
+      border:none;
+      background:var(--eval-grad-cta);
+      color:#0c0a06;
+      cursor:pointer;
+      font-family:"Outfit",system-ui,sans-serif;
+      white-space:nowrap;
+      box-shadow:0 2px 10px rgba(180,150,50,.3);
+      transition:filter .12s,transform .1s,background .2s,color .2s
+    }
+    .eval-tip-copy:hover{filter:brightness(1.08)}
+    .eval-tip-copy:active{transform:scale(.98)}
+    .eval-tip-copy.eval-tip-copied{
+      background:linear-gradient(165deg, #6ecf8f 0%, #2d8a4a 100%);
+      color:#041206;
+      box-shadow:0 2px 10px rgba(50,150,80,.3)
+    }
+    .eval-tip-modal-footer{
+      text-align:center;
+      font-size:.9rem;
+      color:#d8d4cc;
+      margin:1.1rem 0 0;
+      padding-top:.85rem;
+      border-top:1px solid rgba(255,255,255,.08);
+      font-weight:500;
+      letter-spacing:.02em
+    }
+
+    .eval-market-pulse{
+      padding:1.15rem 1.25rem 1.3rem;
+      margin:0
+    }
+    .eval-mp-kicker{
+      font-size:.65rem;
+      text-transform:uppercase;
+      letter-spacing:.24em;
+      color:var(--eval-gold);
+      font-weight:600;
+      margin:0 0 .4rem;
+      font-family:"Cinzel",serif
+    }
+    .eval-mp-title{
+      font-family:"Cormorant",Georgia,serif;
+      font-size:clamp(1.15rem,3.6vw,1.3rem);
+      font-weight:700;
+      color:#f5f0e6;
+      line-height:1.3;
+      margin:0;
+      letter-spacing:.02em
+    }
+    .eval-mp-sub{
+      color:#7a756c;
+      font-size:.82rem;
+      margin:.5rem 0 1rem;
+      line-height:1.45
+    }
+    .eval-mp-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:.5rem;
+      margin-bottom:.75rem
+    }
+    .eval-mp-btn{
+      padding:.5rem 1.05rem;
+      font-size:.8rem;
+      font-weight:600;
+      border-radius:.55rem;
+      cursor:pointer;
+      border:1px solid rgba(200,170,80,.3);
+      background:rgba(0,0,0,.3);
+      color:#d8d4cc;
+      transition:background .2s,border-color .2s,color .2s
+    }
+    .eval-mp-btn:hover{background:rgba(255,255,255,.04);border-color:rgba(200,170,80,.45);color:#fff}
+    .eval-mp-btn-primary{
+      border-color:rgba(212,175,55,.4);
+      color:var(--eval-gold);
+      background:linear-gradient(180deg, rgba(50,40,20,.4) 0%, rgba(10,8,4,.3) 100%)
+    }
+    .eval-mp-btn-primary:hover{
+      color:#fff0c0;
+      border-color:rgba(232,200,100,.5)
+    }
+    .eval-mp-body{margin-top:.75rem}
+    .eval-mp-body[hidden]{display:none !important}
+    .eval-mp-stale{
+      color:#8a8a8a;
+      font-size:.82rem;
+      line-height:1.45;
+      margin:0
+    }
+    .eval-mp-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:.5rem .9rem;
+      font-size:.68rem;
+      text-transform:uppercase;
+      letter-spacing:.1em;
+      color:#666;
+      margin:0 0 .75rem
+    }
+    .eval-mp-meta span{white-space:nowrap}
+    .eval-mp-section{margin-bottom:1.1rem}
+    .eval-mp-section:last-child{margin-bottom:0}
+    .eval-mp-h{
+      font-size:.65rem;
+      text-transform:uppercase;
+      letter-spacing:.1em;
+      color:#666;
+      font-weight:600;
+      margin:0 0 .5rem
+    }
+    .eval-mp-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+      gap:.55rem
+    }
+    .eval-mp-tile{
+      text-align:center;
+      padding:.45rem .4rem;
+      background:rgba(0,0,0,.32);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:.6rem;
+      cursor:pointer;
+      color:inherit;
+      font:inherit;
+      display:block;
+      width:100%;
+      transition:background .12s,transform .1s,border-color .12s
+    }
+    .eval-mp-tile:hover{background:rgba(212,175,55,.1);border-color:rgba(212,175,55,.3)}
+    .eval-mp-tile:active{transform:scale(.98)}
+    .eval-mp-tile img{
+      width:64px;
+      height:64px;
+      object-fit:cover;
+      border-radius:.45rem;
+      display:block;
+      margin:0 auto .35rem;
+      background:#0a0a0a
+    }
+    .eval-mp-tile-num{
+      font-size:.7rem;
+      color:#9a9a9a;
+      font-weight:600
+    }
+    .eval-mp-tile-px{
+      font-size:.8rem;
+      color:var(--eval-gold);
+      font-weight:700;
+      display:block;
+      margin-top:.15rem
+    }
+    .eval-mp-skel{min-height:5rem;border-radius:.6rem;background:rgba(255,255,255,.04);animation:evalPulse 1.2s ease-in-out infinite}
+    @keyframes evalPulse{0%,100%{opacity:.45}50%{opacity:.85}}
+
+    .eval-kennel{
+      margin:0
+    }
+    .eval-kennel-inner{
+      position:relative;
+      padding:0;
+      overflow:hidden;
+      width:100%
+    }
+    .eval-kennel-track{
+      display:flex;
+      width:100%;
+      min-height:8.5rem;
+      position:relative
+    }
+    .eval-kennel-slide{
+      flex:0 0 100%;
+      width:100%;
+      display:grid;
+      grid-template-columns:1fr 120px;
+      align-items:center;
+      gap:1rem;
+      padding:1.1rem 1.2rem 1.2rem;
+      box-sizing:border-box
+    }
+    .eval-kennel-slide a{color:inherit;text-decoration:none}
+    .eval-kennel-badge{
+      font-family:"Cinzel",serif;
+      font-size:.62rem;
+      letter-spacing:.16em;
+      font-weight:700;
+      color:var(--eval-gold);
+      margin:0 0 .35rem
+    }
+    .eval-kennel-h{
+      font-family:"Cormorant",Georgia,serif;
+      font-size:1.15rem;
+      font-weight:700;
+      color:#faf8f2;
+      margin:0 0 .4rem;
+      line-height:1.25;
+      letter-spacing:.02em
+    }
+    .eval-kennel-p{font-size:.8rem;color:#9a9a9a;margin:0 0 .9rem;line-height:1.45}
+    .eval-kennel-cta{
+      display:inline-flex;
+      align-items:center;
+      font-size:.78rem;
+      font-weight:700;
+      color:var(--eval-gold);
+    }
+    .eval-kennel-thumb{
+      width:100%;
+      max-width:120px;
+      border-radius:.65rem;
+      border:1px solid rgba(255,255,255,.08);
+      object-fit:cover;
+      background:#0b0b0b
+    }
+    .eval-kennel-dots{
+      display:flex;
+      justify-content:center;
+      gap:.45rem;
+      padding:.4rem 0 0
+    }
+    .eval-kennel-dot{
+      width:6px;
+      height:6px;
+      border-radius:999px;
+      border:none;
+      padding:0;
+      background:#444;
+      cursor:pointer;
+    }
+    .eval-kennel-dot[aria-selected="true"]{background:var(--eval-gold)}
+    .eval-kennel-dot[disabled]{cursor:default;opacity:.3}
+
+    @media(max-width:480px){
+      .eval-tip-addr-row{grid-template-columns:1fr;gap:.5rem}
+      .eval-tip-copy{justify-self:start}
+      .eval-tip-bar{flex-direction:column;align-items:stretch}
+      .eval-tip-text{text-align:center}
+      .eval-tip-cta{justify-content:center}
+      .eval-kennel-slide{grid-template-columns:1fr;justify-items:center;text-align:center;min-height:12rem}
+      .eval-kennel-thumb{max-width:100px}
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="../index.html" class="header-logo">
+        <img src="../assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+        <span class="header-logo-text">KushMetaX</span>
+      </a>
+      <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="nav-overlay" aria-label="Main navigation">
+    <ul class="nav-list">
+      <li><a href="../index.html" class="nav-link">Home</a></li>
+      <li><a href="../about.html" class="nav-link">About</a></li>
+      <li><a href="../projects.html" class="nav-link">Projects</a></li>
+      <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
+      <li><a href="../services.html" class="nav-link">Services</a></li>
+      <li><a href="../nail-designer/" class="nav-link">Nail Designer</a></li>
+      <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="../contact.html" class="nav-link">Connect</a></li>
+    </ul>
+  </nav>
+
+  <main class="page-body">
+    <section class="section dd-eval-page">
+      <div class="eval-shell">
+
+        <div class="eval-tip-bar eval-glass-panel" role="region" aria-label="Support the evaluator">
+          <span class="eval-tip-heart" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </span>
+          <span class="eval-tip-text">Enjoyed the evaluator?</span>
+          <button type="button" class="eval-tip-cta" id="evalTipCta" aria-haspopup="dialog" aria-controls="evalTipModal">Leave a Tip →</button>
+        </div>
+
+        <div class="eval-title-card eval-glass-panel eval-block-card" role="group" aria-labelledby="evalMainTitle">
+          <div class="eval-intro">
+            <p class="eval-overline">Doginal Dogs</p>
+            <h1 class="eval-title" id="evalMainTitle">Price Evaluator</h1>
+            <p class="eval-subtitle">Trait-weighted valuation powered by live market data</p>
+          </div>
+        </div>
+
+        <div class="eval-market-pulse eval-glass-panel" id="marketPulse">
+          <p class="eval-mp-kicker">Market pulse</p>
+          <h2 class="eval-mp-title">Market Pulse &mdash; Current Floor Listings + Top Sales</h2>
+          <p class="eval-mp-sub">Tap any dog to inspect it in the evaluator.</p>
+          <div class="eval-mp-actions">
+            <button type="button" class="eval-mp-btn eval-mp-btn-primary" id="marketPulseToggle" aria-expanded="false">Expand Board</button>
+            <button type="button" class="eval-mp-btn" id="marketPulseRefresh">Refresh Board</button>
+          </div>
+          <div class="eval-mp-body" id="marketPulseBody" hidden>
+            <p class="eval-mp-meta" id="marketPulseMeta"></p>
+            <div class="eval-mp-skel" id="marketPulseLoading" style="display:none"></div>
+            <div class="eval-mp-stale" id="marketPulseEmpty" style="display:none"></div>
+            <div class="eval-mp-content" id="marketPulseContent" style="display:none"></div>
+          </div>
+        </div>
+
+        <div class="eval-search-card eval-glass-panel eval-block-card" role="search" aria-label="Inscription, rank, or wallet lookup">
+        <div class="eval-mode-toggle" role="tablist" aria-label="Search mode">
+          <button type="button" class="eval-mode-btn active" data-mode="inscription" role="tab" aria-selected="true">Inscription #</button>
+          <button type="button" class="eval-mode-btn" data-mode="rank" role="tab" aria-selected="false">Rarity Rank</button>
+          <button type="button" class="eval-mode-btn" data-mode="wallet" role="tab" aria-selected="false">Wallet Address</button>
+        </div>
+        <div id="modeHint" class="eval-mode-hint" style="display:none">Rank search uses your local scraped index to map rank to dog number.</div>
+
+        <form id="searchForm" class="eval-form">
+          <div class="eval-input-wrap">
+            <span id="inputPrefix" class="eval-input-prefix">#</span>
+            <input id="dogInput" type="text" inputmode="numeric" autocomplete="off"
+                   placeholder="Enter dog number (1–10000)" class="eval-input" />
+          </div>
+          <button type="submit" id="evalBtn" class="eval-btn">Evaluate Price</button>
+        </form>
+        </div>
+
+        <div class="eval-kennel eval-glass-panel" id="kennelRoot" role="region" aria-roledescription="carousel" aria-label="KennelDAO" aria-live="polite">
+          <div class="eval-kennel-inner" id="kennelViewport">
+            <div class="eval-kennel-track" id="kennelTrack" style="display:flex;transition:transform .35s ease;will-change:transform"></div>
+          </div>
+          <div class="eval-kennel-dots" id="kennelDots" role="tablist" aria-label="KennelDAO slide"></div>
+        </div>
+
+        <div id="status" class="eval-status"></div>
+        <div id="result"></div>
+
+        <details class="eval-disclaimer">
+          <summary>How This Works &mdash; Methodology &amp; Disclaimer</summary>
+          <div class="eval-disclaimer-body">
+            <h4>How the estimate is calculated</h4>
+            <ul>
+              <li><strong>Rarest trait drives the base price.</strong> We identify the trait with the lowest count out of 10,000 dogs. Its listing floor or top sale price (whichever is higher) becomes the starting point.</li>
+              <li><strong>Other rare traits add a bonus.</strong> If a secondary trait (count &le; 500) has a higher sale or floor than the base, 20% of the difference is added as a trait bonus.</li>
+              <li><strong>Rarity rank multiplier.</strong> The dog&rsquo;s overall rarity rank applies a multiplier: top 1% &rarr; 1.5&times;, top 5% &rarr; 1.25&times;, top 15% &rarr; 1.1&times;, top 25% &rarr; 1.05&times;.</li>
+              <li><strong>Trending multiplier.</strong> Traits seeing high current demand (like Wizard, Beret, Suit) get an additional boost.</li>
+              <li><strong>Own sale history.</strong> If this specific dog has sold recently, its sale price acts as a floor&mdash;the estimate won&rsquo;t go below it.</li>
+              <li><strong>Collection floor guarantee.</strong> No dog is ever estimated below the collection floor price.</li>
+            </ul>
+
+            <h4>Sale price attribution</h4>
+            <p>When a dog sells, the sale is attributed to its traits. To prevent common traits from being inflated by a rare dog&rsquo;s sale, we apply tiered caps:</p>
+            <ul>
+              <li><strong>Ultra-rare traits</strong> (count &le; 100, plus Diamond &amp; Shiny): full sale price attributed.</li>
+              <li><strong>Moderately rare traits</strong> (count 101&ndash;500): capped at 2&times; the median sale or the listing floor.</li>
+              <li><strong>Common traits</strong> (count &gt; 500): capped at the median sale price.</li>
+            </ul>
+
+            <h4>What this can&rsquo;t measure</h4>
+            <p>Market sentiment, hype cycles, community attachment, and &ldquo;grail&rdquo; status are real factors that move prices&mdash;but they&rsquo;re extremely difficult to quantify in code. A dog might sell for multiples of its estimated value because a collector simply <em>wants</em> it, or sit unsold below estimate because the market is quiet.</p>
+
+            <p class="accent"><strong>&#9888; This tool provides a data-driven estimate, not financial advice.</strong> Actual sale prices depend on buyer demand, timing, and market conditions that no algorithm can fully capture. Always do your own research before buying or selling.</p>
+          </div>
+        </details>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="https://doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Doginal Dogs</a>
+          <a href="https://market.doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Marketplace</a>
+        </div>
+        <p class="footer-copy">&copy; 2026 KushMetaX. All rights reserved.</p>
+      </div>
+      <div class="footer-mascot-wrap">
+        <span class="footer-mascot-text">KushMetaX</span>
+        <img src="../assets/SWB.gif" alt="" class="footer-mascot">
+      </div>
+    </div>
+  </footer>
+
+  <div class="eval-tip-modal" id="evalTipModal" hidden role="dialog" aria-modal="true" aria-labelledby="evalTipModalTitle">
+    <div class="eval-tip-modal-backdrop" id="evalTipModalBackdrop" tabindex="-1" aria-hidden="true"></div>
+    <div class="eval-tip-modal-panel">
+      <button type="button" class="eval-tip-modal-close" id="evalTipModalClose" aria-label="Close">&times;</button>
+      <h2 id="evalTipModalTitle" class="eval-tip-modal-title">Leave a Tip</h2>
+      <p class="eval-tip-modal-msg">Send whatever you feel to any of the wallets below. It goes a long way.</p>
+      <ul class="eval-tip-addr-list">
+        <li class="eval-tip-addr-row">
+          <span class="eval-tip-addr-label">BTC</span>
+          <code class="eval-tip-addr" translate="no">bc1q09cl2dcwegyrdq7z6gdq664ahy87utrt00kytv</code>
+          <button type="button" class="eval-tip-copy" data-copy="bc1q09cl2dcwegyrdq7z6gdq664ahy87utrt00kytv">Copy</button>
+        </li>
+        <li class="eval-tip-addr-row">
+          <span class="eval-tip-addr-label">ETH</span>
+          <code class="eval-tip-addr" translate="no">0xc43e24d5E012E613a55bceED376345BAad02F283</code>
+          <button type="button" class="eval-tip-copy" data-copy="0xc43e24d5E012E613a55bceED376345BAad02F283">Copy</button>
+        </li>
+        <li class="eval-tip-addr-row">
+          <span class="eval-tip-addr-label">SOL</span>
+          <code class="eval-tip-addr" translate="no">148TG8A9wx7sZjCTfDZ3WKuuHaWuvAP1AVgrg1sXpkxV</code>
+          <button type="button" class="eval-tip-copy" data-copy="148TG8A9wx7sZjCTfDZ3WKuuHaWuvAP1AVgrg1sXpkxV">Copy</button>
+        </li>
+        <li class="eval-tip-addr-row">
+          <span class="eval-tip-addr-label">DOGE</span>
+          <code class="eval-tip-addr" translate="no">D7G5HNDjvbSjxo5tGa9KA4GNtAXfBpipvi</code>
+          <button type="button" class="eval-tip-copy" data-copy="D7G5HNDjvbSjxo5tGa9KA4GNtAXfBpipvi">Copy</button>
+        </li>
+      </ul>
+      <p class="eval-tip-modal-footer">Seriously, thank you. 🐳</p>
+    </div>
+  </div>
+
+  <script src="../brand.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+
+    const form     = document.getElementById('searchForm');
+    const input    = document.getElementById('dogInput');
+    const evalBtn  = document.getElementById('evalBtn');
+    const statusEl = document.getElementById('status');
+    const resultEl = document.getElementById('result');
+    const modeHint = document.getElementById('modeHint');
+    const inputPrefix = document.getElementById('inputPrefix');
+    const modeBtns = document.querySelectorAll('.eval-mode-btn');
+    let searchMode = 'inscription'; // 'inscription' | 'rank' | 'wallet'
+
+    function applySearchMode() {
+      if (searchMode === 'rank') {
+        inputPrefix.hidden = false;
+        inputPrefix.textContent = '#';
+        input.style.paddingLeft = '2.1rem';
+        input.placeholder = 'Enter rarity rank (1–10000)';
+        modeHint.textContent = 'Rank search uses your local scraped index to map rank to dog number.';
+        modeHint.style.display = '';
+        return;
+      }
+
+      if (searchMode === 'wallet') {
+        inputPrefix.hidden = true;
+        input.style.paddingLeft = '.85rem';
+        input.placeholder = 'Enter Dogecoin wallet address';
+        modeHint.textContent = 'Estimated Value of Doginal Dogs currently held by that address.';
+        modeHint.style.display = '';
+        return;
+      }
+
+      inputPrefix.hidden = false;
+      inputPrefix.textContent = '#';
+      input.style.paddingLeft = '2.1rem';
+      input.placeholder = 'Enter dog number (1–10000)';
+      modeHint.style.display = 'none';
+    }
+
+    function syncModeTabs() {
+      modeBtns.forEach(function(b) {
+        b.setAttribute('aria-selected', b.classList.contains('active') ? 'true' : 'false');
+      });
+    }
+
+    /* ---------- mode toggle ---------- */
+    modeBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        modeBtns.forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        searchMode = btn.dataset.mode;
+        applySearchMode();
+        syncModeTabs();
+        input.value = '';
+        input.focus();
+      });
+    });
+    applySearchMode();
+    syncModeTabs();
+
+    /* ---------- helpers ---------- */
+    function sanitizeNumber(raw) {
+      return parseInt(String(raw).replace(/[^0-9]/g, ''), 10);
+    }
+    function sanitizeAddress(raw) {
+      return String(raw || '').trim();
+    }
+    function isLikelyWalletAddress(raw) {
+      return /^[A-Za-z0-9]{24,80}$/.test(raw);
+    }
+    function fmt(n, d) {
+      if (n == null) return '\u2014';
+      return Number(n).toLocaleString(undefined, { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+    }
+    function fmtDoge(n) { return n != null ? fmt(n) + ' DOGE' : '\u2014'; }
+    function fmtUsd(n)  { return n != null ? '$' + fmt(n, 2) : ''; }
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function shortAddress(address) {
+      var text = String(address || '');
+      if (text.length <= 12) return text;
+      return text.slice(0, 6) + '...' + text.slice(-4);
+    }
+    function getWalletTier(profile) {
+      return profile && profile.tier ? profile.tier : {
+        name: 'grey',
+        label: 'Grey',
+        color: 'rgba(255, 255, 255, 0.4)',
+        colorLight: 'rgba(255, 255, 255, 0.5)',
+        colorDark: 'rgba(255, 255, 255, 0.2)',
+        glowColor: 'transparent',
+        animated: false
+      };
+    }
+    function getWalletProfileImage(profile, dogNumbers) {
+      if (profile && profile.imageUrl) return profile.imageUrl;
+      if (profile && profile.selectedDogNumber != null) {
+        return 'https://market.doginaldogs.com/dogs/' + encodeURIComponent(profile.selectedDogNumber) + '.png';
+      }
+      if (Array.isArray(dogNumbers) && dogNumbers.length) {
+        return 'https://market.doginaldogs.com/dogs/' + encodeURIComponent(dogNumbers[0]) + '.png';
+      }
+      return '../assets/collection-logo.png';
+    }
+    function renderWalletProfile(profile, wallet) {
+      var tier = getWalletTier(profile);
+      var ringShadow = '0 0 0 3px ' + tier.color + (tier.name === 'grey' ? '' : ', 0 0 18px ' + tier.glowColor);
+      var ringStyle = 'box-shadow:' + ringShadow + ';border:1px solid ' + tier.colorLight + ';';
+      var badgeStyle = 'color:' + tier.color + ';background:' + (tier.name === 'grey' ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,' + tier.colorDark + '22,' + tier.colorLight + '12)') + ';';
+      var marketUrl = profile && profile.marketUrl ? profile.marketUrl : 'https://market.doginaldogs.com/wallet/' + encodeURIComponent(wallet.address || '');
+      var imageUrl = getWalletProfileImage(profile, wallet.dogNumbers);
+      var displayName = profile && profile.displayName ? profile.displayName : shortAddress(wallet.address || '');
+      var handle = profile && profile.username ? '@' + String(profile.username).trim() : shortAddress(wallet.address || '');
+      var verifiedLabel = profile && profile.verified ? ' · verified' : '';
+      var rankHtml = profile && profile.rank != null
+        ? '<div class="eval-wallet-rank-value" style="color:' + esc(tier.color) + '">#' + fmt(profile.rank) + '</div>'
+        : '<div class="eval-wallet-rank-value unranked">Unranked</div>';
+
+      return '<div class="eval-wallet-profile">' +
+        '<div class="eval-wallet-profile-copy">' +
+          '<div class="eval-wallet-rank-label">Market Leaderboard</div>' +
+          rankHtml +
+          '<a class="eval-wallet-owner-link" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(displayName) + '</a>' +
+          '<div class="eval-wallet-handle">' + esc(handle + verifiedLabel) + '</div>' +
+          '<div class="eval-wallet-tier-badge" style="' + badgeStyle + '">' + esc(tier.label) + ' Tier</div>' +
+        '</div>' +
+        '<a class="eval-wallet-pfp-wrap" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer" aria-label="Open market wallet profile">' +
+          '<span class="eval-wallet-pfp-ring" style="' + ringStyle + '"></span>' +
+          '<span class="eval-wallet-pfp"><img src="' + esc(imageUrl) + '" alt="' + esc(displayName) + '" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" /></span>' +
+        '</a>' +
+      '</div>';
+    }
+
+    function renderWalletBreakdown(breakdown, totals) {
+      if (!Array.isArray(breakdown) || !breakdown.length) {
+        return '';
+      }
+
+      var rows = breakdown.map(function(entry) {
+        var usdHtml = entry.estimatedUsd != null
+          ? '<span class="eval-wallet-breakdown-value-sub">' + fmtUsd(entry.estimatedUsd) + '</span>'
+          : '';
+        return '<div class="eval-wallet-breakdown-row">' +
+          '<div class="eval-wallet-breakdown-label">' +
+            '<span>Inscription #' + fmt(entry.dogNumber) + '</span>' +
+            '<span class="eval-wallet-breakdown-note">Included in portfolio estimate</span>' +
+          '</div>' +
+          '<div class="eval-wallet-breakdown-value">' +
+            '<span>' + fmtDoge(entry.estimatedDoge) + '</span>' +
+            usdHtml +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var totalUsdHtml = totals.estimatedUsd != null
+        ? '<span class="eval-wallet-breakdown-value-sub">' + fmtUsd(totals.estimatedUsd) + '</span>'
+        : '';
+
+      return '<div class="eval-wallet-breakdown">' +
+        rows +
+        '<div class="eval-wallet-breakdown-row total">' +
+          '<div class="eval-wallet-breakdown-label">' +
+            '<span>Total portfolio estimate</span>' +
+            '<span class="eval-wallet-breakdown-note">Sum of all inscription estimates above</span>' +
+          '</div>' +
+          '<div class="eval-wallet-breakdown-value">' +
+            '<span>' + fmtDoge(totals.estimatedDoge) + '</span>' +
+            totalUsdHtml +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function verdictColor(v) {
+      if (v === 'undervalued') return 'text-green';
+      if (v === 'overpriced')  return 'text-red';
+      return 'text-yellow';
+    }
+    function verdictIcon(v) {
+      if (v === 'undervalued') return '\u25B2';
+      if (v === 'overpriced')  return '\u25BC';
+      return '\u25AC';
+    }
+
+    /* ---------- loading / error ---------- */
+    function showLoading() {
+      evalBtn.disabled = true;
+      statusEl.innerHTML = '<div class="eval-spinner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg><span>Evaluating\u2026</span></div>';
+      resultEl.innerHTML = '';
+    }
+    function showError(msg) {
+      evalBtn.disabled = false;
+      statusEl.innerHTML = '<div class="eval-error"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>' + esc(msg) + '</div>';
+      resultEl.innerHTML = '';
+    }
+    function clearStatus() { evalBtn.disabled = false; statusEl.innerHTML = ''; }
+
+    /* ---------- render result ---------- */
+    function renderResult(d) {
+      clearStatus();
+      var est = d.estimation || {};
+      var la  = d.listingAnalysis;
+      var displayedEstimatedDoge = est.displayEstimatedDoge != null ? est.displayEstimatedDoge : est.estimatedDoge;
+      var displayedEstimatedUsd = est.displayEstimatedUsd != null ? est.displayEstimatedUsd : est.estimatedUsd;
+
+      var pawSvg = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21c-1.5 0-3.5-2-4.5-3.5S5 14 5 12.5 6.5 10 8 10s2.5.5 3 1.5c.3.6.7 1 1 1s.7-.4 1-1C13.5 10.5 14.5 10 16 10s3 1 3 2.5S18 16 17 17.5 13.5 21 12 21zM6.5 9C5.1 9 4 7.9 4 6.5S5.1 4 6.5 4 9 5.1 9 6.5 7.9 9 6.5 9zm4-2C9.7 7 9 6.3 9 5.5S9.7 4 10.5 4s1.5.7 1.5 1.5S11.3 7 10.5 7zm3 0c-.8 0-1.5-.7-1.5-1.5S12.7 4 13.5 4s1.5.7 1.5 1.5S14.3 7 13.5 7zm4 2C16.1 9 15 7.9 15 6.5S16.1 4 17.5 4 20 5.1 20 6.5 18.9 9 17.5 9z"/></svg>';
+
+      var traitHtml = (d.traitBreakdown || []).map(function(t) {
+        var traitValue = t.displayValue || t.value;
+        var traitCount = t.displayTraitCount != null ? t.displayTraitCount : t.traitCount;
+        var priceLabel = t.topSale != null
+          ? fmtDoge(t.topSale)
+          : (t.floor != null ? fmtDoge(t.floor) : 'unlisted');
+        var saleInfo = t.saleCount > 0
+          ? ' <span class="eval-trait-sale">(' + t.saleCount + ' sale' + (t.saleCount > 1 ? 's' : '') + ')</span>'
+          : '';
+        var countInfo = traitCount != null
+          ? ' <span class="eval-trait-count">(' + traitCount + '/10k)</span>'
+          : '';
+        var isUnlisted = t.topSale == null && t.floor == null;
+        var topSaleBadge = t.isTopSale
+          ? ' <span class="eval-top-sale-badge">' + pawSvg + 'TOP SALE</span>'
+          : '';
+        var trendingBadge = t.trending
+          ? ' <span class="eval-trending-badge">🔥 TRENDING ' + t.trending + 'x</span>'
+          : '';
+        var rareBadge = t.displayBadge
+          ? ' <span class="eval-rare-badge">' + esc(t.displayBadge) + '</span>'
+          : '';
+        var rowClass = 'eval-trait-chip' + (t.isTopSale ? ' top-sale-row' : '') + (t.trending ? ' trending-row' : '');
+        return '<div class="' + rowClass + '">' +
+          '<span class="eval-trait-key">' + esc(t.trait) + countInfo + '</span>' +
+          '<span class="eval-trait-val">' + esc(traitValue) + rareBadge + '</span>' +
+          '<span class="eval-trait-floor' + (isUnlisted ? ' unlisted' : '') + '">' +
+            priceLabel + saleInfo + topSaleBadge + trendingBadge +
+          '</span></div>';
+      }).join('');
+
+      var listingHtml = '';
+      if (la) {
+        listingHtml = '<div class="eval-listing">' +
+          '<h3 class="eval-section-title">Listing Analysis</h3>' +
+          '<div class="eval-listing-row">' +
+            '<div><span>Asking:</span> <strong>' + fmtDoge(la.askingPriceDoge) + '</strong></div>' +
+            '<div><span>vs Estimate:</span> <strong class="' + verdictColor(la.verdict) + '">' + (la.diffPercent > 0 ? '+' : '') + la.diffPercent + '%</strong></div>' +
+            '<div><strong class="' + verdictColor(la.verdict) + '">' + verdictIcon(la.verdict) + ' ' + esc(la.verdict) + '</strong></div>' +
+          '</div></div>';
+      }
+
+      resultEl.innerHTML =
+        '<div class="eval-card">' +
+          '<div class="eval-banner">' +
+            '<img src="' + esc(d.imageUrl) + '" alt="' + esc(d.name) + '" class="eval-dog-img" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+            '<div class="eval-dog-info">' +
+              '<div class="eval-dog-name">' + esc(d.name) + '</div>' +
+              (d.inscriptionId ? '<div class="eval-dog-id">' + esc(d.inscriptionId) + '</div>' : '') +
+              '<div class="eval-badges">' +
+                '<span class="eval-badge ' + (d.isListed ? 'eval-badge-listed' : 'eval-badge-unlisted') + '">' + (d.isListed ? 'Listed' : 'Not Listed') + '</span>' +
+                '<span class="eval-badge eval-badge-rarity">Rarity #' + fmt(d.rarityRank) + ' \u00B7 ' + esc(d.rarityLabel || '') + '</span>' +
+                (est.specialMultiplierDetails ? est.specialMultiplierDetails.map(detail => 
+                  '<span class="eval-badge eval-badge-special" title="' + esc(detail.label) + ' (' + detail.multiplier + 'x)">⚡ ' + esc(detail.label) + '</span>'
+                ).join('') : '') +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="eval-prices">' +
+            '<div class="eval-price-box"><div class="eval-price-label">Estimated Value</div><div class="eval-price-value">' + fmtDoge(displayedEstimatedDoge) + '</div>' + (displayedEstimatedUsd ? '<div class="eval-price-sub">' + fmtUsd(displayedEstimatedUsd) + '</div>' : '') + (est.displayEstimatedUsdNote ? '<div class="eval-price-note">' + esc(est.displayEstimatedUsdNote) + '</div>' : '') + '</div>' +
+            '<div class="eval-price-box"><div class="eval-price-label">Collection Floor</div><div class="eval-price-value white">' + fmtDoge(est.collectionFloor) + '</div>' + (est.dogeUsd && est.collectionFloor ? '<div class="eval-price-sub">' + fmtUsd(est.collectionFloor * est.dogeUsd) + '</div>' : '') + '</div>' +
+          '</div>' +
+
+          listingHtml +
+
+          (est.ownTopSale ? '<div class="eval-own-sale"><div class="eval-own-sale-media"><img src="../assets/DDSHOP.gif" alt="" /></div><div class="eval-own-sale-copy"><div class="eval-own-sale-label">This Dog Sold Recently</div><div class="eval-own-sale-value">Sold for ' + fmtDoge(est.ownTopSale) + '</div></div></div>' : '') +
+
+          '<div class="eval-traits">' +
+            '<h3 class="eval-section-title">Trait Breakdown</h3>' +
+            '<div class="eval-trait-grid">' + traitHtml + '</div>' +
+            '<div class="eval-trait-meta">' +
+              (est.rarestTrait ? '<span>Rarest: ' + esc(est.rarestTrait.value) + ' ' + esc(est.rarestTrait.trait) + ' (' + est.rarestTrait.count + '/10k)</span>' : '') +
+              (est.basePriceDoge ? '<span>Base price: ' + fmtDoge(est.basePriceDoge) + '</span>' : '') +
+              (est.traitBonus > 0 ? '<span>Trait bonus: +' + fmtDoge(est.traitBonus) + '</span>' : '') +
+              (est.valueMultiplier ? '<span>1/1 multiplier: ' + est.valueMultiplier + 'x</span>' : '') +
+              (est.trendingMultiplier ? '<span>🔥 Trending: ' + est.trendingMultiplier + 'x</span>' : '') +
+              (est.specialMultiplier ? '<span>⚡ Special: ' + est.specialMultiplier + 'x</span>' : '') +
+              '<span>Rarity multiplier: ' + (d.rarityMultiplier ? d.rarityMultiplier + 'x' : '\u2014') + '</span>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="eval-timestamp">Evaluated ' + new Date(d.evaluatedAt).toLocaleString() + '</div>' +
+        '</div>';
+    }
+
+    function renderWalletResult(d) {
+      clearStatus();
+
+      var totals = d.totals || {};
+      var balance = d.balance || {};
+      var profile = d.profile || null;
+      var breakdownHtml = renderWalletBreakdown(d.breakdown, totals);
+
+      var metaParts = [];
+      if (balance.total != null) {
+        metaParts.push('<span>Wallet balance: ' + fmtDoge(balance.total) + '</span>');
+      }
+      if (totals.floorEquivalentDoge != null) {
+        metaParts.push('<span>Collection floor equivalent: ' + fmtDoge(totals.floorEquivalentDoge) + (totals.floorEquivalentUsd != null ? ' · ' + fmtUsd(totals.floorEquivalentUsd) : '') + '</span>');
+      }
+      if (d.nonDoginalHoldings) {
+        metaParts.push('<span>Ignored non-Doginal holdings: ' + fmt(d.nonDoginalHoldings) + '</span>');
+      }
+      if (Array.isArray(d.failed) && d.failed.length) {
+        metaParts.push('<span>Skipped: ' + fmt(d.failed.length) + '</span>');
+      }
+
+      var summaryHtml = (d.totalDogs || 0) > 0
+        ? '<div class="eval-wallet-empty">Estimated from ' + fmt(d.totalDogs || 0) + ' Doginal Dog asset' + ((d.totalDogs || 0) === 1 ? '' : 's') + ' currently found in this wallet.</div>'
+        : '<div class="eval-wallet-empty">No Doginal Dog holdings were found for this wallet address.</div>';
+
+      resultEl.innerHTML =
+        '<div class="eval-card">' +
+          '<div class="eval-banner">' +
+            '<div class="eval-dog-info">' +
+              '<div class="eval-dog-name">Wallet Estimate</div>' +
+              '<div class="eval-dog-id">' + esc(d.address || '') + '</div>' +
+              '<div class="eval-badges">' +
+                '<span class="eval-badge eval-badge-rarity">' + fmt(d.totalDogs || 0) + ' Doginal Dog' + ((d.totalDogs || 0) === 1 ? '' : 's') + '</span>' +
+                '<span class="eval-badge ' + ((totals.listedCount || 0) > 0 ? 'eval-badge-listed' : 'eval-badge-unlisted') + '">' + fmt(totals.listedCount || 0) + ' listed</span>' +
+              '</div>' +
+            '</div>' +
+            renderWalletProfile(profile, d) +
+          '</div>' +
+
+          '<div class="eval-prices">' +
+            '<div class="eval-price-box"><div class="eval-price-label">Portfolio Estimate</div><div class="eval-price-value">' + fmtDoge(totals.estimatedDoge) + '</div>' + (totals.estimatedUsd != null ? '<div class="eval-price-sub">' + fmtUsd(totals.estimatedUsd) + '</div>' : '') + '</div>' +
+            '<div class="eval-price-box"><div class="eval-price-label">Listed Dog Total Value</div><div class="eval-price-value white">' + fmtDoge(totals.listedAskingDoge) + '</div>' + (totals.listedAskingUsd != null ? '<div class="eval-price-sub">' + fmtUsd(totals.listedAskingUsd) + '</div>' : '') + '</div>' +
+          '</div>' +
+
+          (metaParts.length ? '<div class="eval-wallet-meta">' + metaParts.join('') + '</div>' : '') +
+
+          '<div class="eval-traits">' +
+            '<h3 class="eval-section-title">Wallet Summary</h3>' +
+            summaryHtml +
+            breakdownHtml +
+          '</div>' +
+
+          '<div class="eval-timestamp">Evaluated ' + new Date(d.evaluatedAt).toLocaleString() + '</div>' +
+        '</div>';
+    }
+
+    async function buildWalletEstimate(address) {
+      var wallet = await getWalletEvaluation(address);
+      var dogNumbers = Array.isArray(wallet.dogNumbers) ? wallet.dogNumbers : [];
+      var breakdown = new Array(dogNumbers.length);
+      var totals = {
+        estimatedDoge: 0,
+        estimatedUsd: 0,
+        listedCount: 0,
+        listedAskingDoge: 0,
+        listedAskingUsd: 0,
+      };
+      var collectionFloorDoge = null;
+      var floorEquivalentDoge = null;
+      var floorEquivalentUsd = null;
+      var concurrency = 3;
+      var cursor = 0;
+
+      function effectiveEstimate(estimation) {
+        var estimatedDoge = estimation.displayEstimatedDoge != null ? estimation.displayEstimatedDoge : estimation.estimatedDoge;
+        var estimatedUsd = estimation.displayEstimatedUsd != null ? estimation.displayEstimatedUsd : estimation.estimatedUsd;
+        return {
+          estimatedDoge: estimatedDoge != null ? estimatedDoge : 0,
+          estimatedUsd: estimatedUsd != null ? estimatedUsd : 0
+        };
+      }
+
+      async function worker() {
+        while (cursor < dogNumbers.length) {
+          var currentIndex = cursor;
+          cursor += 1;
+          var evaluation = await getEvaluation(dogNumbers[currentIndex]);
+          var estimate = effectiveEstimate(evaluation.estimation || {});
+          breakdown[currentIndex] = {
+            dogNumber: dogNumbers[currentIndex],
+            estimatedDoge: estimate.estimatedDoge,
+            estimatedUsd: estimate.estimatedUsd != null ? +estimate.estimatedUsd.toFixed(2) : null
+          };
+          totals.estimatedDoge += estimate.estimatedDoge;
+          totals.estimatedUsd += estimate.estimatedUsd;
+
+          if (evaluation.listingAnalysis && evaluation.listingAnalysis.askingPriceDoge != null) {
+            totals.listedCount += 1;
+            totals.listedAskingDoge += evaluation.listingAnalysis.askingPriceDoge;
+            if ((evaluation.estimation || {}).dogeUsd != null) {
+              totals.listedAskingUsd += evaluation.listingAnalysis.askingPriceDoge * evaluation.estimation.dogeUsd;
+            }
+          }
+
+          if (collectionFloorDoge == null && evaluation.estimation && evaluation.estimation.collectionFloor != null) {
+            collectionFloorDoge = evaluation.estimation.collectionFloor;
+          }
+        }
+      }
+
+      await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, dogNumbers.length || 1)) }, function() { return worker(); }));
+
+      if (collectionFloorDoge != null) {
+        floorEquivalentDoge = collectionFloorDoge * dogNumbers.length;
+        if (totals.estimatedUsd && totals.estimatedDoge) {
+          floorEquivalentUsd = (totals.estimatedUsd / totals.estimatedDoge) * floorEquivalentDoge;
+        }
+      }
+
+      return {
+        address: wallet.address,
+        totalHoldings: wallet.totalHoldings,
+        totalDogs: wallet.totalDogs,
+        nonDoginalHoldings: wallet.nonDoginalHoldings,
+        balance: wallet.balance,
+        collections: wallet.collections,
+        dogNumbers: dogNumbers,
+        breakdown: breakdown.filter(function(entry) { return !!entry; }),
+        profile: wallet.profile || null,
+        totals: {
+          estimatedDoge: Math.round(totals.estimatedDoge),
+          estimatedUsd: totals.estimatedUsd ? +totals.estimatedUsd.toFixed(2) : null,
+          listedCount: totals.listedCount,
+          listedAskingDoge: Math.round(totals.listedAskingDoge),
+          listedAskingUsd: totals.listedAskingUsd ? +totals.listedAskingUsd.toFixed(2) : null,
+          floorEquivalentDoge: floorEquivalentDoge != null ? Math.round(floorEquivalentDoge) : null,
+          floorEquivalentUsd: floorEquivalentUsd != null ? +floorEquivalentUsd.toFixed(2) : null
+        },
+        evaluatedAt: new Date().toISOString()
+      };
+    }
+
+    /* ---------- fetch ---------- */
+    function getEvaluationUrls(dogNumber) {
+      var encoded = encodeURIComponent(dogNumber);
+      return [
+        API_BASE + '/api/dd-evaluator/evaluate/' + encoded,
+        API_BASE + '/api/dd-evaluator.php?action=evaluate&dogNumber=' + encoded
+      ];
+    }
+
+    function getWalletEvaluationUrls(address) {
+      var encoded = encodeURIComponent(address);
+      var phpUrl = API_BASE + '/api/dd-evaluator.php?action=wallet&address=' + encoded;
+      var routeUrl = API_BASE + '/api/dd-evaluator/wallet/' + encoded;
+      if (/kushmedia\.xyz$/i.test(window.location.hostname)) {
+        return [phpUrl, routeUrl];
+      }
+      return [routeUrl, phpUrl];
+    }
+
+    async function readApiError(res) {
+      var body = await res.json().catch(function() { return null; });
+      if (body && (body.error || body.message)) {
+        return body.error || body.message;
+      }
+      return 'Server returned ' + res.status;
+    }
+
+    async function getEvaluation(dogNumber) {
+      var urls = getEvaluationUrls(dogNumber);
+      var lastError = null;
+
+      for (var i = 0; i < urls.length; i += 1) {
+        try {
+          var res = await fetch(urls[i], {
+            headers: { accept: 'application/json' }
+          });
+
+          if (!res.ok) {
+            var message = await readApiError(res);
+            lastError = new Error(message);
+            if ((res.status === 404 || res.status >= 500) && i + 1 < urls.length) {
+              continue;
+            }
+            throw lastError;
+          }
+
+          var data = await res.json().catch(function() { return null; });
+          if (!data || typeof data !== 'object') {
+            lastError = new Error('DD evaluator backend returned an invalid response.');
+            if (i + 1 < urls.length) {
+              continue;
+            }
+            throw lastError;
+          }
+
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          return data;
+        } catch (err) {
+          lastError = err;
+          if (i + 1 < urls.length) {
+            continue;
+          }
+        }
+      }
+
+      throw lastError || new Error('DD evaluator backend is unavailable.');
+    }
+
+    async function getWalletEvaluation(address) {
+      var urls = getWalletEvaluationUrls(address);
+      var lastError = null;
+
+      for (var i = 0; i < urls.length; i += 1) {
+        try {
+          var res = await fetch(urls[i], {
+            headers: { accept: 'application/json' }
+          });
+
+          if (!res.ok) {
+            var message = await readApiError(res);
+            lastError = new Error(message);
+            if ((res.status === 404 || res.status >= 500) && i + 1 < urls.length) {
+              continue;
+            }
+            throw lastError;
+          }
+
+          var data = await res.json().catch(function() { return null; });
+          if (!data || typeof data !== 'object') {
+            lastError = new Error('DD evaluator backend returned an invalid wallet response.');
+            if (i + 1 < urls.length) {
+              continue;
+            }
+            throw lastError;
+          }
+
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          return data;
+        } catch (err) {
+          lastError = err;
+          if (i + 1 < urls.length) {
+            continue;
+          }
+        }
+      }
+
+      throw lastError || new Error('Wallet evaluator backend is unavailable.');
+    }
+
+    /* ---------- rank lookup ---------- */
+    async function lookupRank(rank) {
+      var urls = [
+        API_BASE + '/api/dd-evaluator/rank-lookup/' + encodeURIComponent(rank),
+        API_BASE + '/api/dd-evaluator.php?action=rank-lookup&rank=' + encodeURIComponent(rank)
+      ];
+      var lastError = null;
+      for (var i = 0; i < urls.length; i++) {
+        try {
+          var res = await fetch(urls[i], { headers: { accept: 'application/json' } });
+          if (!res.ok) {
+            var msg = await readApiError(res);
+            lastError = new Error(msg);
+            if (i + 1 < urls.length) continue;
+            throw lastError;
+          }
+          var data = await res.json();
+          if (data && data.dogNumber) return data.dogNumber;
+          lastError = new Error('Rank not found in snapshot.');
+          if (i + 1 < urls.length) continue;
+          throw lastError;
+        } catch (err) {
+          lastError = err;
+          if (i + 1 < urls.length) continue;
+        }
+      }
+      throw lastError || new Error('Rank lookup unavailable.');
+    }
+
+    /* ---------- main ---------- */
+    async function evaluate() {
+      if (searchMode === 'wallet') {
+        var walletAddress = sanitizeAddress(input.value);
+        if (!isLikelyWalletAddress(walletAddress)) {
+          showError('Please enter a valid wallet address.');
+          return;
+        }
+
+        showLoading();
+        try {
+          var walletData = await buildWalletEstimate(walletAddress);
+          renderWalletResult(walletData);
+        } catch (err) {
+          showError(err.message || 'Something went wrong. Please try again.');
+        }
+        return;
+      }
+
+      var num = sanitizeNumber(input.value);
+      if (!num || num < 1 || num > 10000) {
+        showError(searchMode === 'rank'
+          ? 'Please enter a valid rarity rank between 1 and 10,000.'
+          : 'Please enter a valid dog number between 1 and 10,000.');
+        return;
+      }
+      showLoading();
+      try {
+        var dogNumber = num;
+        if (searchMode === 'rank') {
+          dogNumber = await lookupRank(num);
+        }
+        var data = await getEvaluation(dogNumber);
+        renderResult(data);
+      } catch (err) {
+        showError(err.message || 'Something went wrong. Please try again.');
+      }
+    }
+
+    /* ---------- Market Pulse + KennelDAO carousel ---------- */
+    var marketPulseBody = document.getElementById('marketPulseBody');
+    var marketPulseToggle = document.getElementById('marketPulseToggle');
+    var marketPulseRefresh = document.getElementById('marketPulseRefresh');
+    var marketPulseMeta = document.getElementById('marketPulseMeta');
+    var marketPulseLoading = document.getElementById('marketPulseLoading');
+    var marketPulseEmpty = document.getElementById('marketPulseEmpty');
+    var marketPulseContent = document.getElementById('marketPulseContent');
+    var MP_UNAVAIL = 'Market pulse is unavailable right now. You can still evaluate a dog or wallet.';
+    var mpExpanded = false;
+
+    function mpTileHtml(dogNumber, priceDoge) {
+      var n = Number(dogNumber);
+      if (!Number.isFinite(n) || n < 1) return '';
+      var img = 'https://market.doginaldogs.com/dogs/' + encodeURIComponent(n) + '.png';
+      return (
+        '<button type="button" class="eval-mp-tile" data-dog="' + n + '">' +
+          '<img src="' + esc(img) + '" alt="" loading="lazy" />' +
+          '<span class="eval-mp-tile-num">#' + fmt(n) + '</span>' +
+          '<span class="eval-mp-tile-px">' + fmtDoge(priceDoge) + '</span>' +
+        '</button>'
+      );
+    }
+
+    function mpFetchJson(url) {
+      return fetch(url, { headers: { accept: 'application/json' } })
+        .then(function(res) {
+          if (!res.ok) return { ok: false, data: null, status: res.status };
+          return res.json().then(function(data) { return { ok: true, data: data, status: res.status }; });
+        })
+        .catch(function() { return { ok: false, data: null, status: 0 }; });
+    }
+
+    function mpFormatWhen(iso) {
+      if (!iso) return null;
+      try { return new Date(iso).toLocaleString(); } catch (_e) { return null; }
+    }
+
+    function mpRenderSections(floorRows, salesRows, metaLine) {
+      var floorHtml = (floorRows || []).map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
+      var saleHtml = (salesRows || []).map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
+      if (!floorHtml.length && !saleHtml.length) {
+        marketPulseEmpty.textContent = MP_UNAVAIL;
+        marketPulseEmpty.style.display = 'block';
+        marketPulseContent.style.display = 'none';
+        marketPulseMeta.textContent = metaLine || '';
+        return;
+      }
+      var html = '';
+      if (floorHtml.length) {
+        html += '<div class="eval-mp-section"><h3 class="eval-mp-h">Current floor listings</h3><div class="eval-mp-grid">' + floorHtml.join('') + '</div></div>';
+      }
+      if (saleHtml.length) {
+        html += '<div class="eval-mp-section"><h3 class="eval-mp-h">Top sales (recent activity)</h3><div class="eval-mp-grid">' + saleHtml.join('') + '</div></div>';
+      }
+      marketPulseContent.innerHTML = html;
+      marketPulseContent.style.display = 'block';
+      marketPulseEmpty.style.display = 'none';
+      marketPulseMeta.textContent = metaLine != null && metaLine !== '' ? metaLine : '';
+    }
+
+    function mpBindTiles() {
+      var root = marketPulseContent;
+      if (!root) return;
+      root.querySelectorAll('.eval-mp-tile[data-dog]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var d = parseInt(btn.getAttribute('data-dog'), 10);
+          if (!d) return;
+          searchMode = 'inscription';
+          modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === 'inscription'); });
+          syncModeTabs();
+          applySearchMode();
+          input.value = String(d);
+          evaluate();
+        });
+      });
+    }
+
+    async function loadMarketPulse() {
+      marketPulseLoading.style.display = 'block';
+      marketPulseEmpty.style.display = 'none';
+      marketPulseContent.style.display = 'none';
+      marketPulseContent.innerHTML = '';
+      marketPulseMeta.textContent = 'Loading\u2026';
+
+      var st = await mpFetchJson(API_BASE + '/api/dd-evaluator/snapshot/status');
+      var lr = await mpFetchJson(API_BASE + '/api/dd-evaluator/listings?limit=20');
+      var ar = await mpFetchJson(API_BASE + '/api/dd-evaluator/activity?limit=10');
+
+      var stData = st.ok && st.data ? st.data : null;
+      var listings = lr.ok && lr.data && !lr.data.error ? lr.data : null;
+      var act = ar.ok && ar.data && !ar.data.error ? ar.data : null;
+      var nodeUsable = listings && act && (stData == null || stData.ready !== false);
+
+      var floorRows = [];
+      var salesRows = [];
+      var metaLine = '';
+
+      if (nodeUsable) {
+        floorRows = (listings.listings || []).filter(function(x) { return x && x.dogNumber; });
+        salesRows = (act.sales || []).filter(function(x) { return x && x.dogNumber; });
+        if (stData && stData.builtAt) metaLine = 'Snapshot ' + mpFormatWhen(stData.builtAt);
+      }
+
+      if (!nodeUsable || (!floorRows.length && !salesRows.length)) {
+        var rPhp = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=market-pulse&offers=20&sales=10');
+        if (rPhp.ok && rPhp.data) {
+          var p = rPhp.data;
+          floorRows = (p.currentOffers || []).filter(function(x) { return x && x.dogNumber; });
+          salesRows = (p.topSales || []).filter(function(x) { return x && x.dogNumber; });
+          if (p.snapshot && p.snapshot.builtAt) {
+            metaLine = 'Data ' + mpFormatWhen(p.snapshot.builtAt) + ' (on-demand feed)';
+          } else if (p.generatedAt) {
+            metaLine = 'Refreshed ' + mpFormatWhen(p.generatedAt);
+          }
+        } else if (stData && stData.ready === false) {
+          if (!metaLine) metaLine = 'Snapshot not ready. Using on-demand data when available.';
+        }
+      }
+
+      marketPulseLoading.style.display = 'none';
+      mpRenderSections(floorRows, salesRows, metaLine);
+      mpBindTiles();
+    }
+
+    if (marketPulseToggle && marketPulseBody) {
+      marketPulseToggle.addEventListener('click', function() {
+        mpExpanded = !mpExpanded;
+        marketPulseBody.hidden = !mpExpanded;
+        marketPulseToggle.setAttribute('aria-expanded', mpExpanded ? 'true' : 'false');
+        marketPulseToggle.textContent = mpExpanded ? 'Collapse Board' : 'Expand Board';
+        if (mpExpanded) loadMarketPulse();
+      });
+    }
+    if (marketPulseRefresh) {
+      marketPulseRefresh.addEventListener('click', function() {
+        if (marketPulseBody && !marketPulseBody.hidden) loadMarketPulse();
+        else {
+          marketPulseBody.hidden = false;
+          mpExpanded = true;
+          if (marketPulseToggle) {
+            marketPulseToggle.setAttribute('aria-expanded', 'true');
+            marketPulseToggle.textContent = 'Collapse Board';
+          }
+          loadMarketPulse();
+        }
+      });
+    }
+
+    var KENNEL_SLIDES = [
+      {
+        line: 'Own a Fraction of a Doginal Dog',
+        sub: 'Fractional ownership on-chain. No wallet minimums.',
+        cta: 'Explore Fractions \u2192',
+        href: '../projects/kenneldao.html',
+        thumb: '../assets/188.png',
+      },
+      {
+        line: 'Doginal Fractions Are Live',
+        sub: 'Your DCA into the Bitcoin of NFTs, Doginal Dogs.',
+        cta: 'Lock In \u2192',
+        href: '../projects/kenneldao.html',
+        thumb: '../assets/188.png',
+      }
+    ];
+    var kennelIndex = 0;
+    var kennelTimer = null;
+    var kennelTrack = document.getElementById('kennelTrack');
+    var kennelViewport = document.getElementById('kennelViewport');
+    var kennelDots = document.getElementById('kennelDots');
+    var KENNEL_AUTO_MS = 8000;
+
+    function kennelBuild() {
+      if (!kennelTrack) return;
+      kennelTrack.innerHTML = KENNEL_SLIDES.map(function(s) {
+        return (
+          '<div class="eval-kennel-slide eval-glass-panel" style="box-shadow:none;margin:0;border-radius:0;background:transparent;border:0;backdrop-filter:none">' +
+            '<div>' +
+              '<p class="eval-kennel-badge">KENNELDAO</p>' +
+              '<p class="eval-kennel-h">' + esc(s.line) + '</p>' +
+              '<p class="eval-kennel-p">' + esc(s.sub) + '</p>' +
+              '<a class="eval-kennel-cta" href="' + esc(s.href) + '">' + esc(s.cta) + '</a>' +
+            '</div>' +
+            '<img class="eval-kennel-thumb" src="' + esc(s.thumb) + '" alt="" width="120" height="120" />' +
+          '</div>'
+        );
+      }).join('');
+
+      if (kennelDots) {
+        kennelDots.innerHTML = [0, 1, 2].map(function(i) {
+          var isFuture = i >= KENNEL_SLIDES.length;
+          return (
+            '<button type="button" class="eval-kennel-dot" role="tab" aria-label="Slide ' + (i + 1) + '" ' +
+            'aria-selected="' + (kennelIndex === i ? 'true' : 'false') + '" ' +
+            (isFuture ? 'disabled' : ' data-slide="' + i + '"') + '></button>'
+          );
+        }).join('');
+        kennelDots.querySelectorAll('button[data-slide]').forEach(function(dot) {
+          dot.addEventListener('click', function() {
+            goKennel(parseInt(dot.getAttribute('data-slide'), 10), true);
+          });
+        });
+      }
+      layoutKennel();
+    }
+
+    function layoutKennel() {
+      if (!kennelTrack || !kennelViewport) return;
+      var w = kennelViewport.offsetWidth;
+      if (!w) w = 320;
+      kennelTrack.querySelectorAll('.eval-kennel-slide').forEach(function(el) {
+        el.style.flex = '0 0 ' + w + 'px';
+        el.style.width = w + 'px';
+      });
+      goKennel(kennelIndex, false);
+    }
+
+    function goKennel(i, fromUser) {
+      if (i < 0 || i >= KENNEL_SLIDES.length) return;
+      kennelIndex = i;
+      if (fromUser) {
+        if (kennelTimer) clearInterval(kennelTimer);
+        kennelStartAuto();
+      }
+      if (kennelTrack && kennelViewport) {
+        var w = kennelViewport.offsetWidth || 320;
+        kennelTrack.style.transform = 'translateX(' + -i * w + 'px)';
+      }
+      if (kennelDots) {
+        kennelDots.querySelectorAll('button[role=tab]').forEach(function(b, j) {
+          b.setAttribute('aria-selected', j === kennelIndex ? 'true' : 'false');
+        });
+      }
+    }
+
+    function kennelStartAuto() {
+      if (kennelTimer) clearInterval(kennelTimer);
+      kennelTimer = setInterval(function() {
+        goKennel((kennelIndex + 1) % KENNEL_SLIDES.length, false);
+      }, KENNEL_AUTO_MS);
+    }
+
+    if (kennelTrack && kennelViewport) {
+      kennelBuild();
+      kennelStartAuto();
+      window.addEventListener('resize', function() { layoutKennel(); });
+      var kennelRoot = document.getElementById('kennelRoot');
+      if (kennelRoot) {
+        kennelRoot.addEventListener('mouseenter', function() { if (kennelTimer) clearInterval(kennelTimer); });
+        kennelRoot.addEventListener('mouseleave', kennelStartAuto);
+        kennelRoot.addEventListener('touchstart', function(e) { kennelRoot._tX = e.touches[0].clientX; }, { passive: true });
+        kennelRoot.addEventListener('touchend', function(e) {
+          if (e.changedTouches && kennelRoot._tX != null) {
+            var dx = e.changedTouches[0].clientX - kennelRoot._tX;
+            if (dx < -48) goKennel(Math.min(kennelIndex + 1, KENNEL_SLIDES.length - 1), true);
+            if (dx > 48) goKennel(Math.max(kennelIndex - 1, 0), true);
+          }
+          kennelRoot._tX = null;
+        }, { passive: true });
+      }
+    }
+
+    (function() {
+      var cta = document.getElementById('evalTipCta');
+      var modal = document.getElementById('evalTipModal');
+      var closeBtn = document.getElementById('evalTipModalClose');
+      var backdrop = document.getElementById('evalTipModalBackdrop');
+      if (!cta || !modal) return;
+      var prevFocus = null;
+
+      function openTip() {
+        prevFocus = document.activeElement;
+        modal.removeAttribute('hidden');
+        document.body.style.overflow = 'hidden';
+        (closeBtn || cta).focus();
+      }
+      function closeTip() {
+        modal.setAttribute('hidden', '');
+        document.body.style.overflow = '';
+        if (prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus();
+        prevFocus = null;
+      }
+
+      cta.addEventListener('click', function() { openTip(); });
+      if (closeBtn) closeBtn.addEventListener('click', closeTip);
+      if (backdrop) backdrop.addEventListener('click', closeTip);
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal && !modal.hasAttribute('hidden')) closeTip();
+      });
+
+      function copyToClipboard(text, btn) {
+        var orig = btn.textContent;
+        function markDone() {
+          btn.textContent = 'Copied!';
+          btn.classList.add('eval-tip-copied');
+          setTimeout(function() {
+            btn.textContent = orig;
+            btn.classList.remove('eval-tip-copied');
+          }, 2000);
+        }
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.setAttribute('readonly', '');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            if (document.execCommand('copy')) markDone();
+          } finally {
+            document.body.removeChild(ta);
+          }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(markDone).catch(fallback);
+        } else { fallback(); }
+      }
+
+      modal.querySelectorAll('.eval-tip-copy').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var t = btn.getAttribute('data-copy');
+          if (t) copyToClipboard(t, btn);
+        });
+      });
+    })();
+
+    form.addEventListener('submit', function(e) { e.preventDefault(); evaluate(); });
+    input.focus();
+  </script>
+</body>
+</html>
