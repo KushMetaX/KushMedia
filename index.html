@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KushMetaX — Loading</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/Kush.png">
+  <!-- Prefetch background videos for about page (cached during loading screen) -->
+  <link rel="prefetch" href="assets/videos/1.mp4">
+  <link rel="prefetch" href="assets/videos/2.mp4">
+  <link rel="prefetch" href="assets/videos/3.mp4">
+  <link rel="prefetch" href="assets/videos/4.mp4">
+</head>
+<body>
+  <main>
+    <section class="card">
+      <div class="avatar-wrap">
+        <div class="avatar-halo" aria-hidden="true"></div>
+        <div class="avatar" role="img" aria-label="avatar">
+          <img src="assets/Kush.png" alt="Kush avatar" class="avatar-img">
+        </div>
+      </div>
+
+      <h1 class="title">KushMetaX</h1>
+      <p class="subtitle">Welcome to the future of branding. Minimal, bold, and digital-first.</p>
+
+      <div class="progress-outer">
+        <div class="progress-border" aria-hidden="true">
+          <div class="progress-fill" id="progressFill"></div>
+          <div class="progress-content" id="progressContent">
+            <span class="progress-label" id="progressLabel">INITIALIZING</span>
+            <span class="progress-percent" id="progressPercent">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="vortex-wrap">
+        <div class="vortex-back-wrap">
+          <img src="assets/portal1.png" alt="portal back" class="vortex-back-img">
+        </div>
+        <div class="vortex-front-wrap">
+          <img src="assets/portal1.png" alt="portal front" class="vortex-front-img">
+          <button id="portalTrigger" class="portal-trigger" aria-label="Enter portal" disabled></button>
+        </div>
+        <video id="portalVideo" class="portal-video" preload="auto" src="assets/portal-animate.mp4" muted></video>
+      </div>
+    </section>
+  </main>
+
+  <!-- Skip button visible on the home/loading screen (hidden until READY) -->
+  <button class="skip-animation-btn skip-home-btn" id="skipHomeBtn" style="display:none" onclick="window.location.href='about.html'">SKIP ▶▶</button>
+
+  <script>
+    // Animate progress from 1 to 100% then show READY
+    (function(){
+      const fill = document.getElementById('progressFill');
+      const progressLabel = document.getElementById('progressLabel');
+      const progressPercent = document.getElementById('progressPercent');
+      const progressContent = document.getElementById('progressContent');
+      let current = 0;
+
+      const stepMs = 25;
+      const interval = setInterval(() => {
+        current += 1;
+        if (current > 100) current = 100;
+        fill.style.width = current + '%';
+        progressPercent.textContent = current + '%';
+
+        if (current >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            // show READY centered inside the bar
+            progressContent.classList.add('ready');
+            progressContent.innerHTML = '<span class="progress-ready">READY</span>';
+            // enable the portal trigger now that initialization is complete
+            const _trig = document.getElementById('portalTrigger');
+            if (_trig) {
+              _trig.disabled = false;
+              _trig.classList.add('ready-trigger');
+            }
+            // show the skip button now that loading is complete
+            const _skip = document.getElementById('skipHomeBtn');
+            if (_skip) { _skip.style.display = ''; }
+            fill.classList.add('ready-fill');
+          }, 500);
+        }
+      }, stepMs);
+    })();
+  </script>
+  
+  <script>
+    // Portal click -> create fullscreen overlay (originating at portal center), play video, then navigate
+    (function(){
+      const trigger = document.getElementById('portalTrigger');
+      const video = document.getElementById('portalVideo');
+      const vortex = document.querySelector('.vortex-wrap');
+
+      if (!trigger || !video || !vortex) return;
+
+      video.controls = false;
+      video.playsInline = true;
+
+      function createOverlay(originX, originY){
+        const overlay = document.createElement('div');
+        overlay.className = 'portal-overlay';
+        // set transform-origin to the portal center in viewport coordinates
+        overlay.style.setProperty('--portal-origin', `${originX}px ${originY}px`);
+        // preload about.html in an iframe so we can reveal it mid-video for a smooth crossfade
+        const iframe = document.createElement('iframe');
+        iframe.className = 'portal-iframe';
+        // add a cache-busting query so the iframe always fetches the latest about.html
+        iframe.src = 'about.html?cb=' + Date.now();
+        iframe.setAttribute('aria-hidden','true');
+        overlay.appendChild(iframe);
+        document.body.appendChild(overlay);
+        return overlay;
+      }
+
+      function fadeAudioIn(vid, targetVol, durationMs){
+        vid.volume = 0;
+        vid.muted = false;
+        const steps = 20;
+        const stepMs = durationMs / steps;
+        const inc = targetVol / steps;
+        let vol = 0;
+        const iv = setInterval(() => {
+          vol = Math.min(vol + inc, targetVol);
+          vid.volume = vol;
+          if (vol >= targetVol) clearInterval(iv);
+        }, stepMs);
+        return iv;
+      }
+
+      function fadeAudioOut(vid, durationMs, cb){
+        const steps = 20;
+        const stepMs = durationMs / steps;
+        const dec = vid.volume / steps;
+        const iv = setInterval(() => {
+          let v = vid.volume - dec;
+          if (v <= 0) { v = 0; clearInterval(iv); if (cb) cb(); }
+          vid.volume = v;
+        }, stepMs);
+        return iv;
+      }
+
+      function skipAnimation(overlay){
+        // hide the portal-animation skip button
+        const dynSkip = document.querySelector('.skip-animation-btn:not(.skip-home-btn)');
+        if (dynSkip) dynSkip.remove();
+        // fade out audio quickly
+        fadeAudioOut(video, 600);
+        overlay.classList.add('show-iframe','exit');
+        // wait for iframe to fully fade in before navigating
+        setTimeout(() => { window.location.href = 'about.html#from-portal'; }, 800);
+      }
+
+      function enterPortal(){
+        if (trigger.disabled) return;
+        trigger.disabled = true;
+
+        // hide the home skip button
+        const homeSkip = document.getElementById('skipHomeBtn');
+        if (homeSkip) homeSkip.style.display = 'none';
+
+        const rect = trigger.getBoundingClientRect();
+        const originX = Math.round(rect.left + rect.width / 2);
+        const originY = Math.round(rect.top + rect.height / 2);
+
+        const overlay = createOverlay(originX, originY);
+        // move video into overlay and show it
+        overlay.appendChild(video);
+        video.style.display = 'block';
+        video.currentTime = 0;
+
+        // add skip button to body (outside overlay to avoid transform stacking issues)
+        const skipBtn = document.createElement('button');
+        skipBtn.className = 'skip-animation-btn';
+        skipBtn.textContent = 'SKIP \u25B6\u25B6';
+        skipBtn.addEventListener('click', (e) => { e.stopPropagation(); skipAnimation(overlay); });
+        document.body.appendChild(skipBtn);
+
+        // force a reflow, then open overlay (scale up)
+        requestAnimationFrame(()=>{
+          overlay.classList.add('open');
+
+          // fade in audio (user gesture) over 800ms
+          try { fadeAudioIn(video, 0.9, 800); } catch(e){}
+
+          // start playback once overlay begins
+          const p = video.play();
+          if (p && typeof p.catch === 'function') {
+            p.catch(() => {
+              // playback failed: reveal iframe and navigate after a short delay
+              overlay.classList.add('show-iframe','exit');
+              setTimeout(() => { window.location.href = 'about.html'; }, 1000);
+            });
+          }
+        });
+
+        // Reveal about page and crossfade smoothly
+        let revealed = false;
+        function tryReveal(){
+          if (revealed) return;
+          const dur = video.duration;
+          if (!dur || isNaN(dur)) return;
+          if (video.currentTime >= dur * 0.6) {
+            revealed = true;
+            // hide the skip button during crossfade
+            if (skipBtn) skipBtn.remove();
+            // fade out audio over 1200ms
+            fadeAudioOut(video, 1200);
+            // reveal iframe underneath the video
+            overlay.classList.add('show-iframe');
+            // start fade-out animation for the video
+            overlay.classList.add('exit');
+
+            // navigate after crossfade completes smoothly
+            setTimeout(() => { window.location.href = 'about.html'; }, 1800);
+          }
+        }
+
+        // listen for progress to find the reveal point
+        video.addEventListener('timeupdate', tryReveal);
+
+        // also handle the case video ends earlier than expected
+        const onEnd = () => {
+          video.removeEventListener('timeupdate', tryReveal);
+          if (!revealed) {
+            revealed = true;
+            if (skipBtn) skipBtn.remove();
+            fadeAudioOut(video, 1200);
+            overlay.classList.add('show-iframe','exit');
+            setTimeout(() => { window.location.href = 'about.html#from-portal#from-portal'; }, 1800);
+          }
+        };
+        video.addEventListener('ended', onEnd);
+      }
+
+      trigger.addEventListener('click', enterPortal);
+      trigger.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') enterPortal(); });
+    })();
+  </script>
+</body>
+</html>

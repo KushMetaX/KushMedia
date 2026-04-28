@@ -1,0 +1,34 @@
+{
+  "dogNumber": 7742,
+  "name": "Doginal Dog #7742",
+  "inscriptionId": "80991ebd8cc02fb85cef76f51dd58d76042ea5fee22b711eb8414e4042d5394di0",
+  "inscriptionNumber": 61346877,
+  "imageUrl": "https://market.doginaldogs.com/dogs/7742.png",
+  "isListed": false,
+  "price": null,
+  "listingId": null,
+  "traits": {
+    "background": "Yellow",
+    "furColor": "Gray",
+    "furPattern": "Grey",
+    "head": "Sombrero",
+    "eyes": "Black",
+    "clothes": null,
+    "mouth": null,
+    "accessory": null
+  },
+  "colors": {
+    "background": "#ddb74a",
+    "fur": "#7d8591"
+  },
+  "rarityRank": 5529,
+  "rarityLabel": "Collector",
+  "traitCounts": {
+    "background": 1223,
+    "furColor": 991,
+    "furPattern": 130,
+    "head": 160,
+    "eyes": 3288
+  },
+  "scrapedAt": "2026-04-17T01:25:25.530Z"
+}

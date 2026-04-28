@@ -1,0 +1,77 @@
+# =============================================================================
+# /api/ - security additions (Wave 2 Server Hardening)
+# These additions DO NOT modify the existing rewrites below. The PHP
+# Hardening agent (Wave 2d) owns the functional rewrites. This block only
+# adds:
+#   - directory listing off
+#   - explicit deny on data/ (rank maps, .gitkeep, anything else dropped here)
+#   - explicit deny on backup/dotfile leaks even if the root .htaccess is
+#     stripped by a host that doesn't honour parent .htaccess inheritance
+#   - re-assert the baseline security headers in case parent inheritance
+#     is disabled (some LiteSpeed configs scope headers per-directory)
+# =============================================================================
+
+Options -Indexes -MultiViews
+
+# Don't serve api/data/* directly - it's read by the PHP scripts only.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^data(/|$) - [F,L,NC]
+</IfModule>
+
+# Re-assert dotfile / backup denies at this level too.
+<FilesMatch "^\.">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<FilesMatch "(?i)\.(bak|backup|old|orig|swp|swo|tmp|env|log|ndjson|sqlite3?|db|sh|ps1|cmd)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Re-assert the baseline security headers in case inheritance is off.
+# CSP intentionally NOT re-set here; the root .htaccess CSP is authoritative
+# and PHP scripts may override Content-Security-Policy themselves.
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()"
+  Header always unset X-Powered-By
+  Header unset X-Powered-By
+</IfModule>
+
+# =============================================================================
+# Existing functional rewrites (DO NOT MODIFY in this wave - owned by
+# the PHP Hardening agent, Wave 2d).
+# =============================================================================
+
+RewriteEngine On
+
+RewriteRule ^dd-evaluator/community/status/?$ dd-evaluator.php?action=community-status [L,QSA,NC]
+RewriteRule ^dd-evaluator/community/lore/([0-9]+)/?$ dd-evaluator.php?action=community-lore&dogNumber=$1 [L,QSA,NC]
+RewriteRule ^dd-evaluator/community/suggestions/?$ dd-evaluator.php?action=community-suggestions [L,QSA,NC]
+RewriteRule ^dd-evaluator/evaluate/([0-9]+)/?$ dd-evaluator.php?action=evaluate&dogNumber=$1 [L,QSA,NC]
+RewriteRule ^dd-evaluator/wallet/([A-Za-z0-9]+)/?$ dd-evaluator.php?action=wallet&address=$1 [L,QSA,NC]
+RewriteRule ^dd-evaluator/rank-lookup/([0-9]+)/?$ dd-evaluator.php?action=rank-lookup&rank=$1 [L,QSA,NC]
+RewriteRule ^dd-evaluator/snapshot/status/?$ dd-evaluator.php?action=snapshot_status [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/trending/?$ dd-evaluator.php?action=admin-trending [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/evaluations-import/?$ dd-evaluator.php?action=admin-evaluations-import [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/suggestions/([^\s/?#]+)/review/?$ dd-evaluator.php?action=admin-suggestions-review&suggestionId=$1 [L,NC]
+RewriteRule ^dd-evaluator/admin/suggestions/?$ dd-evaluator.php?action=admin-suggestions [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/community-notes/list/?$ dd-evaluator.php?action=admin-community-notes-list [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/community-notes/save/?$ dd-evaluator.php?action=admin-community-notes-save [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/community-notes/delete/?$ dd-evaluator.php?action=admin-community-notes-delete [L,QSA,NC]

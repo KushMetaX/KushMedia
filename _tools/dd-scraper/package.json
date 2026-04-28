@@ -1,0 +1,22 @@
+{
+  "name": "dd-scraper",
+  "version": "1.0.0",
+  "description": "Scrape Doginal Dogs inscription data, traits, and images from market.doginaldogs.com",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "scrape": "node scraper.js",
+    "scrape:all": "node scraper.js --all",
+    "scrape:range": "node scraper.js --range 1 100",
+    "scrape:images": "node scraper.js --images",
+    "scrape:single": "node scraper.js --dog 7742",
+    "market:listings": "node scraper.js --listings",
+    "market:floor": "node scraper.js --floor",
+    "market:activity": "node scraper.js --activity",
+    "market:traits": "node scraper.js --traits",
+    "market:price": "node scraper.js --price"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

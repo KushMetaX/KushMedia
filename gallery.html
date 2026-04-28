@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KushMetaX — Gallery</title>
+  <meta name="description" content="Visual gallery featuring artwork and creative work by KushMetaX.">
+  <link rel="icon" href="assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/Kush.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css">
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+        <span class="header-logo-text">KushMetaX</span>
+      </a>
+      <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== NAV OVERLAY ===== -->
+  <nav class="nav-overlay" aria-label="Main navigation">
+    <ul class="nav-list">
+      <li><a href="index.html" class="nav-link">Home</a></li>
+      <li><a href="about.html" class="nav-link">About</a></li>
+      <li><a href="gallery.html" class="nav-link">Gallery</a></li>
+      <li><a href="services.html" class="nav-link">Services</a></li>
+      <li><a href="dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="community-suggestions.html" class="nav-link">Community suggestions</a></li>
+      <li><a href="contact.html" class="nav-link">Connect</a></li>
+    </ul>
+  </nav>
+
+  <!-- ===== GALLERY ===== -->
+  <main class="page-body">
+    <section class="section">
+      <div class="container">
+        <h1 class="page-title">Gallery</h1>
+        <p class="page-subtitle">Visuals, artwork, and creative work from the KushMetaX universe.</p>
+
+        <div class="gallery-grid" id="galleryGrid">
+          <!-- Images loaded dynamically from /gallery/ folder -->
+        </div>
+        <p id="galleryEmpty" class="page-subtitle" style="text-align:center;margin-top:40px;display:none;">No media yet — drop images or videos into the <code>gallery/</code> folder and refresh.</p>
+
+        <!-- ===== TOP PERFORMING TWEETS ===== -->
+        <h2 class="section-heading">Top Performing Tweets</h2>
+        <p class="page-subtitle">The hardest-hitting posts from <a href="https://x.com/KushMetaX" target="_blank" rel="noopener noreferrer" class="inline-link">@KushMetaX</a> on X.</p>
+
+        <h3 class="tweet-category">Highest Engagement</h3>
+        <div class="tweets-grid">
+
+          <a href="https://x.com/KushMetaX/status/2006797738315493825" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Birth is taxed. Death is taxed. Even your income tax is taxed.</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 604</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 16.8K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2026361940868567404" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">It&rsquo;s bittersweet. I don&rsquo;t think any conspiracy theorist WANTED to be right. But it&rsquo;s nice to not be labelled as a nut job for critically thinking.</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 433</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 17.5K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2031780868037947690" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Phase 2</p>
+            <span class="tweet-badge">KennelDAO</span>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 329</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 23.8K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2033278268837691743" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Imagine 200 years of accepted slavery for people to control your every move meanwhile they eat babies &mdash; I guess what I&rsquo;m saying is, I&rsquo;m happy with the time we are given.</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 248</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> ~7K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2021317033711857929" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">This is real af. Conspiracy Theorists = Critical Thinkers</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 194</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 3.6K</span>
+            </div>
+          </a>
+
+        </div>
+
+        <h3 class="tweet-category">70K&ndash;100K+ Views</h3>
+        <div class="tweets-grid">
+
+          <a href="https://x.com/KushMetaX/status/2034368659984925162" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Denver Airport conspiracy thread</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 48</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> ~79K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2034411974881091668" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Denver Airport reply</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 82</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 51.6K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2032659358266343627" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Cowboy hat / JFK weirdness</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 28</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> ~75.7K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2032949030628573386" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">JFK weirdness reply</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 118</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 43.6K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2007910985726915063" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">It&rsquo;s legal crime season, Bark</p>
+            <span class="tweet-badge">Bark Media</span>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 78</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 17.3K</span>
+            </div>
+          </a>
+
+        </div>
+
+        <h3 class="tweet-category">Other Notable Bangers</h3>
+        <div class="tweets-grid">
+
+          <a href="https://x.com/KushMetaX/status/1858225014060859643" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Doginal Dogs adoption announcement</p>
+            <span class="tweet-badge">Doginal Dogs</span>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 128</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M4.75 3.79l4.603 4.3-1.706 1.82L6 8.38V19h-2V8.38L2.353 9.91.647 8.09l4.103-4.3zm11.5 16.42l-4.603-4.3 1.706-1.82L15 15.62V5h2v10.62l1.647-1.53 1.706 1.82-4.103 4.3z"/></svg> 41</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 3.2K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/1998743574859362424" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">30 years later and mfer still think his opinion matters</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 295</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 22.6K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2037179699747491944" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">What in the autism &mdash; I consider myself neurodivergent but how tf does this mean 10 days</p>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 72</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> 14.3K</span>
+            </div>
+          </a>
+
+          <a href="https://x.com/KushMetaX/status/2039506659840524573" target="_blank" rel="noopener noreferrer" class="tweet-card">
+            <div class="tweet-header">
+              <img src="assets/Kush.png" alt="" class="tweet-avatar" width="40" height="40">
+              <div class="tweet-author">
+                <span class="tweet-name">Kush <svg class="tweet-verified" viewBox="0 0 22 22" width="16" height="16"><path fill="#1d9bf0" d="M20.396 11c-.018-.646-.217-1.285-.6-1.83-.383-.544-.912-.953-1.527-1.18a4.308 4.308 0 0 0-.517-2.023 4.05 4.05 0 0 0-1.586-1.542c-.654-.37-1.395-.5-2.126-.405a4.04 4.04 0 0 0-1.612-1.607 4.042 4.042 0 0 0-4.263.164 4.05 4.05 0 0 0-1.493 1.7 4.076 4.076 0 0 0-2.14.464 4.04 4.04 0 0 0-1.524 1.522c-.43.72-.56 1.56-.38 2.36a4.06 4.06 0 0 0-.62 1.9c-.02.69.18 1.37.58 1.93.383.545.913.955 1.528 1.182.122.753.447 1.457.946 2.024a4.04 4.04 0 0 0 1.587 1.14c.324.147.67.245 1.025.294a4.04 4.04 0 0 0 1.613 1.608 4.042 4.042 0 0 0 4.263-.164 4.05 4.05 0 0 0 1.492-1.7 4.076 4.076 0 0 0 2.142-.465 4.04 4.04 0 0 0 1.524-1.52c.43-.72.56-1.56.38-2.36a4.06 4.06 0 0 0 .62-1.9zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246-5.683 6.206z"/></svg></span>
+                <span class="tweet-handle">@KushMetaX</span>
+              </div>
+              <svg class="tweet-x-logo" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </div>
+            <p class="tweet-text">Doginal Dogs rarity / #710</p>
+            <span class="tweet-badge">Doginal Dogs</span>
+            <div class="tweet-stats">
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.83C3.89 4.38 5.46 3.5 7.24 3.5c1.58 0 3.03.73 4.03 1.97L12 6.35l.73-.88a5.1 5.1 0 0 1 4.03-1.97c1.78 0 3.35.88 4.46 2.86 1.12 1.91 1.02 4.33-.34 6.83z"/></svg> 49</span>
+              <span class="tweet-stat"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="tweet-icon"><path d="M8.75 21V3h2v18h-2zM18.75 21V8h2v13h-2zM13.75 21v-9h2v9h-2zM3.75 21v-5h2v5h-2z"/></svg> High interest</span>
+            </div>
+          </a>
+
+        </div>
+
+        <div class="content-nav">
+          <a href="index.html">&larr; Home</a>
+          <a href="contact.html">Connect &rarr;</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-content">
+      <div class="footer-links">
+        <a href="https://doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Doginal Dogs</a>
+        <a href="https://market.doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Marketplace</a>
+      </div>
+      <div class="footer-social">
+        <a href="https://x.com/KushMetaX" target="_blank" rel="noopener noreferrer" aria-label="Follow @KushMetaX on X">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <a href="https://x.com/KennelDAO" target="_blank" rel="noopener noreferrer" aria-label="Follow @KennelDAO on X">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/@KushMetaX" target="_blank" rel="noopener noreferrer" aria-label="KushMetaX on YouTube">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="https://www.instagram.com/kushmetax/" target="_blank" rel="noopener noreferrer" aria-label="Follow @kushmetax on Instagram">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+        </a>
+      </div>
+      <p class="footer-copy">&copy; 2026 KushMetaX. All rights reserved.</p>
+      </div>
+      <div class="footer-mascot-wrap">
+        <span class="footer-mascot-text">KushMetaX</span>
+        <img src="assets/SWB.gif" alt="" class="footer-mascot">
+      </div>
+    </div>
+  </footer>
+
+  <script src="brand.js"></script>
+  <script>
+  // Load gallery images and videos from the /gallery/ folder via directory listing
+  (function(){
+    var grid = document.getElementById('galleryGrid');
+    var emptyMsg = document.getElementById('galleryEmpty');
+    var imgExts = /\.(jpe?g|png|gif|webp|svg|avif)$/i;
+    var vidExts = /\.(mp4|webm|mov|ogv)$/i;
+    var mediaExts = /\.(jpe?g|png|gif|webp|svg|avif|mp4|webm|mov|ogv)$/i;
+
+    fetch('gallery/')
+      .then(function(r){ return r.text(); })
+      .then(function(html){
+        // Python http.server returns an HTML directory listing — extract href values
+        var matches = html.match(/href="([^"]+)"/g) || [];
+        var files = [];
+        matches.forEach(function(m){
+          var name = m.replace('href="','').replace('"','');
+          try { name = decodeURIComponent(name); } catch(e){}
+          // Strip any leading path so we get just the filename
+          name = name.replace(/^.*\//, '');
+          if (mediaExts.test(name)) files.push(name);
+        });
+
+        if (!files.length) { emptyMsg.style.display = ''; return; }
+
+        files.sort(function(a,b){ return a.localeCompare(b); });
+        files.forEach(function(f){
+          var item = document.createElement('div');
+          item.className = 'gallery-item';
+
+          if (vidExts.test(f)) {
+            var vid = document.createElement('video');
+            vid.src = 'gallery/' + f;
+            vid.controls = true;
+            vid.preload = 'metadata';
+            vid.muted = true;
+            vid.playsInline = true;
+            item.appendChild(vid);
+          } else {
+            var img = document.createElement('img');
+            img.src = 'gallery/' + f;
+            img.alt = f.replace(imgExts,'').replace(/[-_]/g,' ');
+            img.loading = 'lazy';
+            item.appendChild(img);
+          }
+
+          grid.appendChild(item);
+        });
+      })
+      .catch(function(){
+        emptyMsg.style.display = '';
+      });
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+{
+    "version": 1,
+    "items": [
+        {
+            "id": "eeeca919-3879-4c60-b414-53b0f467c7f1",
+            "status": "rejected",
+            "kind": "trait_multiplier",
+            "payload": {
+                "traitKey": "furPattern",
+                "traitValue": "sadfsdf",
+                "multiplier": 1.1
+            },
+            "submittedAt": "2026-04-27T22:59:32+00:00",
+            "reviewedAt": "2026-04-27T23:06:02+00:00",
+            "reviewNote": null
+        },
+        {
+            "id": "f1f7f367-0d2f-4172-a4a1-d29af4506b29",
+            "status": "approved",
+            "kind": "lore_only",
+            "payload": {
+                "dogNumber": 7742,
+                "lore": "This is the dog of a legend, won in a waffle back in Nov.2024 and hasn’t moved since"
+            },
+            "submittedAt": "2026-04-27T23:50:55+00:00",
+            "reviewedAt": "2026-04-27T23:54:06+00:00",
+            "reviewNote": null,
+            "mergeResult": {
+                "dogNumber": 7742
+            }
+        },
+        {
+            "id": "7e8b6143-d23d-4625-8eb6-951857eeafad",
+            "status": "approved",
+            "kind": "lore_only",
+            "payload": {
+                "dogNumber": 7742,
+                "lore": "A fucking legend"
+            },
+            "submittedAt": "2026-04-28T00:03:01+00:00",
+            "reviewedAt": "2026-04-28T00:03:12+00:00",
+            "reviewNote": null,
+            "mergeResult": {
+                "dogNumber": 7742
+            }
+        },
+        {
+            "id": "8ad53e86-b87b-484f-8b02-ea62d97467b3",
+            "status": "approved",
+            "kind": "lore_only",
+            "payload": {
+                "dogNumber": 7742,
+                "lore": "A fucking legend"
+            },
+            "submittedAt": "2026-04-28T00:14:00+00:00",
+            "reviewedAt": "2026-04-28T00:14:14+00:00",
+            "reviewNote": null,
+            "mergeResult": {
+                "dogNumber": 7742
+            }
+        },
+        {
+            "id": "40d14a77-fc12-4736-a371-69f487362b43",
+            "status": "approved",
+            "kind": "lore_only",
+            "payload": {
+                "dogNumber": 7742,
+                "lore": "this is a test lore, this dog is the grail of all fkn grails"
+            },
+            "submittedAt": "2026-04-28T00:15:54+00:00",
+            "reviewedAt": "2026-04-28T00:16:02+00:00",
+            "reviewNote": null,
+            "mergeResult": {
+                "dogNumber": 7742
+            }
+        },
+        {
+            "id": "8347df0d-b10d-4857-8bc9-7aacd29d62ee",
+            "status": "approved",
+            "kind": "lore_only",
+            "payload": {
+                "dogNumber": 7742,
+                "lore": "test!!!!!\nThe legend inscription"
+            },
+            "submittedAt": "2026-04-28T00:24:35+00:00",
+            "reviewedAt": "2026-04-28T00:24:56+00:00",
+            "reviewNote": null,
+            "mergeResult": {
+                "dogNumber": 7742
+            }
+        },
+        {
+            "id": "2558b920-efed-4dbe-bd71-eec58b5f20c8",
+            "status": "approved",
+            "kind": "combo",
+            "payload": {
+                "label": "Tr8 Gang",
+                "multiplier": 1.15,
+                "conditions": [
+                    {
+                        "trait": "background",
+                        "op": "eq",
+                        "value": "Any"
+                    },
+                    {
+                        "trait": "furColor",
+                        "op": "eq",
+                        "value": "Any"
+                    },
+                    {
+                        "trait": "furPattern",
+                        "op": "eq",
+                        "value": "Any"
+                    }
+                ]
+            },
+            "submittedAt": "2026-04-28T04:25:35+00:00",
+            "reviewedAt": "2026-04-28T05:24:24+00:00",
+            "reviewNote": null,
+            "mergeResult": {
+                "comboId": "tr8-gang-2558b920efed"
+            }
+        }
+    ]
+}

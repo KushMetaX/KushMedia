@@ -1,0 +1,1114 @@
+/* ========================================================
+   Nail Designer v2 — Overhauled toggle-grid UI
+   ======================================================== */
+
+/* ── Page chrome ─────────────────────────────────────── */
+
+.nail-page {
+  position: relative;
+  padding-top: calc(var(--header-h) + 28px);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(248, 228, 158, 0.16), transparent 26%),
+    radial-gradient(circle at 82% 10%, rgba(255, 255, 255, 0.08), transparent 22%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+}
+
+.nail-page::before,
+.nail-page::after {
+  content: '';
+  position: fixed;
+  width: 32rem;
+  height: 32rem;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(94px);
+  opacity: 0.3;
+  z-index: 0;
+}
+
+.nail-page::before {
+  top: 5rem;
+  left: -10rem;
+  background: var(--nail-accent, #f8e49e);
+}
+
+.nail-page::after {
+  top: 18rem;
+  right: -14rem;
+  background: rgba(255,255,255,0.16);
+}
+
+.nail-designer-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+}
+
+.nail-page .section {
+  padding: 28px 0 44px;
+}
+
+/* ── Intro ───────────────────────────────────────────── */
+
+.nail-designer-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+
+.nail-overline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: rgba(247,244,234,0.78);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.nail-overline::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--nail-accent, #f8e49e);
+  box-shadow: 0 0 18px rgba(248, 228, 158, 0.6);
+}
+
+.nail-title {
+  margin-bottom: 8px;
+  font-family: var(--font-logo);
+  font-size: clamp(1.9rem, 4.6vw, 3.4rem);
+  line-height: 1.02;
+  letter-spacing: 0.03em;
+  color: var(--nail-text, #f7f4ea);
+}
+
+.nail-subtitle {
+  max-width: 46rem;
+  color: rgba(247,244,234,0.72);
+  font-size: 14px;
+}
+
+.nail-highlight-card {
+  min-width: 220px;
+  max-width: 300px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background:
+    linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)),
+    rgba(5, 5, 5, 0.76);
+  box-shadow: 0 18px 34px rgba(0,0,0,0.26);
+}
+
+.nail-brand-card {
+  display: grid;
+  gap: 10px;
+}
+
+.nail-brand-line {
+  color: var(--nail-accent, #f8e49e);
+  font-family: var(--font-logo);
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.nail-brand-mary-art {
+  width: 212px;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.nail-highlight-label {
+  color: rgba(247,244,234,0.62);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ── Shared panel chrome ─────────────────────────────── */
+
+.nail-panel {
+  padding: 22px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015)),
+    rgba(6,6,6,0.8);
+  box-shadow: 0 18px 34px rgba(0,0,0,0.24);
+  backdrop-filter: blur(16px);
+}
+
+.nail-panel h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  color: var(--nail-text, #f7f4ea);
+}
+
+.nail-panel p {
+  color: rgba(247,244,234,0.72);
+}
+
+/* ── Field tokens ────────────────────────────────────── */
+
+.nail-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nail-field label {
+  color: rgba(247,244,234,0.88);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.nail-field input,
+.nail-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background-color: rgba(255,255,255,0.04);
+  color: var(--nail-text, #f7f4ea);
+  font-size: 15px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.nail-field input::placeholder {
+  color: rgba(247,244,234,0.42);
+}
+
+.nail-field select {
+  appearance: none;
+  padding-right: 40px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23f7f4ea' d='M1.41 3.84 6 8.41l4.59-4.57L12 5.25 6 11.25 0 5.25z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px;
+}
+
+.nail-field input:focus,
+.nail-field select:focus {
+  outline: none;
+  border-color: var(--nail-accent, #f8e49e);
+  box-shadow: 0 0 0 3px rgba(248, 228, 158, 0.12);
+}
+
+.nail-field select option {
+  background: #f7f4ea;
+  color: #050505;
+}
+
+.nail-style-note {
+  min-height: 28px;
+  color: rgba(247,244,234,0.7);
+  font-size: 13px;
+}
+
+.nail-range {
+  width: 100%;
+  accent-color: var(--nail-accent, #f8e49e);
+}
+
+.nail-range-value {
+  color: var(--nail-accent, #f8e49e);
+  font-family: var(--font-logo);
+  font-size: 13px;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+
+.nail-generate-btn,
+.nail-export-btn,
+.nail-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--nail-accent, #f8e49e), #fff1bd);
+  color: #050505;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.nail-generate-btn:hover,
+.nail-export-btn:hover,
+.nail-download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 20px rgba(248, 228, 158, 0.24);
+}
+
+.nail-generate-btn:disabled,
+.nail-export-btn:disabled,
+.nail-download-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  box-shadow: none;
+  transform: none;
+}
+
+.nail-generate-btn--ai {
+  background: linear-gradient(135deg, #b388ff, #7c4dff);
+  color: #ffffff;
+}
+
+.nail-generate-btn--ai:hover {
+  box-shadow: 0 12px 20px rgba(179, 136, 255, 0.24);
+}
+
+.nail-reset-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(247,244,234,0.88);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nail-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Setup panel ─────────────────────────────────────── */
+
+.nd-setup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.nd-setup-form {
+  display: grid;
+  gap: 14px;
+}
+
+.nd-setup-fields {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.nd-setup-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Palette swatches ────────────────────────────────── */
+
+.nd-palette {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  flex-wrap: wrap;
+}
+
+.nd-palette-label {
+  color: rgba(247,244,234,0.56);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.nd-palette-swatches {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+}
+
+.nd-swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(247,244,234,0.8);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.nd-swatch.is-active {
+  border-color: var(--nail-accent, #f8e49e);
+  background: rgba(248,228,158,0.1);
+}
+
+.nd-swatch-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+  background: #888;
+  flex-shrink: 0;
+}
+
+.nd-swatch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nd-auto-color-btn {
+  margin-left: auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  color: var(--nail-accent, #f8e49e);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 160ms ease;
+}
+
+.nd-auto-color-btn:hover {
+  background: rgba(248,228,158,0.12);
+}
+
+/* ── Five-Nail Preview ───────────────────────────────── */
+
+.nd-preview {
+  position: relative;
+}
+
+.nd-preview-head {
+  margin-bottom: 14px;
+}
+
+.nd-preview-head h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  color: var(--nail-text, #f7f4ea);
+}
+
+.nd-preview-hint {
+  color: rgba(247,244,234,0.64);
+  font-size: 14px;
+  margin: 0;
+}
+
+.nd-nail-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.nd-nail-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 20px;
+  border: 2px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
+    rgba(10,10,10,0.72);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  cursor: pointer;
+}
+
+.nd-nail-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.26);
+}
+
+.nd-nail-card.is-active {
+  border-color: rgba(248,228,158,0.6);
+  box-shadow: 0 14px 28px rgba(248,228,158,0.14);
+}
+
+.nd-nail-label {
+  font-family: var(--font-logo);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(247,244,234,0.7);
+}
+
+.nd-nail-card.is-active .nd-nail-label {
+  color: var(--nail-accent, #f8e49e);
+}
+
+.nd-nail-canvas-wrap {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.nd-nail-canvas-wrap canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+}
+
+.nd-nail-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  border-radius: 14px;
+}
+
+.nd-nail-loading[hidden] {
+  display: none;
+}
+
+.nd-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(248,228,158,0.3);
+  border-top-color: var(--nail-accent, #f8e49e);
+  border-radius: 50%;
+  animation: nd-spin 0.7s linear infinite;
+}
+
+@keyframes nd-spin {
+  to { transform: rotate(360deg); }
+}
+
+.nd-nail-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nd-nail-color {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nd-nail-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.nd-nail-color::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+
+.nd-nail-color-label {
+  color: rgba(247,244,234,0.56);
+  font-size: 12px;
+}
+
+.nd-nail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 20px;
+}
+
+.nd-nail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  font-size: 11px;
+  color: rgba(247,244,234,0.72);
+}
+
+.nd-nail-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nail-accent, #f8e49e);
+}
+
+/* ── Asset Assignment Grid ───────────────────────────── */
+
+.nd-assets-head {
+  margin-bottom: 16px;
+}
+
+.nd-assets-head h2 {
+  margin-bottom: 6px;
+}
+
+.nd-asset-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) repeat(5, 1fr);
+  gap: 2px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.nd-asset-grid-header {
+  display: contents;
+}
+
+.nd-asset-grid-corner,
+.nd-asset-grid-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(247,244,234,0.64);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.nd-asset-grid-corner {
+  justify-content: flex-start;
+  padding-left: 14px;
+}
+
+.nd-asset-row {
+  display: contents;
+}
+
+.nd-asset-row-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.03);
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.nd-asset-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+.nd-asset-name {
+  color: rgba(247,244,234,0.84);
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nd-asset-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: rgba(255,255,255,0.02);
+  border-top: 1px solid rgba(255,255,255,0.04);
+  transition: background 140ms ease;
+}
+
+.nd-asset-cell:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.nd-asset-check {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--nail-accent, #f8e49e);
+  cursor: pointer;
+}
+
+/* ── Active Nail Controls ────────────────────────────── */
+
+.nd-active-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.nd-active-hint {
+  color: rgba(247,244,234,0.64);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.nd-active-assets {
+  display: grid;
+  gap: 14px;
+}
+
+.nd-active-asset-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+}
+
+.nd-active-asset-thumb {
+  flex-shrink: 0;
+}
+
+.nd-active-asset-name {
+  flex: 1;
+  min-width: 80px;
+}
+
+.nd-active-asset-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 10px;
+  image-rendering: pixelated;
+}
+
+.nd-active-asset-name {
+  color: var(--nail-text, #f7f4ea);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.nd-active-asset-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nd-active-asset-control label {
+  color: rgba(247,244,234,0.64);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.nd-active-asset-control input[type="range"] {
+  width: 80px;
+  accent-color: var(--nail-accent, #f8e49e);
+}
+
+.nd-active-asset-control button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(247,244,234,0.78);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nd-active-asset-control button:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.nd-active-asset-control button.is-on {
+  background: rgba(248,228,158,0.14);
+  color: var(--nail-accent, #f8e49e);
+  border-color: rgba(248,228,158,0.3);
+}
+
+.nd-active-empty {
+  padding: 20px;
+  text-align: center;
+  color: rgba(247,244,234,0.48);
+  font-size: 14px;
+}
+
+/* ── Output panel ────────────────────────────────────── */
+
+.nd-output-head {
+  margin-bottom: 16px;
+}
+
+.nd-output-body {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.nd-meta {
+  display: grid;
+  gap: 12px;
+}
+
+.nail-meta-row {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.nail-meta-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.nail-meta-label {
+  color: rgba(247,244,234,0.54);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.nail-meta-value {
+  color: var(--nail-text, #f7f4ea);
+  font-size: 15px;
+}
+
+.nail-trait-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.nail-trait-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: rgba(247,244,234,0.8);
+  font-size: 13px;
+}
+
+.nd-export {
+  display: grid;
+  gap: 12px;
+}
+
+.nail-download-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.nail-download-btn {
+  font-size: 13px;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+/* ── Status pill ─────────────────────────────────────── */
+
+.nail-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.05);
+  color: rgba(247,244,234,0.78);
+}
+
+.nail-status[data-tone='success'] {
+  background: rgba(110,194,126,0.14);
+  color: #9be0a4;
+}
+
+.nail-status[data-tone='warning'] {
+  background: rgba(248,228,158,0.18);
+  color: #f8e49e;
+}
+
+.nail-status[data-tone='error'] {
+  background: rgba(196,69,54,0.2);
+  color: #efaa9f;
+}
+
+.nail-status[data-tone='loading'] {
+  background: rgba(255,255,255,0.07);
+  color: rgba(247,244,234,0.86);
+}
+
+/* ── Custom select dropdown ──────────────────────────── */
+
+.nail-field--select {
+  position: relative;
+}
+
+.nail-native-select {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nail-select-shell {
+  position: relative;
+  z-index: 2;
+}
+
+.nail-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background-color: rgba(255,255,255,0.04);
+  color: var(--nail-text, #f7f4ea);
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  transition: border-color 160ms ease;
+}
+
+.nail-select-trigger:hover {
+  border-color: rgba(255,255,255,0.22);
+}
+
+.nail-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--nail-accent, #f8e49e);
+  box-shadow: 0 0 0 3px rgba(248, 228, 158, 0.12);
+}
+
+.nail-select-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nail-select-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.nail-select-icon {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  transition: transform 180ms ease;
+}
+
+.nail-select-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.is-open > .nail-select-trigger .nail-select-icon {
+  transform: rotate(180deg);
+}
+
+.nail-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(30,28,26,0.98), rgba(18,16,14,0.98)),
+    rgba(6,6,6,0.96);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.44);
+  backdrop-filter: blur(18px);
+  z-index: 100;
+  display: none;
+}
+
+.is-open > .nail-select-menu {
+  display: block;
+}
+
+.nail-select-option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(247,244,234,0.82);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.nail-select-option:hover,
+.nail-select-option:focus-visible {
+  background: rgba(255,255,255,0.08);
+  outline: none;
+}
+
+.nail-select-option.is-selected {
+  background: rgba(248,228,158,0.14);
+  color: var(--nail-accent, #f8e49e);
+  font-weight: 600;
+}
+
+.nail-select-option.is-disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+
+@media (max-width: 980px) {
+  .nd-setup-fields {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nd-nail-strip {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+
+  .nail-designer-intro {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nail-highlight-card {
+    max-width: none;
+    width: 100%;
+  }
+
+  .nd-output-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .nd-nail-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .nd-asset-grid {
+    font-size: 12px;
+  }
+
+  .nd-asset-grid-corner,
+  .nd-asset-grid-col {
+    padding: 8px 4px;
+    font-size: 10px;
+  }
+
+  .nd-active-asset-row {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .nd-active-asset-control {
+    flex-basis: calc(50% - 8px);
+  }
+}
+
+@media (max-width: 640px) {
+  .nd-setup-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .nd-nail-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nd-nail-strip .nd-nail-card:nth-child(5) {
+    grid-column: 1 / -1;
+    max-width: 50%;
+    justify-self: center;
+  }
+
+  .nail-download-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .nail-panel {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .nd-palette {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nd-palette-swatches {
+    flex-wrap: wrap;
+  }
+
+  .nd-auto-color-btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .nail-title {
+    font-size: clamp(1.72rem, 10vw, 2.4rem);
+  }
+
+  .nd-nail-strip {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .nail-panel h2 {
+    font-size: 18px;
+  }
+
+  .nd-asset-grid {
+    grid-template-columns: minmax(80px, 120px) repeat(5, 1fr);
+  }
+}

@@ -1,0 +1,180 @@
+# =============================================================================
+# kushmedia.xyz - Root .htaccess (Wave 2 Server Hardening)
+# Apache + LiteSpeed compatible. Defence-in-depth: even if a misconfigured
+# host serves the doc root in a way that exposes repo internals, every
+# sensitive path/extension below returns 403 and every response carries the
+# baseline security headers + a Content-Security-Policy.
+#
+# Policy:
+#   - Permissive CSP active so day-one nothing breaks (inline scripts allowed).
+#   - Strict CSP commented at the bottom; flip it on after the Frontend
+#     Refactor + Verification waves confirm zero inline scripts remain.
+#   - api/.htaccess inherits the headers/denies but keeps its own routing.
+#   - server/.htaccess hard-denies the entire /server/ tree.
+# =============================================================================
+# -----------------------------------------------------------------------------
+# 1. Indexing / content negotiation off
+# -----------------------------------------------------------------------------
+Options -Indexes -MultiViews
+<IfModule mod_autoindex.c>
+  IndexIgnore *
+</IfModule>
+DirectoryIndex index.html index.htm
+# -----------------------------------------------------------------------------
+# 2. Block dotfiles (.git, .env*, .htaccess access, .DS_Store, ...)
+# -----------------------------------------------------------------------------
+<FilesMatch "^\.">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+# -----------------------------------------------------------------------------
+# 3. Block sensitive file extensions anywhere in the tree
+# -----------------------------------------------------------------------------
+<FilesMatch "(?i)\.(bak|backup|old|orig|swp|swo|tmp|env|log|ndjson|sqlite|sqlite3|db|sh|ps1|cmd)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+# Block dotenv variants like .env.local, .env.production
+<FilesMatch "(?i)^\.env(\..*)?$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+</FilesMatch>
+# -----------------------------------------------------------------------------
+# 4. Block known sensitive filenames at any depth
+# -----------------------------------------------------------------------------
+<FilesMatch "(?i)^(package(-lock)?\.json|composer(\.lock)?\.json|yarn\.lock|pnpm-lock\.yaml|Procfile|ecosystem(\..+)?\.cjs|.+\.config\.(c?js|mjs|ts)|README\.md|DEPLOYMENT\.md|CHANGELOG\.md|.+\.md|server\.env)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+# -----------------------------------------------------------------------------
+# 5. Block whole directory trees that have no business being public.
+#    Uses mod_rewrite so it works even where <Directory> isn't allowed.
+#    Note: /api/ and /assets/ and /components/ are intentionally NOT blocked -
+#    they ship the live site. /components/ filenames are still filtered by
+#    the FilesMatch rules above (no .bak, no .md, no .git inside).
+# -----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # /server/* (Node app data + admin password file)
+  RewriteRule ^server(/|$)                                - [F,L,NC]
+  # /node_modules/* (full dependency disclosure if served)
+  RewriteRule ^node_modules(/|$)                          - [F,L,NC]
+  # SecretWeapon (duplicate site fork) and its former standalone variant
+  RewriteRule ^SecretWeapon                               - [F,L,NC]
+  # Internal tooling (not web-facing)
+  RewriteRule ^_tools(/|$)                                 - [F,L,NC]
+  # Legacy path (old folder name)
+  RewriteRule ^DD(%20|\ )Price(%20|\ )Evaluation          - [F,L,NC]
+  # Cursor / VCS / editor caches at any depth
+  RewriteRule (^|/)(\.git|\.github|\.vscode|\.idea|\.cursor)(/|$) - [F,L,NC]
+  # Anything ending in .bak / .env / .ndjson / .log at any depth
+  # (defence-in-depth, also caught by FilesMatch above)
+  RewriteRule \.(bak|backup|old|orig|env|ndjson|log|sqlite3?|db)$ - [F,L,NC]
+</IfModule>
+# -----------------------------------------------------------------------------
+# 6. Baseline security headers - applied to every response, including 4xx/5xx.
+# -----------------------------------------------------------------------------
+<IfModule mod_headers.c>
+  # HTTPS-only forever (1 year, includeSubDomains).
+  # Add `; preload` only after submitting to the HSTS preload list.
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  # Disable MIME sniffing.
+  Header always set X-Content-Type-Options "nosniff"
+  # Click-jacking off (frame-ancestors in CSP also enforces this).
+  Header always set X-Frame-Options "DENY"
+  # Don't leak full URLs as referers across origins.
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  # Cross-origin isolation defaults.
+  Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  # Powerful-feature opt-out.
+  Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()"
+  # Reduce server fingerprint where the runtime allows it.
+  Header always unset X-Powered-By
+  Header unset X-Powered-By
+  Header always unset Server
+  Header unset Server
+  # ---------------------------------------------------------------------------
+  # 6a. ACTIVE Content-Security-Policy (PERMISSIVE)
+  # ---------------------------------------------------------------------------
+  # Allows inline <script> blocks so day-one rendering is unaffected while
+  # the Frontend Refactor wave extracts inline JS into /assets/js/*.js.
+  # The connect-src allowlist was computed by the Probe Agent from a grep
+  # of every HTML/JS asset (see docs/security/deployment-facts.md).
+  # ---------------------------------------------------------------------------
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-elem 'self' 'unsafe-inline'; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai https://therovers.xyz; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  # ---------------------------------------------------------------------------
+  # 6b. STRICT Content-Security-Policy (DISABLED - flip on after refactor)
+  # ---------------------------------------------------------------------------
+  # Removes 'unsafe-inline' from script-src. Pre-conditions:
+  #   1. Frontend Refactor Agent has extracted ALL inline <script> from
+  #      admin.html, orders.html, services.html, and any other page.
+  #   2. Verification Agent confirms zero inline-script CSP violations
+  #      (run report-only first, then promote).
+  # To activate: comment out 6a above and uncomment the Header line below.
+  # ---------------------------------------------------------------------------
+  # Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-elem 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  # Optional: report-only mirror to collect violations without breaking pages.
+  # Uncomment together with the strict policy above to run them in parallel
+  # for one deploy cycle, then remove report-only and switch the strict one
+  # to enforced.
+  # Header always set Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; ..."
+</IfModule>
+# -----------------------------------------------------------------------------
+# 7. Charset / MIME hygiene
+# -----------------------------------------------------------------------------
+AddDefaultCharset utf-8
+<IfModule mod_mime.c>
+  AddType application/javascript .js .mjs
+  AddType text/css              .css
+  AddType image/svg+xml         .svg .svgz
+  AddType application/json      .json
+  AddType audio/mpeg            .mp3
+  AddType video/mp4             .mp4
+</IfModule>
+# -----------------------------------------------------------------------------
+# 8. Disable HTTP TRACE (avoid XST)
+# -----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)$
+  RewriteRule .* - [F,L]
+</IfModule>
+# -----------------------------------------------------------------------------
+# 9. Force HTTPS - DISABLED by default
+#    The probe agent confirmed the APISIX edge already 301-redirects
+#    http -> https. Enabling this here without verifying that APISIX sets
+#    X-Forwarded-Proto: https would create a redirect loop. If you confirm
+#    the header is set (or move off APISIX), uncomment to add belt+suspenders.
+# -----------------------------------------------------------------------------
+# <IfModule mod_rewrite.c>
+#   RewriteCond %{HTTPS} !=on
+#   RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+#   RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+# </IfModule>
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/kushmetax/public_html/public"
+PassengerBaseURI "/"
+PassengerNodejs "/home/kushmetax/nodevenv/public_html/public/20/bin/node"
+PassengerAppType node
+PassengerStartupFile server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+# Environment secrets: set in the hosting control panel (LiteSpeed/cPanel
+# "Environment Variables"), or use gitignored files under server/data/
+# (.dd-admin-password, .dd-admin-ui-password, .dd-community-password).
+# Never commit passwords in this file.

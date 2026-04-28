@@ -1,0 +1,14 @@
+assets/videos/
+assets/audio/
+assets/videos/
+assets/tile-cnc/*.mp4
+gallery/*.mp4
+gallery/*.zip
+gallery/
+server/data/.dd-admin-password
+server/data/.dd-admin-ui-password
+server/data/.dd-community-password
+# Runtime / host noise (do not commit)
+**/api/error_log
+**/public/stderr.log
+**/node_modules.zip

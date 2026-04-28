@@ -1,0 +1,125 @@
+{
+    "manualMultipliers": {
+        "head:Wizard": 1.5,
+        "head:Beret": 1.25,
+        "clothes:Suit": 1.5,
+        "furColor:Orange": 1,
+        "furPattern:Split": 1.15,
+        "eyes:Pink": 1.15,
+        "eyes:Mixed": 1.16,
+        "eyes:Blue": 1.17,
+        "furColor:Yellow": 1.16,
+        "clothes:Shirt": 1.25,
+        "furPattern:Husky": 1.25,
+        "furPattern:Boxer": 1.25,
+        "eyes:Sunglasses": 2,
+        "furColor:Gold": 1.5
+    },
+    "refusedOffers": {
+        "9098": {
+            "dogNumber": 9098,
+            "minOfferUsd": 100000,
+            "minOfferDoge": null,
+            "note": "Turned down in live X space",
+            "updatedAt": "2026-04-28T00:44:07+00:00",
+            "updatedBy": "admin.html"
+        }
+    },
+    "autoTrend": {
+        "enabled": true,
+        "maxTraitCount": 500,
+        "minSaleCount": 4,
+        "minSalesPercent": 0.005,
+        "saleWeight": 0.06,
+        "salesPercentWeight": 10,
+        "listingWeight": 1.5,
+        "maxMultiplier": 1.75,
+        "disabledTrendKeys": [
+            "head:Snapback",
+            "furPattern:Spotted"
+        ]
+    },
+    "specialMultipliers": {
+        "colorMatch": {
+            "enabled": true,
+            "multiplier": 1.1
+        },
+        "minimalTiers": {
+            "black_classic_visor": {
+                "enabled": true,
+                "multiplier": 1.5
+            },
+            "black_classic": {
+                "enabled": true,
+                "multiplier": 1.25
+            },
+            "visor_minimal": {
+                "enabled": true,
+                "multiplier": 1.25
+            },
+            "ultra_clean": {
+                "enabled": true,
+                "multiplier": 1.2
+            },
+            "minimal_1": {
+                "enabled": true,
+                "multiplier": 1.1
+            },
+            "minimal_2": {
+                "enabled": true,
+                "multiplier": 1.05
+            }
+        },
+        "combos": [
+            {
+                "id": "tr8-gang-2558b920efed",
+                "label": "Tr8 Gang",
+                "conditions": [
+                    {
+                        "trait": "background",
+                        "op": "eq",
+                        "value": "Any"
+                    },
+                    {
+                        "trait": "furColor",
+                        "op": "eq",
+                        "value": "Any"
+                    },
+                    {
+                        "trait": "furPattern",
+                        "op": "eq",
+                        "value": "Any"
+                    }
+                ],
+                "multiplier": 1.15,
+                "enabled": true
+            }
+        ],
+        "angelNumbers": {
+            "quadRepeater": {
+                "enabled": true,
+                "multiplier": 1.25
+            },
+            "tripleRepeater": {
+                "enabled": true,
+                "multiplier": 1.15
+            },
+            "trendNumbers": {
+                "67": {
+                    "enabled": true,
+                    "multiplier": 1.1
+                },
+                "69": {
+                    "enabled": true,
+                    "multiplier": 1.1
+                },
+                "420": {
+                    "enabled": true,
+                    "multiplier": 1.1
+                }
+            }
+        }
+    },
+    "updatedAt": "2026-04-28T05:24:24+00:00",
+    "updatedBy": "community-approve"
+}

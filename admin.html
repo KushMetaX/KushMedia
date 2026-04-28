@@ -1,0 +1,2770 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KushMetaX &#8212; Admin</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="../assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="../assets/Kush.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css">
+  <style>
+    .dd-settings{margin-top:2.5rem;padding-top:2rem;border-top:1px solid rgba(255,255,255,.08)}
+    .dd-settings-copy{color:#8d8d8d;font-size:.92rem;max-width:54rem;margin:.35rem 0 0}
+    .dd-settings-actions{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center}
+    .dd-settings-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
+    .dd-settings-card{padding:1rem;border:1px solid rgba(255,255,255,.08);border-radius:1rem;background:rgba(255,255,255,.02)}
+    .dd-settings-label{display:block;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;margin-bottom:.45rem}
+    .dd-settings-help{color:#7a7a7a;font-size:.8rem;line-height:1.5;margin-top:.4rem}
+    .dd-settings-card input[type="number"],.dd-settings-toolbar input[type="search"]{width:100%;padding:.7rem .85rem;border-radius:.8rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff}
+    .dd-settings-card input[type="checkbox"]{transform:scale(1.1);accent-color:#d4af37}
+    .dd-settings-toggle{display:flex;align-items:center;gap:.6rem;color:#fff;font-weight:600}
+    .dd-settings-toolbar{display:flex;gap:1rem;align-items:flex-end;justify-content:space-between;margin-top:1.5rem;flex-wrap:wrap}
+    .dd-settings-toolbar .form-group{min-width:260px;flex:1}
+    .dd-settings-meta{color:#8d8d8d;font-size:.82rem}
+    .dd-settings-status{margin-top:1rem;padding:.85rem 1rem;border-radius:.85rem;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:#ddd}
+    .dd-settings-status.error{border-color:rgba(220,80,80,.35);background:rgba(220,80,80,.12);color:#ffb4b4}
+    .dd-settings-status.success{border-color:rgba(80,190,120,.35);background:rgba(80,190,120,.12);color:#b8ffcb}
+    .dd-settings-tabs{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:1.25rem;padding:.4rem;border:1px solid rgba(255,255,255,.08);border-radius:1rem;background:rgba(255,255,255,.02)}
+    .dd-settings-tab{padding:.72rem .95rem;border-radius:.8rem;border:1px solid transparent;background:transparent;color:#9a9a9a;font-size:.78rem;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+    .dd-settings-tab:hover{background:rgba(255,255,255,.04);color:#fff}
+    .dd-settings-tab.active{background:#111;border-color:rgba(212,175,55,.35);color:#f7d37a}
+    .dd-settings-panel[hidden]{display:none !important}
+    .dd-settings-table-wrap{margin-top:1rem;overflow:auto;border:1px solid rgba(255,255,255,.08);border-radius:1rem;background:rgba(255,255,255,.02)}
+    .dd-settings-table{width:100%;border-collapse:collapse;min-width:960px}
+    .dd-settings-table th,.dd-settings-table td{padding:.85rem .9rem;border-top:1px solid rgba(255,255,255,.06);text-align:left;vertical-align:middle}
+    .dd-settings-table thead th{border-top:0;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:#888;background:rgba(255,255,255,.03)}
+    .dd-settings-table tbody tr:hover{background:rgba(255,255,255,.025)}
+    .dd-settings-table input[type="number"],.dd-settings-table input[type="text"]{width:100%;padding:.65rem .75rem;border-radius:.75rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff}
+    .dd-settings-pill{display:inline-flex;align-items:center;justify-content:center;padding:.3rem .55rem;border-radius:999px;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid currentColor}
+    .dd-settings-pill.manual{color:#f7d37a;background:rgba(212,175,55,.08)}
+    .dd-settings-pill.auto{color:#8ee7ff;background:rgba(80,180,255,.08)}
+    .dd-settings-pill.mixed{color:#c9b0ff;background:rgba(146,90,255,.08)}
+    .dd-settings-pill.suppressed{color:#ffb882;background:rgba(255,140,80,.08)}
+    .dd-settings-pill.none{color:#777;background:rgba(255,255,255,.04)}
+    .dd-settings-manual{width:88px;padding:.55rem .65rem;border-radius:.7rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff}
+    .dd-settings-small{color:#8d8d8d;font-size:.76rem}
+    .dd-settings-subsection{margin-top:1.5rem}
+    .dd-settings-subhead{display:flex;gap:1rem;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;margin-bottom:.9rem}
+    .dd-settings-subtitle{margin:0;color:#fff;font-size:1rem}
+    .dd-settings-inline-note{display:block;margin-top:.35rem;color:#7a7a7a;font-size:.72rem;line-height:1.4}
+    .dd-settings-textarea{width:100%;min-height:220px;padding:.85rem .95rem;border-radius:1rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff;resize:vertical;font:inherit;line-height:1.5;margin-top:1rem}
+    .dd-settings-import-grid{display:grid;grid-template-columns:minmax(160px,220px) minmax(0,1fr);gap:1rem;align-items:end;margin-top:1rem}
+    .dd-community-stack{display:flex;align-items:center;gap:.8rem}
+    .dd-community-thumb{width:52px;height:52px;border-radius:.8rem;background:#111;object-fit:cover;flex:0 0 auto}
+    .dd-community-name{color:#fff;font-weight:600}
+    .dd-community-usd{white-space:nowrap}
+    .dd-settings-remove{white-space:nowrap}
+    .dd-trait-action{white-space:nowrap;text-align:right}
+    .dd-trait-actions{display:flex;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}
+    .dd-trait-save{min-width:76px}
+    .dd-trait-toggle{min-width:96px}
+    @media (max-width: 900px){
+      .dd-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .dd-settings-import-grid{grid-template-columns:1fr}
+    }
+    @media (max-width: 640px){
+      .dd-settings-grid{grid-template-columns:1fr}
+      .dd-settings-actions{width:100%}
+      .dd-settings-actions .btn-outline,.dd-settings-actions .btn-primary{width:100%}
+    }
+    .dd-settings-table-wrap{max-height:70vh;overflow-y:auto;overflow-x:auto}
+    .dd-settings-table thead th{position:sticky;top:0;z-index:2;background:#0d0d0d}
+    .dd-cat-filters{display:flex;gap:.4rem;flex-wrap:wrap;margin:.75rem 0 0}
+    .dd-cat-chip{padding:.38rem .75rem;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#888;font-size:.71rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s,border-color .12s;letter-spacing:.04em}
+    .dd-cat-chip:hover{background:rgba(255,255,255,.06);color:#ccc}
+    .dd-cat-chip.active{background:rgba(212,175,55,.12);border-color:rgba(212,175,55,.4);color:#f7d37a}
+    .dd-mult-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:1rem}
+    .dd-mult-card{padding:1.1rem 1.15rem;border:1px solid rgba(255,255,255,.08);border-radius:1rem;background:rgba(255,255,255,.02)}
+    .dd-mult-card-title{font-size:.78rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#888;margin-bottom:.7rem}
+    .dd-mult-tier{display:flex;justify-content:space-between;align-items:flex-start;padding:.5rem .65rem;border-radius:.6rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);margin-bottom:.4rem;gap:.75rem}
+    .dd-mult-tier-label{font-size:.84rem;color:#e0e0e0;font-weight:600}
+    .dd-mult-tier-cond{font-size:.71rem;color:#666;margin-top:.1rem;line-height:1.35}
+    .dd-mult-tier-val{font-size:.92rem;font-weight:700;color:#f7d37a;white-space:nowrap;flex-shrink:0}
+    .dd-mult-section{margin-bottom:1.4rem}
+    .dd-mult-section-title{font-size:.76rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#888;margin-bottom:.55rem;display:flex;align-items:center;gap:.75rem}
+    .dd-mult-editable-row{display:flex;align-items:center;gap:.7rem;padding:.45rem .65rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:.6rem;margin-bottom:.35rem;flex-wrap:wrap}
+    .dd-mult-toggle-wrap{display:flex;align-items:center;gap:.3rem;font-size:.79rem;color:#aaa;white-space:nowrap;cursor:pointer;flex-shrink:0}
+    .dd-mult-toggle-wrap input{cursor:pointer}
+    .dd-mult-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:.4rem;color:#e8e8e8;padding:.28rem .5rem;font-size:.87rem;outline:none}
+    .dd-mult-input:focus{border-color:rgba(255,255,255,.3)}
+    .dd-mult-add-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:.5rem;color:#ccc;padding:.22rem .6rem;font-size:.75rem;cursor:pointer;white-space:nowrap}
+    .dd-mult-add-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+    .dd-mult-remove-btn{background:rgba(220,60,60,.13);border:1px solid rgba(220,60,60,.22);border-radius:.4rem;color:#f88;padding:.22rem .45rem;font-size:.75rem;cursor:pointer;flex-shrink:0;line-height:1}
+    .dd-mult-remove-btn:hover{background:rgba(220,60,60,.26)}
+    .dd-combo-row{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:.75rem;margin-bottom:.7rem;padding:.7rem .85rem}
+    .dd-combo-header{display:flex;align-items:center;gap:.55rem;margin-bottom:.5rem;flex-wrap:wrap}
+    .dd-combo-conditions{padding-left:.55rem;border-left:2px solid rgba(255,255,255,.07);margin-bottom:.4rem}
+    .dd-combo-cond{display:flex;align-items:center;gap:.45rem;padding:.3rem 0;flex-wrap:wrap}
+    .dd-combo-add-cond{background:transparent;border:1px dashed rgba(255,255,255,.15);border-radius:.4rem;color:#888;padding:.2rem .5rem;font-size:.74rem;cursor:pointer}
+    .dd-combo-add-cond:hover{border-color:rgba(255,255,255,.3);color:#ccc}
+    .dd-mult-x{color:#f7d37a;font-weight:700;flex-shrink:0}
+    .cs-queue-hint{font-size:.8rem;color:#7a7a7a;line-height:1.45;margin:.35rem 0 1rem}
+    .cs-queue-msg{font-size:.85rem;margin-top:.65rem;color:#bbb}
+    .cs-queue-msg.err{color:#ffb4b4}
+    .cs-queue-msg.ok{color:#b8ffcb}
+    .cs-queue-pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:.72rem;max-height:8rem;overflow:auto}
+    .cs-queue-actions{white-space:nowrap}
+    .cs-queue-actions button{padding:.35rem .55rem;font-size:.72rem;margin-right:.35rem}
+    .dd-settings-table.dd-lore-table{min-width:560px}
+    .dd-lore-dog-col{width:7rem;vertical-align:top}
+    .dd-lore-dog{width:100%;max-width:6.5rem;padding:.65rem .75rem;border-radius:.75rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff}
+    input.dd-lore-dog[readonly]{opacity:.88;cursor:default}
+    textarea.dd-lore-textarea{width:100%;min-height:5.5rem;margin:0;padding:.65rem .75rem;border-radius:.75rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff;font:inherit;line-height:1.45;resize:vertical;box-sizing:border-box}
+    .dd-th-sort{display:block;width:100%;text-align:left;background:transparent;border:none;padding:.15rem 0;font:inherit;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;cursor:pointer}
+    .dd-th-sort:hover{color:#f7d37a}
+    .dd-th-sort.dd-sort-on{color:#f7d37a}
+    .dd-combo-ddm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:.55rem .65rem;margin-top:.65rem;padding-top:.55rem;border-top:1px solid rgba(255,255,255,.06)}
+    .dd-combo-ddm-field{display:flex;flex-direction:column;gap:.22rem}
+    .dd-combo-ddm-field label{font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#777}
+    .dd-combo-ddm-field select{width:100%;padding:.45rem .5rem;border-radius:.55rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff;font-size:.82rem}
+    .dd-lore-mult{width:100%;max-width:6rem;padding:.55rem .65rem;border-radius:.75rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff}
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="../index.html" class="header-logo">
+        <img src="../assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+        <span class="header-logo-text">KushMetaX</span>
+      </a>
+      <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="nav-overlay" aria-label="Main navigation">
+    <ul class="nav-list">
+      <li><a href="../index.html" class="nav-link">Home</a></li>
+      <li><a href="../about.html" class="nav-link">About</a></li>
+      <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
+      <li><a href="../services.html" class="nav-link">Services</a></li>
+      <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="community-suggestions.html" class="nav-link">Community suggestions</a></li>
+      <li><a href="../contact.html" class="nav-link">Connect</a></li>
+    </ul>
+  </nav>
+
+  <!-- ===== MAIN ===== -->
+  <main class="page-body">
+    <section class="section">
+      <div class="container">
+
+        <!-- LOGIN -->
+        <div id="loginPanel" class="admin-login">
+          <h1 class="page-title">Admin</h1>
+          <form id="loginForm" autocomplete="off">
+            <div class="form-group">
+              <label for="adminPw">Password</label>
+              <input type="password" id="adminPw" name="password" required placeholder="Enter admin password">
+            </div>
+            <div id="loginError" class="form-error" hidden></div>
+            <button type="submit" class="btn-primary form-submit" id="loginBtn">Log In &#8594;</button>
+          </form>
+        </div>
+
+        <!-- DASHBOARD (hidden until auth) -->
+        <div id="dashboard" class="admin-dashboard" hidden>
+          <div class="admin-header-row">
+            <h1 class="page-title">Orders</h1>
+            <button type="button" class="btn-outline admin-logout-btn" id="logoutBtn">Log Out</button>
+          </div>
+
+          <!-- Filters -->
+          <div class="admin-filters">
+            <button type="button" class="admin-filter-btn active" data-filter="all">All</button>
+            <button type="button" class="admin-filter-btn" data-filter="Pending">Pending</button>
+            <button type="button" class="admin-filter-btn" data-filter="In Progress">In Progress</button>
+            <button type="button" class="admin-filter-btn" data-filter="Complete">Complete</button>
+          </div>
+
+          <div id="ordersLoading" class="admin-loading" hidden>Loading orders&#8230;</div>
+          <div id="ordersEmpty" class="admin-empty" hidden>No orders found.</div>
+          <div id="ordersTable" hidden>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th>Service</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th>Paid</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="ordersTbody"></tbody>
+            </table>
+          </div>
+
+          <section class="dd-settings" aria-labelledby="ddSettingsTitle">
+            <div class="admin-header-row">
+              <div>
+                <h2 id="ddSettingsTitle" class="page-title">DD Evaluator Dashboard</h2>
+                <p class="dd-settings-copy">Browse every trait variant in one sortable table (filter to trending and overrides only). Edit manual multipliers, save rows, and use Ignore Auto to tune falsely hot traits. Switching DD tabs keeps draft edits until you save or refresh.</p>
+              </div>
+              <div class="dd-settings-actions">
+                <button type="button" class="btn-outline" id="ddReloadBtn">Refresh DD Data</button>
+                <button type="button" class="btn-primary" id="ddSaveBtn">Save DD Settings</button>
+              </div>
+            </div>
+
+            <div id="ddSettingsStatus" class="dd-settings-status" hidden></div>
+
+            <div class="dd-settings-tabs" aria-label="DD dashboard sections">
+              <button type="button" class="dd-settings-tab active" data-dd-panel-target="controls" aria-pressed="true">Trait Controls</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="base" aria-pressed="false">Base Prices</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="offers" aria-pressed="false">Refused Offers</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="imports" aria-pressed="false">Imported Evals</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="multipliers" aria-pressed="false">Multipliers</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="suggestions" aria-pressed="false">Suggestions queue</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="community-lore" aria-pressed="false">Community lore</button>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="offers" hidden aria-labelledby="ddCommunityOffersTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddCommunityOffersTitle" class="dd-settings-subtitle">Refused Community Offers</h3>
+                  <p class="dd-settings-copy">Save the refused USD amount for community offers and use the live DOGE equivalent as a minimum estimate floor for that inscription.</p>
+                </div>
+                <button type="button" class="btn-outline" id="ddAddCommunityOfferBtn">Add Refused Offer</button>
+              </div>
+
+              <div class="dd-settings-table-wrap">
+                <table class="dd-settings-table">
+                  <thead>
+                    <tr>
+                      <th>Preview</th>
+                      <th>Inscription</th>
+                      <th>Min Refused USD</th>
+                      <th>Live DOGE Floor</th>
+                      <th>Notes</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ddCommunityOfferTbody">
+                    <tr><td colspan="6" class="dd-settings-small">No refused offers saved yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="imports" hidden aria-labelledby="ddEvaluationLogTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddEvaluationLogTitle" class="dd-settings-subtitle">Imported Inscription Evaluations</h3>
+                  <p class="dd-settings-copy">Shows only DD history imported from a KushMedia log file. Live searches on the site no longer populate this table.</p>
+                </div>
+              </div>
+
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddEvaluationImportInput">KushMedia Log Backfill</label>
+                <p class="dd-settings-help">Paste Apache, Nginx, or IIS raw access logs from KushMedia.xyz. The importer extracts DD evaluation requests, rehydrates current evaluator details, and appends them into Imported Inscription Evaluations.</p>
+                <div class="dd-settings-import-grid">
+                  <div>
+                    <label class="dd-settings-label" for="ddEvaluationImportHours">Lookback Hours</label>
+                    <input type="number" id="ddEvaluationImportHours" min="1" max="168" step="1" value="48">
+                  </div>
+                  <div class="dd-settings-actions">
+                    <input type="file" id="ddEvaluationImportFile" accept=".log,.txt,.json,.ndjson" hidden>
+                    <button type="button" class="btn-outline" id="ddEvaluationImportFileBtn">Load Log File</button>
+                    <button type="button" class="btn-primary" id="ddEvaluationImportBtn">Import Recent Evaluations</button>
+                    <button type="button" class="btn-outline" id="ddEvaluationClearBtn">Clear Imported Results</button>
+                  </div>
+                </div>
+                <textarea id="ddEvaluationImportInput" class="dd-settings-textarea" placeholder="Paste raw access logs, DD evaluator URLs, or NDJSON lines here.&#10;Supported patterns include /api/dd-evaluator/evaluate/269 and /api/dd-evaluator.php?action=evaluate&dogNumber=269"></textarea>
+                <div id="ddEvaluationImportStatus" class="dd-settings-status" hidden></div>
+              </div>
+
+              <div class="dd-settings-table-wrap">
+                <table class="dd-settings-table">
+                  <thead>
+                    <tr>
+                      <th>Preview</th>
+                      <th>Inscription</th>
+                      <th>Estimate</th>
+                      <th>Rarity</th>
+                      <th>Market</th>
+                      <th>Logged</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ddEvaluationLogTbody">
+                    <tr><td colspan="6" class="dd-settings-small">No imported inscription evaluations found for the selected lookback window.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="base" hidden aria-labelledby="ddBasePriceTraitsTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddBasePriceTraitsTitle" class="dd-settings-subtitle">Base Price Signals</h3>
+                  <p class="dd-settings-copy">Explains which listing floors, sale history, or simple scarcity are anchoring trait values. This helps separate true trait-driven pricing from dogs that are just expensive because the overall rarity stack is thin.</p>
+                </div>
+              </div>
+
+              <div class="dd-settings-toolbar">
+                <div class="form-group">
+                  <label for="ddBasePriceTraitSearch">Search Base Price Signals</label>
+                  <input type="search" id="ddBasePriceTraitSearch" placeholder="Diamond, Shiny, Cowboy, mouth, accessory...">
+                </div>
+                <div class="dd-settings-meta" id="ddBasePriceTraitMeta">Loading base price signals…</div>
+              </div>
+              <div class="dd-cat-filters" id="ddBaseCatFilters">
+                <button type="button" class="dd-cat-chip active" data-dd-cat="all">All</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="eyes">Eyes</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="clothes">Clothes</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="accessory">Accessory</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="mouth">Mouth</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="head">Head</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="background">Background</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="furColor">Fur Color</button>
+                <button type="button" class="dd-cat-chip" data-dd-cat="furPattern">Fur Pattern</button>
+              </div>
+
+              <div class="dd-settings-table-wrap">
+                <table class="dd-settings-table">
+                  <thead>
+                    <tr>
+                      <th>Trait</th>
+                      <th>Value</th>
+                      <th>Rarity</th>
+                      <th>Count</th>
+                      <th>Listed</th>
+                      <th>Recent Sales</th>
+                      <th>Market Inputs</th>
+                      <th>Strongest Signal</th>
+                      <th>Profile</th>
+                      <th>Why It Looks Expensive</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ddBasePriceTraitTbody">
+                    <tr><td colspan="10" class="dd-settings-small">Loading base price signals…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="multipliers" hidden aria-labelledby="ddMultipliersTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddMultipliersTitle" class="dd-settings-subtitle">Special Multipliers</h3>
+                  <p class="dd-settings-copy">Fixed bonuses applied after rarity + trending scoring. Custom combos use one dropdown per trait (Any = wildcard). Positive combo multipliers boost; negative use (1+m). Click <strong>Save Special Multipliers</strong> to persist.</p>
+                </div>
+                <button type="button" id="ddSaveSpecialMultipliers" class="dd-settings-save" style="align-self:flex-start" hidden>Save Special Multipliers</button>
+              </div>
+
+              <!-- Color Match -->
+              <div class="dd-mult-section">
+                <div class="dd-mult-section-title">🎨 Color Match</div>
+                <div class="dd-mult-editable-row">
+                  <label class="dd-mult-toggle-wrap"><input type="checkbox" id="ddCmEnabled" checked> Enabled</label>
+                  <div style="flex:1;font-size:.78rem;color:#888;line-height:1.4">2+ traits share the same dominant color (e.g.&nbsp;Gold background + Gold clothes)</div>
+                  <div style="display:flex;align-items:center;gap:.4rem">
+                    <input type="number" id="ddCmMultiplier" class="dd-mult-input" min="1" max="10" step="0.01" value="1.10" style="width:72px">
+                    <span class="dd-mult-x">&times;</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Minimal Tiers -->
+              <div class="dd-mult-section">
+                <div class="dd-mult-section-title">✨ Minimal Dog Tiers</div>
+                <div id="ddMinimalTiersContainer"></div>
+              </div>
+
+              <!-- Custom Combos -->
+              <div class="dd-mult-section">
+                <div class="dd-mult-section-title">
+                  🎯 Custom Trait Combos
+                  <button type="button" id="ddAddComboBtn" class="dd-mult-add-btn">+ Add Combo</button>
+                </div>
+                <div id="ddCombosContainer"></div>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="suggestions" hidden aria-labelledby="ddSuggestionsQueueTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddSuggestionsQueueTitle" class="dd-settings-subtitle">Community suggestions queue</h3>
+                  <p class="dd-settings-copy">Approve or reject pending community submissions for trending and lore.</p>
+                </div>
+              </div>
+              <p class="cs-queue-hint">Enter the DD admin password (same as <strong>Save DD Settings</strong>). You can also set it via the DD password prompt elsewhere on this dashboard.</p>
+              <label class="dd-settings-label" for="traitPw">DD admin password</label>
+              <input id="traitPw" type="password" autocomplete="current-password" placeholder="Admin API password"
+                style="max-width:28rem;width:100%;padding:.7rem .85rem;border-radius:.8rem;border:1px solid rgba(212,175,55,.35);background:#111;color:#fff">
+              <div class="dd-settings-actions" style="margin-top:1rem">
+                <button type="button" class="btn-primary" id="csLoadPending">Load pending queue</button>
+              </div>
+              <p id="queueMeta" class="dd-settings-meta" style="margin-top:.85rem"></p>
+              <p id="queueMsg" class="cs-queue-msg"></p>
+              <div class="dd-settings-table-wrap" id="queueTableWrap" hidden>
+                <table class="dd-settings-table cs-queue-table" id="queueTable">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Kind</th>
+                      <th>Payload</th>
+                      <th>Submitted</th>
+                      <th class="cs-queue-actions-head"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="queueBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="community-lore" hidden aria-labelledby="ddCommunityLoreTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddCommunityLoreTitle" class="dd-settings-subtitle">Published community lore</h3>
+                  <p class="dd-settings-copy">View and edit notes stored in <code>dd-community-notes.json</code> (same text shown on DD Evaluator). Uses the DD admin password from the <strong>Suggestions queue</strong> tab.</p>
+                </div>
+              </div>
+              <p class="cs-queue-hint">Enter the DD admin password in <strong>Suggestions queue</strong> (field above), or set it via the DD save password prompt elsewhere on this dashboard.</p>
+              <div class="dd-settings-actions" style="margin-top:.75rem;flex-wrap:wrap;gap:.75rem;align-items:center">
+                <button type="button" class="btn-primary" id="clLoreLoadBtn">Load all lore</button>
+                <button type="button" class="btn-outline" id="clLoreAddBtn">Add entry</button>
+              </div>
+              <p id="clLoreMeta" class="dd-settings-meta" style="margin-top:.85rem"></p>
+              <p id="clLoreMsg" class="cs-queue-msg"></p>
+              <div class="dd-settings-table-wrap" id="clLoreTableWrap" hidden>
+                <table class="dd-settings-table dd-lore-table" id="clLoreTable">
+                  <thead>
+                    <tr>
+                      <th>Dog #</th>
+                      <th>× Lore price</th>
+                      <th>Lore</th>
+                      <th class="dd-trait-action">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="clLoreTbody"></tbody>
+                </table>
+              </div>
+              <div class="dd-settings-subsection" id="clLorePendingWrap" style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid rgba(255,255,255,.08)" hidden aria-labelledby="clLorePendingTitle">
+                <h4 id="clLorePendingTitle" class="dd-settings-subtitle" style="font-size:.95rem;margin:0 0 .35rem">Pending lore-only (not yet published)</h4>
+                <p class="dd-settings-copy" style="margin:0 0 .75rem">These submissions are still in the queue. They do not appear in <code>dd-community-notes.json</code> (and not on the evaluator) until you approve them under <strong>Suggestions queue</strong>.</p>
+                <div class="dd-settings-table-wrap">
+                  <table class="dd-settings-table dd-lore-table" id="clLorePendingTable">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Dog #</th>
+                        <th>Lore</th>
+                        <th>Next step</th>
+                      </tr>
+                    </thead>
+                    <tbody id="clLorePendingTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel" data-dd-panel="controls">
+
+            <div class="dd-settings-grid">
+              <div class="dd-settings-card">
+                <label class="dd-settings-label">Auto Trend</label>
+                <label class="dd-settings-toggle"><input type="checkbox" id="ddAutoEnabled"> Enable auto multiplier engine</label>
+                <p class="dd-settings-help">When enabled, sub-800 traits can pick up an automatic multiplier from recent sales count and penetration.</p>
+              </div>
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddMaxTraitCount">Max Trait Count</label>
+                <input type="number" id="ddMaxTraitCount" min="1" step="1">
+                <p class="dd-settings-help">Traits above this count skip the auto-trend engine.</p>
+              </div>
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddMinSaleCount">Min Recent Sales</label>
+                <input type="number" id="ddMinSaleCount" min="1" step="1">
+                <p class="dd-settings-help">Minimum live-window sales needed before a trait can trend on count alone.</p>
+              </div>
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddMinSalesPercent">Min Sales %</label>
+                <input type="number" id="ddMinSalesPercent" min="0" step="0.001">
+                <p class="dd-settings-help">Alternative trigger based on the percent of that trait that traded recently.</p>
+              </div>
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddSaleWeight">Sale Weight</label>
+                <input type="number" id="ddSaleWeight" min="0" step="0.01">
+                <p class="dd-settings-help">How much each recent sale adds to the auto multiplier.</p>
+              </div>
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddSalesPercentWeight">Sales % Weight</label>
+                <input type="number" id="ddSalesPercentWeight" min="0" step="0.1">
+                <p class="dd-settings-help">How aggressively high-trade penetration pushes a rare trait upward.</p>
+              </div>
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddListingWeight">Listing Weight</label>
+                <input type="number" id="ddListingWeight" min="0" step="0.1">
+                <p class="dd-settings-help">Adds support when a trait has shallow listed supply relative to its count.</p>
+              </div>
+              <div class="dd-settings-card">
+                <label class="dd-settings-label" for="ddMaxMultiplier">Auto Max Multiplier</label>
+                <input type="number" id="ddMaxMultiplier" min="1" step="0.05">
+                <p class="dd-settings-help">Caps the auto-trend engine so it cannot overrun the base evaluator.</p>
+              </div>
+            </div>
+
+            <div class="dd-settings-toolbar">
+              <div class="form-group">
+                <label for="ddTraitSearch">Search traits</label>
+                <input type="search" id="ddTraitSearch" placeholder="Wizard, Beret, Suit, mouth, Diamond...">
+              </div>
+              <div class="dd-settings-meta" id="ddSettingsMeta">Loading DD evaluator dashboard…</div>
+            </div>
+            <div class="dd-cat-filters" id="ddTraitViewFilters" aria-label="Trait list scope">
+              <button type="button" class="dd-cat-chip active" data-dd-trait-view="all">All variants</button>
+              <button type="button" class="dd-cat-chip" data-dd-trait-view="active">Trending / manual / suppressed only</button>
+            </div>
+            <div class="dd-cat-filters" id="ddTraitCatFilters">
+              <button type="button" class="dd-cat-chip active" data-dd-cat="all">All</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="eyes">Eyes</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="clothes">Clothes</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="accessory">Accessory</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="mouth">Mouth</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="head">Head</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="background">Background</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="furColor">Fur Color</button>
+              <button type="button" class="dd-cat-chip" data-dd-cat="furPattern">Fur Pattern</button>
+            </div>
+
+            <div class="dd-settings-table-wrap">
+              <table class="dd-settings-table">
+                <thead>
+                  <tr>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="trait">Trait</button></th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="value">Value</button></th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="traitCount">Count</button></th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="listed">Listed</button></th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="saleCount">Recent sales</button></th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="autoMultiplier">Auto</button></th>
+                    <th scope="col">Manual</th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="effectiveMultiplier">Effective</button></th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="source">Source</button></th>
+                    <th scope="col"><button type="button" class="dd-th-sort" data-dd-sort="trendReason">Trend detail</button></th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="ddTraitTbody"></tbody>
+              </table>
+            </div>
+            </div>
+          </section>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== DETAIL MODAL ===== -->
+  <div class="modal-backdrop" id="detailBackdrop" aria-hidden="true">
+    <div class="modal-card admin-detail-modal">
+      <button type="button" class="modal-close" id="detailClose" aria-label="Close">&times;</button>
+      <h2 class="modal-title" id="detailTitle">Order Details</h2>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-content">
+      <p class="footer-copy">&copy; 2026 KushMetaX. Admin Panel.</p>
+      </div>
+      <div class="footer-mascot-wrap">
+        <span class="footer-mascot-text">KushMetaX</span>
+        <img src="../assets/SWB.gif" alt="" class="footer-mascot">
+      </div>
+    </div>
+  </footer>
+
+  <script src="../brand.js"></script>
+  <script>
+  /* ==================================================
+     KushMetaX — Admin Dashboard
+     ================================================== */
+  (function(){
+    var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAkUTenNWA0-gO6RU9w6cLqlXtmQn4yGkIkMsfDnbPqX_8czMQVeEHFJ-Kd5VX2-ndBw/exec';
+    var password   = '';
+    var ddAdminPassword = '';
+    var allOrders  = [];
+    var currentFilter = 'all';
+
+    /* ---- DOM refs ---- */
+    var loginPanel   = document.getElementById('loginPanel');
+    var loginForm    = document.getElementById('loginForm');
+    var loginError   = document.getElementById('loginError');
+    var loginBtn     = document.getElementById('loginBtn');
+    var dashboard    = document.getElementById('dashboard');
+    var logoutBtn    = document.getElementById('logoutBtn');
+    var ordersLoading= document.getElementById('ordersLoading');
+    var ordersEmpty  = document.getElementById('ordersEmpty');
+    var ordersTable  = document.getElementById('ordersTable');
+    var ordersTbody  = document.getElementById('ordersTbody');
+    var detailBg     = document.getElementById('detailBackdrop');
+    var detailClose  = document.getElementById('detailClose');
+    var detailTitle  = document.getElementById('detailTitle');
+    var detailContent= document.getElementById('detailContent');
+    var ddReloadBtn  = document.getElementById('ddReloadBtn');
+    var ddSaveBtn    = document.getElementById('ddSaveBtn');
+    var ddSettingsStatus = document.getElementById('ddSettingsStatus');
+    var ddSettingsMeta = document.getElementById('ddSettingsMeta');
+    var ddTraitSearch = document.getElementById('ddTraitSearch');
+    var ddTraitTbody  = document.getElementById('ddTraitTbody');
+    var ddBasePriceTraitSearch = document.getElementById('ddBasePriceTraitSearch');
+    var ddBasePriceTraitMeta = document.getElementById('ddBasePriceTraitMeta');
+    var ddBasePriceTraitTbody = document.getElementById('ddBasePriceTraitTbody');
+    var ddAddCommunityOfferBtn = document.getElementById('ddAddCommunityOfferBtn');
+    var ddCommunityOfferTbody = document.getElementById('ddCommunityOfferTbody');
+    var ddEvaluationLogTbody = document.getElementById('ddEvaluationLogTbody');
+    var ddEvaluationImportInput = document.getElementById('ddEvaluationImportInput');
+    var ddEvaluationImportHours = document.getElementById('ddEvaluationImportHours');
+    var ddEvaluationImportBtn = document.getElementById('ddEvaluationImportBtn');
+    var ddEvaluationImportFile = document.getElementById('ddEvaluationImportFile');
+    var ddEvaluationImportFileBtn = document.getElementById('ddEvaluationImportFileBtn');
+    var ddEvaluationClearBtn = document.getElementById('ddEvaluationClearBtn');
+    var ddEvaluationImportStatus = document.getElementById('ddEvaluationImportStatus');
+    var ddAutoEnabled = document.getElementById('ddAutoEnabled');
+    var ddMaxTraitCount = document.getElementById('ddMaxTraitCount');
+    var ddMinSaleCount = document.getElementById('ddMinSaleCount');
+    var ddMinSalesPercent = document.getElementById('ddMinSalesPercent');
+    var ddSaleWeight = document.getElementById('ddSaleWeight');
+    var ddSalesPercentWeight = document.getElementById('ddSalesPercentWeight');
+    var ddListingWeight = document.getElementById('ddListingWeight');
+    var ddMaxMultiplier = document.getElementById('ddMaxMultiplier');
+    var ddSaveSpecialMultipliersBtn = document.getElementById('ddSaveSpecialMultipliers');
+    var ddMinimalTiersContainer = document.getElementById('ddMinimalTiersContainer');
+    var ddCombosContainer = document.getElementById('ddCombosContainer');
+    var ddAddComboBtn = document.getElementById('ddAddComboBtn');
+    var ddDashboardData = null;
+    var ddManualMultiplierDrafts = Object.create(null);
+    var ddActivePanel = 'controls';
+    var ddActiveCategoryFilter = 'all';
+    var ddTraitViewFilter = 'all';
+    var ddTraitSortKey = 'traitCount';
+    var ddTraitSortDir = 'asc';
+    var ddTraitValueLists = null;
+    var ddActiveBaseCategoryFilter = 'all';
+    var ddPanelButtons = Array.prototype.slice.call(document.querySelectorAll('[data-dd-panel-target]'));
+    var ddPanels = Array.prototype.slice.call(document.querySelectorAll('[data-dd-panel]'));
+
+    /* ---- Helpers ---- */
+    function esc(s){
+      if(!s) return '';
+      var d=document.createElement('div');
+      d.appendChild(document.createTextNode(String(s)));
+      return d.innerHTML;
+    }
+
+    function formatService(s){
+      if(!s) return '';
+      return s.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+    }
+
+    function formatDate(ts){
+      if(!ts) return '';
+      var d = new Date(ts);
+      if(isNaN(d)) return String(ts);
+      return d.toLocaleDateString('en-CA') + ' ' + d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
+    }
+
+    function badgeClass(status){
+      if(!status) return 'pending';
+      var s = status.toLowerCase();
+      if(s.indexOf('progress')!==-1||s.indexOf('working')!==-1) return 'in-progress';
+      if(s.indexOf('complete')!==-1||s.indexOf('done')!==-1||s.indexOf('delivered')!==-1) return 'complete';
+      return 'pending';
+    }
+
+    function fmt(n, d){
+      if(n === null || n === undefined || n === '') return '-';
+      return Number(n).toLocaleString(undefined, { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+    }
+
+    function fmtMaybe(n, d, suffix){
+      if(n === null || n === undefined || n === '') return '-';
+      return fmt(n, d) + (suffix || '');
+    }
+
+    function settingsUrl(){
+      return window.location.origin + '/api/dd-evaluator/admin/trending';
+    }
+
+    function evaluationImportUrl(){
+      return window.location.origin + '/api/dd-evaluator/admin/evaluations/import';
+    }
+
+    function evaluationClearUrl(){
+      return window.location.origin + '/api/dd-evaluator/admin/evaluations/clear';
+    }
+
+    function ddDogImageUrl(dogNumber){
+      return dogNumber ? ('/api/doginal-proxy.php?action=image&dogNumber=' + encodeURIComponent(dogNumber)) : '../assets/collection-logo.png';
+    }
+
+    function getDdLiveDogeUsd(){
+      return ddDashboardData && ddDashboardData.snapshot && ddDashboardData.snapshot.dogeUsd != null
+        ? Number(ddDashboardData.snapshot.dogeUsd)
+        : null;
+    }
+
+    function showDdStatus(message, kind){
+      if(!message){
+        ddSettingsStatus.hidden = true;
+        ddSettingsStatus.textContent = '';
+        ddSettingsStatus.className = 'dd-settings-status';
+        return;
+      }
+      ddSettingsStatus.hidden = false;
+      ddSettingsStatus.textContent = message;
+      ddSettingsStatus.className = 'dd-settings-status' + (kind ? ' ' + kind : '');
+    }
+
+    function setDdActivePanel(nextPanel){
+      var target = String(nextPanel || '').trim() || 'controls';
+      ddActivePanel = target;
+      ddPanelButtons.forEach(function(button){
+        var active = String(button.getAttribute('data-dd-panel-target') || '') === target;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      ddPanels.forEach(function(panel){
+        var active = String(panel.getAttribute('data-dd-panel') || '') === target;
+        panel.hidden = !active;
+      });
+      if (target === 'community-lore' && typeof loadCommunityLoreTable === 'function' && typeof getCsAdminPassword === 'function' && getCsAdminPassword()) {
+        loadCommunityLoreTable();
+      }
+    }
+
+    function showDdEvaluationImportStatus(message, kind){
+      if(!ddEvaluationImportStatus) return;
+      if(!message){
+        ddEvaluationImportStatus.hidden = true;
+        ddEvaluationImportStatus.textContent = '';
+        ddEvaluationImportStatus.className = 'dd-settings-status';
+        return;
+      }
+      ddEvaluationImportStatus.hidden = false;
+      ddEvaluationImportStatus.textContent = message;
+      ddEvaluationImportStatus.className = 'dd-settings-status' + (kind ? ' ' + kind : '');
+    }
+
+    function getDdRequestPassword(){
+      return ddAdminPassword || '';
+    }
+
+    function isInvalidDdPasswordError(message){
+      return /invalid dd admin password/i.test(String(message || ''));
+    }
+
+    function promptForDdAdminPassword(){
+      var next = window.prompt(
+        'DD save/import uses a separate password. Enter the DD admin password stored in server/data/.dd-admin-password.',
+        ddAdminPassword || password || ''
+      );
+      if(next === null) return false;
+      ddAdminPassword = String(next || '').trim();
+      var tpSync = document.getElementById('traitPw');
+      if(tpSync && ddAdminPassword) tpSync.value = ddAdminPassword;
+      return !!ddAdminPassword;
+    }
+
+    function ensureDdAdminPassword(){
+      if(ddAdminPassword) return true;
+      return promptForDdAdminPassword();
+    }
+
+    function setDdDashboardData(payload, saveEnabled){
+      ddDashboardData = Object.assign({}, payload || {}, { saveEnabled: !!saveEnabled });
+    }
+
+    function applyDdConfigToForm(config){
+      var auto = config && config.autoTrend ? config.autoTrend : {};
+      ddAutoEnabled.checked = !!auto.enabled;
+      ddMaxTraitCount.value = auto.maxTraitCount || 800;
+      ddMinSaleCount.value = auto.minSaleCount || 2;
+      ddMinSalesPercent.value = auto.minSalesPercent != null ? auto.minSalesPercent : 0.005;
+      ddSaleWeight.value = auto.saleWeight != null ? auto.saleWeight : 0.06;
+      ddSalesPercentWeight.value = auto.salesPercentWeight != null ? auto.salesPercentWeight : 10;
+      ddListingWeight.value = auto.listingWeight != null ? auto.listingWeight : 1.5;
+      ddMaxMultiplier.value = auto.maxMultiplier != null ? auto.maxMultiplier : 2.5;
+      renderSpecialMultipliersPanel(config);
+    }
+
+    /* ---- Special Multipliers ---- */
+    var DD_TIER_DEFS = [
+      { id: 'black_classic_visor', label: '🎨 Black Classic + Visor', cond: 'Black fur + Classic pattern + Visor eyes', def: 1.20 },
+      { id: 'black_classic',       label: '🎨 Black Classic',          cond: 'Black fur + Classic pattern (any eyes)',    def: 1.15 },
+      { id: 'visor_minimal',       label: '✨ Visor (sole extra trait)', cond: 'Visor as the only non-base trait',          def: 1.15 },
+      { id: 'ultra_clean',         label: '✨ Ultra Clean',             cond: 'No extra traits beyond base (bg, fur, head)', def: 1.10 },
+      { id: 'minimal_1',           label: '✨ Minimal — 1 extra trait', cond: 'One non-base trait (e.g. just eyes)',        def: 1.05 },
+      { id: 'minimal_2',           label: '✨ Minimal — 2 extra traits', cond: 'Two non-base traits (e.g. eyes + clothes)', def: 1.01 },
+    ];
+    var DD_EVAL_TRAIT_KEYS = ['background','furColor','furPattern','eyes','clothes','accessory','mouth','head'];
+    var DD_SORT_LABELS = {
+      trait: 'Trait',
+      value: 'Value',
+      traitCount: 'Count',
+      listed: 'Listed',
+      saleCount: 'Recent sales',
+      autoMultiplier: 'Auto',
+      effectiveMultiplier: 'Effective',
+      source: 'Source',
+      trendReason: 'Trend detail'
+    };
+
+    function makeDdComboId(){
+      return 'combo_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function renderSpecialMultipliersPanel(config){
+      var sm = config && config.specialMultipliers ? config.specialMultipliers : {};
+      var cmConfig = sm.colorMatch && typeof sm.colorMatch === 'object' ? sm.colorMatch : { enabled: true, multiplier: 1.10 };
+      var tiersConfig = sm.minimalTiers && typeof sm.minimalTiers === 'object' ? sm.minimalTiers : {};
+      var combos = Array.isArray(sm.combos) ? sm.combos : [];
+      var angelConfig = sm.angelNumbers && typeof sm.angelNumbers === 'object' ? sm.angelNumbers : {};
+
+      // Color Match
+      var cmEnabled = document.getElementById('ddCmEnabled');
+      var cmMult = document.getElementById('ddCmMultiplier');
+      if(cmEnabled) cmEnabled.checked = cmConfig.enabled !== false;
+      if(cmMult) cmMult.value = Number(cmConfig.multiplier) || 1.10;
+
+      // Minimal Tiers
+      if(ddMinimalTiersContainer){
+        ddMinimalTiersContainer.innerHTML = '';
+        DD_TIER_DEFS.forEach(function(tier){
+          var tierConfig = tiersConfig[tier.id] && typeof tiersConfig[tier.id] === 'object'
+            ? tiersConfig[tier.id]
+            : { enabled: true, multiplier: tier.def };
+          var row = document.createElement('div');
+          row.className = 'dd-mult-editable-row';
+          row.dataset.tierId = tier.id;
+          row.innerHTML =
+            '<label class="dd-mult-toggle-wrap"><input type="checkbox" class="dd-tier-enabled"' + (tierConfig.enabled !== false ? ' checked' : '') + '> On</label>' +
+            '<div style="flex:1"><div class="dd-mult-tier-label">' + esc(tier.label) + '</div><div class="dd-mult-tier-cond">' + esc(tier.cond) + '</div></div>' +
+            '<div style="display:flex;align-items:center;gap:.4rem">' +
+              '<input type="number" class="dd-tier-mult dd-mult-input" min="1" max="10" step="0.01" value="' + (Number(tierConfig.multiplier) || tier.def) + '" style="width:72px">' +
+              '<span class="dd-mult-x">&times;</span>' +
+            '</div>';
+          ddMinimalTiersContainer.appendChild(row);
+        });
+      }
+
+      // Combos
+      if(ddCombosContainer){
+        ddCombosContainer.innerHTML = '';
+        combos.forEach(function(combo){ addDdComboRow(combo); });
+      }
+
+      // Angel Numbers
+      var quadConfig = angelConfig.quadRepeater && typeof angelConfig.quadRepeater === 'object' ? angelConfig.quadRepeater : { enabled: true, multiplier: 1.25 };
+      var tripleConfig = angelConfig.tripleRepeater && typeof angelConfig.tripleRepeater === 'object' ? angelConfig.tripleRepeater : { enabled: true, multiplier: 1.15 };
+      var trendConfig = angelConfig.trendNumbers && typeof angelConfig.trendNumbers === 'object' ? angelConfig.trendNumbers : {};
+
+      var quadEnabled = document.getElementById('ddQuadEnabled');
+      var quadMult = document.getElementById('ddQuadMultiplier');
+      if(quadEnabled) quadEnabled.checked = quadConfig.enabled !== false;
+      if(quadMult) quadMult.value = Number(quadConfig.multiplier) || 1.25;
+
+      var tripleEnabled = document.getElementById('ddTripleEnabled');
+      var tripleMult = document.getElementById('ddTripleMultiplier');
+      if(tripleEnabled) tripleEnabled.checked = tripleConfig.enabled !== false;
+      if(tripleMult) tripleMult.value = Number(tripleConfig.multiplier) || 1.15;
+
+      ['67', '69', '420'].forEach(function(num){
+        var config = trendConfig[num] && typeof trendConfig[num] === 'object' ? trendConfig[num] : { enabled: true, multiplier: 1.10 };
+        var enabledEl = document.getElementById('ddTrend' + num + 'Enabled');
+        var multEl = document.getElementById('ddTrend' + num + 'Multiplier');
+        if(enabledEl) enabledEl.checked = config.enabled !== false;
+        if(multEl) multEl.value = Number(config.multiplier) || 1.10;
+      });
+    }
+
+    function ddComboTraitSelectHtml(traitKey, selectedVal){
+      var list = ddTraitValueLists && ddTraitValueLists[traitKey] ? ddTraitValueLists[traitKey] : [];
+      var sel = selectedVal != null ? String(selectedVal).trim() : 'Any';
+      if(sel.toLowerCase() === 'any') sel = 'Any';
+      var opts = '<option value="Any"' + (sel === 'Any' ? ' selected' : '') + '>Any</option>';
+      list.forEach(function(v){
+        opts += '<option value="' + esc(v) + '"' + (v === sel ? ' selected' : '') + '>' + esc(v) + '</option>';
+      });
+      return opts;
+    }
+
+    function mapExistingComboConditions(combo){
+      var map = Object.create(null);
+      if(combo && Array.isArray(combo.conditions)){
+        combo.conditions.forEach(function(c){
+          if(c && c.trait) map[c.trait] = c.value;
+        });
+      }
+      return map;
+    }
+
+    function addDdComboRow(comboData){
+      if(!ddCombosContainer) return;
+      var combo = comboData || {};
+      var comboId = combo.id || makeDdComboId();
+      var row = document.createElement('div');
+      row.className = 'dd-combo-row';
+      row.dataset.comboId = comboId;
+      var cmap = mapExistingComboConditions(combo);
+      var grid = DD_EVAL_TRAIT_KEYS.map(function(tk){
+        var selVal = Object.prototype.hasOwnProperty.call(cmap, tk) ? cmap[tk] : 'Any';
+        return '<div class="dd-combo-ddm-field"><label>' + esc(tk) + '</label><select class="dd-combo-trait-val" data-trait="' + tk + '">' + ddComboTraitSelectHtml(tk, selVal) + '</select></div>';
+      }).join('');
+      row.innerHTML =
+        '<div class="dd-combo-header">' +
+          '<input type="text" class="dd-combo-label dd-mult-input" placeholder="Label (e.g. Gold Suit)..." value="' + esc(combo.label || '') + '" style="flex:1;min-width:120px">' +
+          '<div style="display:flex;align-items:center;gap:.35rem">' +
+            '<input type="number" class="dd-combo-mult dd-mult-input" min="-10" max="100" step="0.01" value="' + (Number(combo.multiplier) !== 0 && Number.isFinite(Number(combo.multiplier)) ? Number(combo.multiplier) : 1.20) + '" style="width:80px" title="Positive = direct ×. Negative uses (1+m), e.g. −0.2 → ×0.8">' +
+            '<span class="dd-mult-x">&times;</span>' +
+          '</div>' +
+          '<label class="dd-mult-toggle-wrap"><input type="checkbox" class="dd-combo-enabled"' + (combo.enabled !== false ? ' checked' : '') + '> On</label>' +
+          '<button type="button" class="dd-mult-remove-btn dd-combo-remove" title="Remove combo">&times;</button>' +
+        '</div>' +
+        '<div class="dd-combo-ddm-grid">' + grid + '</div>';
+      ddCombosContainer.appendChild(row);
+    }
+
+    function collectSpecialMultipliers(){
+      var cmEnabled = document.getElementById('ddCmEnabled');
+      var cmMult = document.getElementById('ddCmMultiplier');
+      var colorMatch = {
+        enabled: cmEnabled ? cmEnabled.checked : true,
+        multiplier: Math.max(1.0, Number(cmMult ? cmMult.value : 1.10) || 1.10),
+      };
+
+      var minimalTiers = {};
+      var tierRows = ddMinimalTiersContainer ? ddMinimalTiersContainer.querySelectorAll('[data-tier-id]') : [];
+      Array.prototype.forEach.call(tierRows, function(row){
+        var id = row.dataset.tierId;
+        var enabledInput = row.querySelector('.dd-tier-enabled');
+        var multInput = row.querySelector('.dd-tier-mult');
+        minimalTiers[id] = {
+          enabled: enabledInput ? enabledInput.checked : true,
+          multiplier: Math.max(1.0, Number(multInput ? multInput.value : 1.0) || 1.0),
+        };
+      });
+
+      var combos = [];
+      var comboRows = ddCombosContainer ? ddCombosContainer.querySelectorAll('.dd-combo-row') : [];
+      Array.prototype.forEach.call(comboRows, function(row){
+        var labelInput = row.querySelector('.dd-combo-label');
+        var multInput  = row.querySelector('.dd-combo-mult');
+        var enabledInput = row.querySelector('.dd-combo-enabled');
+        var label = labelInput ? labelInput.value.trim() : '';
+        if(!label) return;
+        var conditions = [];
+        DD_EVAL_TRAIT_KEYS.forEach(function(tk){
+          var sel = row.querySelector('.dd-combo-trait-val[data-trait="' + tk + '"]');
+          var value = sel ? String(sel.value || '').trim() : '';
+          if(!value || value.toLowerCase() === 'any'){
+            conditions.push({ trait: tk, op: 'eq', value: 'Any' });
+          } else {
+            conditions.push({ trait: tk, op: 'eq', value: value });
+          }
+        });
+        var multRaw = Number(multInput ? multInput.value : NaN);
+        if(!Number.isFinite(multRaw) || multRaw === 0) return;
+        combos.push({
+          id:         row.dataset.comboId || makeDdComboId(),
+          label:      label,
+          multiplier: multRaw,
+          enabled:    enabledInput ? enabledInput.checked : true,
+          conditions: conditions,
+        });
+      });
+
+      return { colorMatch: colorMatch, minimalTiers: minimalTiers, combos: combos };
+    }
+
+    function saveSpecialMultipliers(){
+      if(!ddDashboardData || !ddDashboardData.saveEnabled){
+        showDdStatus('Saving is disabled until DD_ADMIN_PASSWORD is configured on the server.', 'error');
+        return;
+      }
+      if(!ensureDdAdminPassword()){
+        showDdStatus('DD admin password is required to save special multipliers.', 'error');
+        return;
+      }
+      var saveBtn = document.getElementById('ddSaveSpecialMultipliers');
+      if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+      showDdStatus('Saving special multipliers…');
+
+      function runSave(allowPrompt){
+        fetch(settingsUrl(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-dd-admin-password': getDdRequestPassword() },
+          body: JSON.stringify({
+            manualMultipliers: (ddDashboardData.config && ddDashboardData.config.manualMultipliers) || {},
+            refusedOffers:     (ddDashboardData.config && ddDashboardData.config.refusedOffers)     || {},
+            autoTrend:         (ddDashboardData.config && ddDashboardData.config.autoTrend)         || buildDdSavedAutoTrend(),
+            specialMultipliers: collectSpecialMultipliers(),
+            updatedBy: 'admin.html:multipliers',
+          })
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = 'Save Special Multipliers'; }
+            if(data.error){
+              if(allowPrompt && isInvalidDdPasswordError(data.error)){
+                ddAdminPassword = '';
+                if(promptForDdAdminPassword()){
+                  showDdStatus('Retrying with DD admin password…');
+                  runSave(false);
+                  return;
+                }
+              }
+              showDdStatus(data.error, 'error');
+              return;
+            }
+            setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
+            renderSpecialMultipliersPanel((data.dashboard && data.dashboard.config) || {});
+            showDdStatus('Special multipliers saved. New evaluations will use the updated values.', 'success');
+          })
+          .catch(function(){
+            if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = 'Save Special Multipliers'; }
+            showDdStatus('Failed to save special multipliers.', 'error');
+          });
+      }
+      runSave(true);
+    }
+
+    function sourcePill(source){
+      var label = source || 'none';
+      var cls = 'none';
+      if(label === 'manual') cls = 'manual';
+      else if(label === 'auto') cls = 'auto';
+      else if(label === 'manual+auto') cls = 'mixed';
+      else if(label === 'suppressed') cls = 'suppressed';
+      return '<span class="dd-settings-pill ' + cls + '">' + esc(label) + '</span>';
+    }
+
+    function normalizeDdManualMultiplierValue(value){
+      var number = Number(value);
+      return Number.isFinite(number) && number >= 1 ? +number.toFixed(4) : null;
+    }
+
+    function cloneDdManualMultipliers(input){
+      var next = Object.create(null);
+      if(!input || typeof input !== 'object') return next;
+      Object.keys(input).forEach(function(key){
+        var value = normalizeDdManualMultiplierValue(input[key]);
+        if(value != null){
+          next[key] = value;
+        }
+      });
+      return next;
+    }
+
+    function syncDdManualMultiplierDrafts(){
+      var manual = ddDashboardData && ddDashboardData.config && ddDashboardData.config.manualMultipliers
+        ? ddDashboardData.config.manualMultipliers
+        : {};
+      ddManualMultiplierDrafts = cloneDdManualMultipliers(manual);
+    }
+
+    function getDdSavedManualMultiplier(trendKey){
+      var manual = ddDashboardData && ddDashboardData.config && ddDashboardData.config.manualMultipliers
+        ? ddDashboardData.config.manualMultipliers
+        : {};
+      if(!trendKey || !Object.prototype.hasOwnProperty.call(manual, trendKey)) return null;
+      return normalizeDdManualMultiplierValue(manual[trendKey]);
+    }
+
+    function getDdDraftManualMultiplier(trendKey){
+      if(!trendKey || !Object.prototype.hasOwnProperty.call(ddManualMultiplierDrafts, trendKey)) return null;
+      return normalizeDdManualMultiplierValue(ddManualMultiplierDrafts[trendKey]);
+    }
+
+    function isDdManualMultiplierDirty(trendKey){
+      return getDdSavedManualMultiplier(trendKey) !== getDdDraftManualMultiplier(trendKey);
+    }
+
+    function setDdManualMultiplierDraft(trendKey, value){
+      if(!trendKey) return;
+      ddManualMultiplierDrafts[trendKey] = normalizeDdManualMultiplierValue(value);
+    }
+
+    function buildDdSavedManualMultipliers(){
+      var manual = ddDashboardData && ddDashboardData.config && ddDashboardData.config.manualMultipliers
+        ? ddDashboardData.config.manualMultipliers
+        : {};
+      return cloneDdManualMultipliers(manual);
+    }
+
+    function normalizeDdDisabledTrendKeys(input){
+      var source = [];
+      if(Array.isArray(input)){
+        source = input;
+      } else if(input && typeof input === 'object'){
+        Object.keys(input).forEach(function(key){
+          if(input[key]) source.push(key);
+        });
+      }
+
+      var seen = Object.create(null);
+      var next = [];
+      source.forEach(function(rawValue){
+        var trendKey = String(rawValue || '').trim();
+        if(!trendKey || seen[trendKey]) return;
+        seen[trendKey] = true;
+        next.push(trendKey);
+      });
+      return next;
+    }
+
+    function getDdSavedDisabledTrendKeys(){
+      var auto = ddDashboardData && ddDashboardData.config && ddDashboardData.config.autoTrend
+        ? ddDashboardData.config.autoTrend
+        : {};
+      return normalizeDdDisabledTrendKeys(auto.disabledTrendKeys);
+    }
+
+    function isDdAutoTrendSuppressed(trendKey){
+      return !!trendKey && getDdSavedDisabledTrendKeys().indexOf(trendKey) !== -1;
+    }
+
+    function buildDdSavedAutoTrend(){
+      var auto = ddDashboardData && ddDashboardData.config && ddDashboardData.config.autoTrend
+        ? ddDashboardData.config.autoTrend
+        : {};
+      return {
+        enabled: auto.enabled !== false,
+        maxTraitCount: Number(auto.maxTraitCount) || 800,
+        minSaleCount: Number(auto.minSaleCount) || 2,
+        minSalesPercent: Number(auto.minSalesPercent) || 0.005,
+        saleWeight: Number(auto.saleWeight) || 0.06,
+        salesPercentWeight: Number(auto.salesPercentWeight) || 10,
+        listingWeight: Number(auto.listingWeight) || 1.5,
+        maxMultiplier: Number(auto.maxMultiplier) || 2.5,
+        disabledTrendKeys: getDdSavedDisabledTrendKeys()
+      };
+    }
+
+    function getDdManualMultiplierInputValue(entry){
+      var trendKey = entry && entry.trendKey ? String(entry.trendKey) : '';
+      var draft = getDdDraftManualMultiplier(trendKey);
+      if(Object.prototype.hasOwnProperty.call(ddManualMultiplierDrafts, trendKey)){
+        return draft != null ? String(draft) : '';
+      }
+      var saved = getDdSavedManualMultiplier(trendKey);
+      return saved != null ? String(saved) : '';
+    }
+
+    function updateDdTraitRowSaveState(row){
+      if(!row) return;
+      var input = row.querySelector('[data-trend-key]');
+      var button = row.querySelector('[data-dd-trait-save]');
+      var saveEnabled = !!(ddDashboardData && ddDashboardData.saveEnabled);
+      if(!input || !button) return;
+      var trendKey = String(input.getAttribute('data-trend-key') || '');
+      var dirty = saveEnabled && isDdManualMultiplierDirty(trendKey);
+      button.hidden = !dirty;
+      button.disabled = !dirty;
+      button.textContent = 'Save';
+    }
+
+    function renderDdCommunityOffers(rows){
+      var entries = Array.isArray(rows) ? rows : [];
+      var liveDogeUsd = getDdLiveDogeUsd();
+      if(entries.length === 0){
+        ddCommunityOfferTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">No refused offers saved yet.</td></tr>';
+        return;
+      }
+
+      ddCommunityOfferTbody.innerHTML = entries.map(function(entry, index){
+        var dogNumber = entry.dogNumber != null ? entry.dogNumber : '';
+        var minOfferUsd = entry.minOfferUsd != null
+          ? entry.minOfferUsd
+          : (entry.minOfferDoge != null && liveDogeUsd != null ? +(Number(entry.minOfferDoge) * liveDogeUsd).toFixed(2) : '');
+        var note = entry.note || '';
+        var savedMeta = entry.updatedAt
+          ? 'Saved ' + formatDate(entry.updatedAt) + (entry.updatedBy ? ' · ' + entry.updatedBy : '')
+          : 'Not saved yet';
+
+        return '<tr data-community-index="' + index + '" data-updated-at="' + esc(entry.updatedAt || '') + '" data-updated-by="' + esc(entry.updatedBy || '') + '">' +
+          '<td>' +
+            '<div class="dd-community-stack">' +
+              '<img class="dd-community-thumb" src="' + esc(ddDogImageUrl(dogNumber)) + '" alt="Dog preview" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+              '<div>' +
+                '<div class="dd-community-name">' + esc(dogNumber ? ('Doginal Dog #' + dogNumber) : 'New refused offer') + '</div>' +
+                '<div class="dd-settings-small dd-community-meta">Estimator floor guard</div>' +
+              '</div>' +
+            '</div>' +
+          '</td>' +
+          '<td><input class="dd-community-inscription" type="number" min="1" max="10000" step="1" value="' + esc(dogNumber) + '" placeholder="269"></td>' +
+          '<td><input class="dd-community-offer" type="number" min="1" step="0.01" value="' + esc(minOfferUsd) + '" placeholder="10000"></td>' +
+          '<td class="dd-community-usd">-</td>' +
+          '<td><input class="dd-community-note" type="text" value="' + esc(note) + '" placeholder="Turned down in community deal"><span class="dd-settings-inline-note">' + esc(savedMeta) + '</span></td>' +
+          '<td><button type="button" class="btn-outline dd-settings-remove" data-remove-community-index="' + index + '">Remove</button></td>' +
+        '</tr>';
+      }).join('');
+
+      ddCommunityOfferTbody.querySelectorAll('tr[data-community-index]').forEach(updateDdCommunityOfferRow);
+    }
+
+    function updateDdCommunityOfferRow(row){
+      if(!row) return;
+      var dogInput = row.querySelector('.dd-community-inscription');
+      var offerInput = row.querySelector('.dd-community-offer');
+      var thumb = row.querySelector('.dd-community-thumb');
+      var nameEl = row.querySelector('.dd-community-name');
+      var dogeEl = row.querySelector('.dd-community-usd');
+      var dogNumber = Number(dogInput && dogInput.value);
+      var minOfferUsd = Number(offerInput && offerInput.value);
+      var liveDogeUsd = getDdLiveDogeUsd();
+
+      thumb.src = ddDogImageUrl(Number.isInteger(dogNumber) && dogNumber > 0 ? dogNumber : null);
+      thumb.alt = Number.isInteger(dogNumber) && dogNumber > 0 ? ('Doginal Dog #' + dogNumber) : 'Dog preview';
+      nameEl.textContent = Number.isInteger(dogNumber) && dogNumber > 0 ? ('Doginal Dog #' + dogNumber) : 'New refused offer';
+      dogeEl.textContent = Number.isFinite(minOfferUsd) && minOfferUsd > 0 && liveDogeUsd != null && liveDogeUsd > 0
+        ? (fmt(Math.round(minOfferUsd / liveDogeUsd)) + ' DOGE')
+        : '-';
+    }
+
+    function collectDdCommunityOfferRows(includeDrafts){
+      var rows = [];
+      ddCommunityOfferTbody.querySelectorAll('tr[data-community-index]').forEach(function(row){
+        var dogValue = String((row.querySelector('.dd-community-inscription') || {}).value || '').trim();
+        var offerValue = String((row.querySelector('.dd-community-offer') || {}).value || '').trim();
+        var noteValue = String((row.querySelector('.dd-community-note') || {}).value || '').trim();
+        var dogNumber = Number(dogValue);
+        var minOfferUsd = Number(offerValue);
+
+        if(includeDrafts){
+          rows.push({
+            dogNumber: Number.isInteger(dogNumber) && dogNumber > 0 ? dogNumber : null,
+            minOfferUsd: Number.isFinite(minOfferUsd) && minOfferUsd > 0 ? +minOfferUsd.toFixed(2) : null,
+            note: noteValue,
+            updatedAt: row.getAttribute('data-updated-at') || null,
+            updatedBy: row.getAttribute('data-updated-by') || null
+          });
+          return;
+        }
+
+        if(Number.isInteger(dogNumber) && dogNumber > 0 && Number.isFinite(minOfferUsd) && minOfferUsd > 0){
+          rows.push({
+            dogNumber: dogNumber,
+            minOfferUsd: +minOfferUsd.toFixed(2),
+            note: noteValue || null
+          });
+        }
+      });
+      return rows;
+    }
+
+    function collectDdRefusedOffers(){
+      var result = {};
+      collectDdCommunityOfferRows(false).forEach(function(entry){
+        result[String(entry.dogNumber)] = {
+          minOfferUsd: entry.minOfferUsd,
+          note: entry.note || null
+        };
+      });
+      return result;
+    }
+
+    function renderDdEvaluationLog(rows){
+      var entries = Array.isArray(rows) ? rows : [];
+      if(entries.length === 0){
+        ddEvaluationLogTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">No imported inscription evaluations found for the selected lookback window.</td></tr>';
+        return;
+      }
+
+      ddEvaluationLogTbody.innerHTML = entries.map(function(entry){
+        var dogNumber = entry.dogNumber != null ? entry.dogNumber : '';
+        var name = entry.name || (dogNumber ? ('Doginal Dog #' + dogNumber) : 'Doginal Dog');
+        var rarityText = entry.rarityRank != null
+          ? ('#' + fmt(entry.rarityRank) + (entry.rarityLabel ? ' · ' + entry.rarityLabel : ''))
+          : '-';
+        var estimateText = entry.estimatedDoge != null ? fmt(entry.estimatedDoge) + ' DOGE' : '-';
+        var estimateUsd = entry.estimatedUsd != null ? ('$' + fmt(entry.estimatedUsd, 2)) : '';
+        var marketText = entry.isListed ? 'Listed' : 'Unlisted';
+        var sourceText = formatService(entry.source || 'unknown');
+        var imageUrl = entry.imageUrl || ddDogImageUrl(dogNumber);
+
+        return '<tr>' +
+          '<td>' +
+            '<div class="dd-community-stack">' +
+              '<img class="dd-community-thumb" src="' + esc(imageUrl) + '" alt="' + esc(name) + '" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+              '<div>' +
+                '<div class="dd-community-name">' + esc(name) + '</div>' +
+                '<div class="dd-settings-small">' + esc(entry.inscriptionId || (dogNumber ? ('Dog #' + dogNumber) : 'Unknown inscription')) + '</div>' +
+              '</div>' +
+            '</div>' +
+          '</td>' +
+          '<td>' + (dogNumber ? ('#' + fmt(dogNumber)) : '-') + '</td>' +
+          '<td>' + estimateText + (estimateUsd ? '<div class="dd-settings-small">' + esc(estimateUsd) + '</div>' : '') + '</td>' +
+          '<td>' + esc(rarityText) + '</td>' +
+          '<td>' + esc(marketText) + '<div class="dd-settings-small">via ' + esc(sourceText) + '</div></td>' +
+          '<td>' + esc(entry.evaluatedAt ? formatDate(entry.evaluatedAt) : '-') + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function ddTraitMatchesQuery(entry, query){
+      if(!query) return true;
+      return [
+        entry && entry.trait,
+        entry && entry.value,
+        entry && entry.trendKey,
+        entry && entry.source,
+        entry && entry.trendReason,
+        entry && entry.baseProfile,
+        entry && entry.baseReason,
+        entry && entry.baseSignalSource,
+        entry && entry.rarityBand
+      ].some(function(part){
+        return String(part || '').toLowerCase().indexOf(query) !== -1;
+      });
+    }
+
+    function renderDdEditableTraitRow(entry, saveEnabled, includeReasonColumn){
+      var autoMeta = entry.autoMetrics
+        ? ' <span class="dd-settings-small">(' + fmtMaybe(entry.autoMetrics.salesPercent * 100, 2, '% sold') + ')</span>'
+        : '';
+      var trendKey = String(entry.trendKey || '');
+      var dirty = saveEnabled && isDdManualMultiplierDirty(trendKey);
+      var autoSuppressed = !!entry.autoSuppressed;
+      var showAutoToggle = !!(entry.autoMultiplier || autoSuppressed);
+      return '<tr>' +
+        '<td>' + esc(entry.trait) + '</td>' +
+        '<td>' + esc(entry.value) + '</td>' +
+        '<td>' + fmt(entry.traitCount) + '</td>' +
+        '<td>' + fmt(entry.listed) + '</td>' +
+        '<td>' + fmt(entry.saleCount) + '</td>' +
+        '<td>' + (entry.autoMultiplier ? fmtMaybe(entry.autoMultiplier, 2, 'x') + autoMeta : '-') + '</td>' +
+        '<td><input class="dd-settings-manual" type="number" min="1" step="0.01" data-trend-key="' + esc(trendKey) + '" value="' + esc(getDdManualMultiplierInputValue(entry)) + '" placeholder="1.00"></td>' +
+        '<td>' + fmtMaybe(entry.effectiveMultiplier, 2, 'x') + '</td>' +
+        '<td>' + sourcePill(entry.source) + '</td>' +
+        (includeReasonColumn ? '<td class="dd-settings-small">' + esc(entry.trendReason || '-') + '</td>' : '') +
+        '<td class="dd-trait-action"><div class="dd-trait-actions">' +
+          '<button type="button" class="btn-outline dd-trait-save" data-dd-trait-save data-trend-key="' + esc(trendKey) + '"' + (dirty ? '' : ' hidden') + (dirty ? '' : ' disabled') + '>Save</button>' +
+          (showAutoToggle
+            ? '<button type="button" class="btn-outline dd-trait-toggle" data-dd-trait-auto-toggle data-trend-key="' + esc(trendKey) + '"' + (saveEnabled ? '' : ' disabled') + '>' + (autoSuppressed ? 'Use Auto' : 'Ignore Auto') + '</button>'
+            : '') +
+        '</div></td>' +
+      '</tr>';
+    }
+
+    function formatDdBasePriceInputs(entry){
+      var parts = [];
+      if(entry.floorDoge != null) parts.push('Floor ' + fmt(entry.floorDoge) + ' DOGE');
+      if(entry.saleMedianDoge != null) parts.push('Sale med ' + fmt(entry.saleMedianDoge) + ' DOGE');
+      if(entry.topSaleDoge != null) parts.push('Top sale ' + fmt(entry.topSaleDoge) + ' DOGE');
+      return parts.length ? parts.join(' · ') : 'No direct market input';
+    }
+
+    function formatDdBaseSignal(entry){
+      if(entry.baseSignalDoge == null){
+        return '<span class="dd-settings-small">Scarcity stack</span>';
+      }
+      return fmt(entry.baseSignalDoge) + ' DOGE' +
+        (entry.baseSignalUsd != null ? '<div class="dd-settings-small">$' + fmt(entry.baseSignalUsd, 2) + '</div>' : '') +
+        '<div class="dd-settings-small">' + esc(String(entry.baseSignalSource || 'scarcity').replace(/-/g, ' ')) + '</div>';
+    }
+
+    function renderDdBasePriceTraits(){
+      if(!ddBasePriceTraitTbody) return;
+      var rows = ddDashboardData && Array.isArray(ddDashboardData.basePriceTraits) ? ddDashboardData.basePriceTraits : [];
+      var query = String((ddBasePriceTraitSearch && ddBasePriceTraitSearch.value) || '').trim().toLowerCase();
+      var filtered = rows.filter(function(entry){
+        return ddTraitMatchesQuery(entry, query) && (ddActiveBaseCategoryFilter === 'all' || entry.trait === ddActiveBaseCategoryFilter);
+      });
+
+      if(filtered.length === 0){
+        ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">No base price signals matched this filter.</td></tr>';
+      } else {
+        ddBasePriceTraitTbody.innerHTML = filtered.map(function(entry){
+          return '<tr>' +
+            '<td>' + esc(entry.trait) + '</td>' +
+            '<td>' + esc(entry.value) + '</td>' +
+            '<td>' + esc(String(entry.rarityBand || '-').replace(/-/g, ' ')) + '</td>' +
+            '<td>' + fmt(entry.traitCount) + '</td>' +
+            '<td>' + fmt(entry.listed) + '</td>' +
+            '<td>' + fmt(entry.saleCount) + '</td>' +
+            '<td class="dd-settings-small">' + esc(formatDdBasePriceInputs(entry)) + '</td>' +
+            '<td>' + formatDdBaseSignal(entry) + '</td>' +
+            '<td>' + esc(String(entry.baseProfile || '-').replace(/-/g, ' ')) + '</td>' +
+            '<td class="dd-settings-small">' + esc(entry.baseReason || '-') + '</td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      if(ddBasePriceTraitMeta){
+        ddBasePriceTraitMeta.textContent = 'Base price signals: ' + fmt(filtered.length) + ' shown of ' + fmt(rows.length) + ' · Listing, sale, and scarcity-led anchors';
+      }
+    }
+
+    function loadDdEvaluationImportFile(file){
+      if(!file || !ddEvaluationImportInput) return;
+      var reader = new FileReader();
+      reader.onload = function(){
+        ddEvaluationImportInput.value = String(reader.result || '');
+        showDdEvaluationImportStatus('Loaded ' + file.name + ' into the backfill box.', 'success');
+      };
+      reader.onerror = function(){
+        showDdEvaluationImportStatus('Failed to read the selected log file.', 'error');
+      };
+      reader.readAsText(file);
+    }
+
+    function importDdEvaluationHistory(){
+      if(!ddDashboardData || !ddDashboardData.saveEnabled){
+        showDdEvaluationImportStatus('Importing is disabled until DD_ADMIN_PASSWORD is configured on the server.', 'error');
+        return;
+      }
+      if(!ensureDdAdminPassword()){
+        showDdEvaluationImportStatus('DD admin password is required to import evaluation history.', 'error');
+        return;
+      }
+
+      var rawText = String((ddEvaluationImportInput && ddEvaluationImportInput.value) || '').trim();
+      if(!rawText){
+        showDdEvaluationImportStatus('Paste raw access logs, DD evaluator URLs, or NDJSON lines before importing.', 'error');
+        return;
+      }
+
+      var lookbackHours = Number((ddEvaluationImportHours && ddEvaluationImportHours.value) || 48);
+      if(!Number.isFinite(lookbackHours) || lookbackHours < 1){
+        lookbackHours = 48;
+      }
+
+      ddEvaluationImportBtn.disabled = true;
+      if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = true;
+      if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = true;
+      showDdEvaluationImportStatus('Importing DD evaluator history from the pasted logs…');
+
+      function runDdImport(allowPrompt){
+        fetch(evaluationImportUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-dd-admin-password': getDdRequestPassword()
+          },
+          body: JSON.stringify({
+            rawText: rawText,
+            lookbackHours: lookbackHours,
+            source: 'kushmedia-backfill'
+          })
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if(data.error){
+              if(allowPrompt && isInvalidDdPasswordError(data.error)){
+                ddAdminPassword = '';
+                if(promptForDdAdminPassword()){
+                  showDdEvaluationImportStatus('Retrying DD evaluation history import with the DD admin password…');
+                  runDdImport(false);
+                  return;
+                }
+              }
+              ddEvaluationImportBtn.disabled = false;
+              if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = false;
+              if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = false;
+              showDdEvaluationImportStatus(data.error, 'error');
+              return;
+            }
+
+            ddEvaluationImportBtn.disabled = false;
+            if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = false;
+            if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = false;
+            setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
+            renderDdCommunityOffers((ddDashboardData && ddDashboardData.communityOffers) || []);
+            renderDdEvaluationLog((ddDashboardData && ddDashboardData.recentEvaluations) || []);
+            renderDdTraits();
+
+            var importedLabel = fmt(data.importedCount) + ' evaluation' + (Number(data.importedCount) === 1 ? '' : 's');
+            var dogLabel = fmt(data.uniqueDogs) + ' dog' + (Number(data.uniqueDogs) === 1 ? '' : 's');
+            var notes = [];
+            if(data.duplicateCount) notes.push(fmt(data.duplicateCount) + ' duplicate' + (Number(data.duplicateCount) === 1 ? '' : 's') + ' skipped');
+            if(data.skippedOutsideWindow) notes.push(fmt(data.skippedOutsideWindow) + ' older line' + (Number(data.skippedOutsideWindow) === 1 ? '' : 's') + ' ignored');
+            if(data.invalidCount) notes.push(fmt(data.invalidCount) + ' non-matching line' + (Number(data.invalidCount) === 1 ? '' : 's') + ' ignored');
+            if(Array.isArray(data.failedDogs) && data.failedDogs.length) notes.push('Failed dogs: ' + data.failedDogs.join(', '));
+            showDdEvaluationImportStatus('Imported ' + importedLabel + ' across ' + dogLabel + '.' + (notes.length ? ' ' + notes.join(' · ') + '.' : ''), 'success');
+            showDdStatus('DD evaluation history import finished and the recent evaluation table has been refreshed.', 'success');
+          })
+          .catch(function(){
+            ddEvaluationImportBtn.disabled = false;
+            if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = false;
+            if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = false;
+            showDdEvaluationImportStatus('Failed to import DD evaluation history.', 'error');
+          });
+      }
+
+      runDdImport(true);
+    }
+
+    function clearDdEvaluationHistory(){
+      if(!ddDashboardData || !ddDashboardData.saveEnabled){
+        showDdEvaluationImportStatus('Clearing is disabled until DD_ADMIN_PASSWORD is configured on the server.', 'error');
+        return;
+      }
+      if(!ensureDdAdminPassword()){
+        showDdEvaluationImportStatus('DD admin password is required to clear evaluation history.', 'error');
+        return;
+      }
+
+      if(!window.confirm('Clear imported DD evaluation history from the admin log? This removes the imported results from the server log file and the admin table.')){
+        return;
+      }
+
+      ddEvaluationImportBtn.disabled = true;
+      if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = true;
+      if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = true;
+      showDdEvaluationImportStatus('Clearing imported DD evaluation history from the admin log…');
+
+      function runDdClear(allowPrompt){
+        fetch(evaluationClearUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-dd-admin-password': getDdRequestPassword()
+          },
+          body: JSON.stringify({
+            source: 'kushmedia-backfill'
+          })
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if(data.error){
+              if(allowPrompt && isInvalidDdPasswordError(data.error)){
+                ddAdminPassword = '';
+                if(promptForDdAdminPassword()){
+                  showDdEvaluationImportStatus('Retrying DD evaluation history clear with the DD admin password…');
+                  runDdClear(false);
+                  return;
+                }
+              }
+              ddEvaluationImportBtn.disabled = false;
+              if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = false;
+              if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = false;
+              showDdEvaluationImportStatus(data.error, 'error');
+              return;
+            }
+
+            ddEvaluationImportBtn.disabled = false;
+            if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = false;
+            if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = false;
+            if(ddEvaluationImportInput) ddEvaluationImportInput.value = '';
+            setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
+            renderDdCommunityOffers((ddDashboardData && ddDashboardData.communityOffers) || []);
+            renderDdEvaluationLog((ddDashboardData && ddDashboardData.recentEvaluations) || []);
+            renderDdTraits();
+
+            showDdEvaluationImportStatus(
+              Number(data.removedCount) > 0
+                ? ('Cleared ' + fmt(data.removedCount) + ' imported evaluation' + (Number(data.removedCount) === 1 ? '' : 's') + ' from the admin log.')
+                : 'No imported evaluations were stored in the admin log.',
+              'success'
+            );
+            showDdStatus('Imported DD evaluation history has been cleared and the admin table has been refreshed.', 'success');
+          })
+          .catch(function(error){
+            ddEvaluationImportBtn.disabled = false;
+            if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = false;
+            if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = false;
+            showDdEvaluationImportStatus(
+              error && error.message ? ('Failed to clear DD evaluation history: ' + error.message) : 'Failed to clear DD evaluation history.',
+              'error'
+            );
+          });
+      }
+
+      runDdClear(true);
+    }
+
+    function rebuildDdTraitValueLists(){
+      ddTraitValueLists = Object.create(null);
+      DD_EVAL_TRAIT_KEYS.forEach(function(k){ ddTraitValueLists[k] = []; });
+      var traitRows = ddDashboardData && Array.isArray(ddDashboardData.traits) ? ddDashboardData.traits : [];
+      traitRows.forEach(function(entry){
+        var k = entry.trait;
+        var v = entry.value;
+        if(!k || v == null || v === '') return;
+        if(ddTraitValueLists[k].indexOf(v) === -1){
+          ddTraitValueLists[k].push(v);
+        }
+      });
+      DD_EVAL_TRAIT_KEYS.forEach(function(k){
+        ddTraitValueLists[k].sort(function(a, b){ return String(a).localeCompare(String(b)); });
+      });
+    }
+
+    function ddNumericSortKey(v, desc){
+      if(v == null || v === ''){
+        return desc ? -Infinity : Infinity;
+      }
+      var n = Number(v);
+      return Number.isFinite(n) ? n : (desc ? -Infinity : Infinity);
+    }
+
+    function compareDdTraitEntries(a, b, key, dir){
+      var desc = dir === 'desc';
+      var mul = desc ? -1 : 1;
+      switch(key){
+        case 'trait':
+          return mul * String(a.trait || '').localeCompare(String(b.trait || ''));
+        case 'value':
+          return mul * String(a.value || '').localeCompare(String(b.value || ''));
+        case 'traitCount':
+          return mul * (ddNumericSortKey(a.traitCount, desc) - ddNumericSortKey(b.traitCount, desc));
+        case 'listed':
+          return mul * (ddNumericSortKey(a.listed, desc) - ddNumericSortKey(b.listed, desc));
+        case 'saleCount':
+          return mul * (ddNumericSortKey(a.saleCount, desc) - ddNumericSortKey(b.saleCount, desc));
+        case 'autoMultiplier':
+          return mul * (ddNumericSortKey(a.autoMultiplier, desc) - ddNumericSortKey(b.autoMultiplier, desc));
+        case 'effectiveMultiplier':
+          return mul * (ddNumericSortKey(a.effectiveMultiplier, desc) - ddNumericSortKey(b.effectiveMultiplier, desc));
+        case 'source':
+          return mul * String(a.source || '').localeCompare(String(b.source || ''));
+        case 'trendReason':
+          return mul * String(a.trendReason || '').localeCompare(String(b.trendReason || ''));
+        default:
+          return mul * (ddNumericSortKey(a.traitCount, desc) - ddNumericSortKey(b.traitCount, desc));
+      }
+    }
+
+    function syncDdTraitSortHeaderClasses(){
+      document.querySelectorAll('.dd-th-sort').forEach(function(btn){
+        var k = btn.getAttribute('data-dd-sort');
+        var base = DD_SORT_LABELS[k] || k;
+        btn.classList.toggle('dd-sort-on', k === ddTraitSortKey);
+        btn.textContent = base + (k === ddTraitSortKey ? (ddTraitSortDir === 'desc' ? ' ▼' : ' ▲') : '');
+      });
+    }
+
+    function renderDdTraits(){
+      rebuildDdTraitValueLists();
+      var rows = ddDashboardData && Array.isArray(ddDashboardData.traits) ? ddDashboardData.traits : [];
+      var query = String(ddTraitSearch.value || '').trim().toLowerCase();
+      var saveEnabled = !!(ddDashboardData && ddDashboardData.saveEnabled);
+      var filtered = rows.filter(function(entry){
+        return ddTraitMatchesQuery(entry, query) && (ddActiveCategoryFilter === 'all' || entry.trait === ddActiveCategoryFilter);
+      });
+      if(ddTraitViewFilter === 'active'){
+        filtered = filtered.filter(function(entry){
+          return entry.source !== 'none' || entry.autoSuppressed || entry.autoMultiplier != null;
+        });
+      }
+      var sorted = filtered.slice().sort(function(a, b){
+        return compareDdTraitEntries(a, b, ddTraitSortKey, ddTraitSortDir);
+      });
+
+      if(sorted.length === 0){
+        ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">No traits matched this filter.</td></tr>';
+      } else {
+        ddTraitTbody.innerHTML = sorted.map(function(entry){
+          return renderDdEditableTraitRow(entry, saveEnabled, true);
+        }).join('');
+      }
+      syncDdTraitSortHeaderClasses();
+
+      var snapshot = ddDashboardData && ddDashboardData.snapshot ? ddDashboardData.snapshot : {};
+      var updatedAt = ddDashboardData && ddDashboardData.config ? ddDashboardData.config.updatedAt : null;
+      var communityCount = ddDashboardData && Array.isArray(ddDashboardData.communityOffers) ? ddDashboardData.communityOffers.length : 0;
+      var evaluationCount = ddDashboardData && Array.isArray(ddDashboardData.recentEvaluations) ? ddDashboardData.recentEvaluations.length : 0;
+      var trendingCount = ddDashboardData && Array.isArray(ddDashboardData.trendingTraits) ? ddDashboardData.trendingTraits.length : 0;
+      var baseSignalCount = ddDashboardData && Array.isArray(ddDashboardData.basePriceTraits) ? ddDashboardData.basePriceTraits.length : 0;
+      ddSettingsMeta.textContent = 'Traits: ' + fmt(sorted.length) + ' shown of ' + fmt(rows.length) + ' · Trending subset ' + fmt(trendingCount) + ' · Base signals ' + fmt(baseSignalCount) + ' · Refused offers ' + fmt(communityCount) + ' · Imported evals ' + fmt(evaluationCount) + ' · Snapshot ' + (snapshot.builtAt ? formatDate(snapshot.builtAt) : 'pending') + ' · DOGE/USD ' + (snapshot.dogeUsd != null ? '$' + Number(snapshot.dogeUsd).toFixed(4) : 'pending') + (updatedAt ? ' · Last saved ' + formatDate(updatedAt) : '');
+      ddSaveBtn.disabled = !saveEnabled;
+      if(ddEvaluationImportBtn) ddEvaluationImportBtn.disabled = !saveEnabled;
+      if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = !saveEnabled;
+      if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = !saveEnabled;
+      if(ddSaveSpecialMultipliersBtn) ddSaveSpecialMultipliersBtn.hidden = !saveEnabled;
+      renderDdBasePriceTraits();
+      if(ddDashboardData && !saveEnabled){
+        showDdStatus('Viewing live DD data only. Saving is disabled until DD_ADMIN_PASSWORD is configured on the server.', 'error');
+      }
+    }
+
+    function collectDdManualMultipliers(){
+      var result = {};
+      Object.keys(ddManualMultiplierDrafts).forEach(function(key){
+        var value = getDdDraftManualMultiplier(key);
+        if(value != null){
+          result[key] = value;
+        }
+      });
+      return result;
+    }
+
+    function saveDdTraitRow(trendKey, row){
+      if(!ddDashboardData || !ddDashboardData.saveEnabled){
+        showDdStatus('Saving is disabled until DD_ADMIN_PASSWORD is configured on the server.', 'error');
+        return;
+      }
+      if(!ensureDdAdminPassword()){
+        showDdStatus('DD admin password is required to save trait overrides.', 'error');
+        return;
+      }
+
+      if(!trendKey || !isDdManualMultiplierDirty(trendKey)){
+        if(row) updateDdTraitRowSaveState(row);
+        return;
+      }
+
+      var button = row ? row.querySelector('[data-dd-trait-save]') : null;
+      var nextManualMultipliers = buildDdSavedManualMultipliers();
+      var nextValue = getDdDraftManualMultiplier(trendKey);
+      if(nextValue != null){
+        nextManualMultipliers[trendKey] = nextValue;
+      } else {
+        delete nextManualMultipliers[trendKey];
+      }
+
+      if(button){
+        button.hidden = false;
+        button.disabled = true;
+        button.textContent = 'Saving...';
+      }
+      showDdStatus('Saving trait override for ' + trendKey + '...');
+
+      function runDdTraitSave(allowPrompt){
+        fetch(settingsUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-dd-admin-password': getDdRequestPassword()
+          },
+          body: JSON.stringify({
+            manualMultipliers: nextManualMultipliers,
+            refusedOffers: ddDashboardData && ddDashboardData.config && ddDashboardData.config.refusedOffers ? ddDashboardData.config.refusedOffers : {},
+            autoTrend: ddDashboardData && ddDashboardData.config && ddDashboardData.config.autoTrend ? ddDashboardData.config.autoTrend : collectDdAutoTrend(),
+            updatedBy: 'admin.html:trait-row'
+          })
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if(data.error){
+              if(allowPrompt && isInvalidDdPasswordError(data.error)){
+                ddAdminPassword = '';
+                if(promptForDdAdminPassword()){
+                  showDdStatus('Retrying row save with the DD admin password…');
+                  runDdTraitSave(false);
+                  return;
+                }
+              }
+              if(row) updateDdTraitRowSaveState(row);
+              showDdStatus(data.error, 'error');
+              return;
+            }
+
+            setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
+            setDdManualMultiplierDraft(trendKey, getDdSavedManualMultiplier(trendKey));
+            renderDdTraits();
+            showDdStatus('Saved trait override for ' + trendKey + '.', 'success');
+          })
+          .catch(function(){
+            if(row) updateDdTraitRowSaveState(row);
+            showDdStatus('Failed to save trait override for ' + trendKey + '.', 'error');
+          });
+      }
+
+      runDdTraitSave(true);
+    }
+
+    function saveDdTraitAutoTrend(trendKey, row){
+      if(!ddDashboardData || !ddDashboardData.saveEnabled){
+        showDdStatus('Saving is disabled until DD_ADMIN_PASSWORD is configured on the server.', 'error');
+        return;
+      }
+      if(!ensureDdAdminPassword()){
+        showDdStatus('DD admin password is required to update auto trend controls.', 'error');
+        return;
+      }
+      if(!trendKey) return;
+
+      var button = row ? row.querySelector('[data-dd-trait-auto-toggle]') : null;
+      var nextAutoTrend = buildDdSavedAutoTrend();
+      var nextDisabledTrendKeys = nextAutoTrend.disabledTrendKeys.filter(function(key){
+        return key !== trendKey;
+      });
+      var nextSuppressed = !isDdAutoTrendSuppressed(trendKey);
+      if(nextSuppressed){
+        nextDisabledTrendKeys.push(trendKey);
+      }
+      nextAutoTrend.disabledTrendKeys = normalizeDdDisabledTrendKeys(nextDisabledTrendKeys);
+
+      if(button){
+        button.disabled = true;
+        button.textContent = 'Saving...';
+      }
+      showDdStatus((nextSuppressed ? 'Ignoring' : 'Restoring') + ' auto trend for ' + trendKey + '...');
+
+      function runDdAutoTrendSave(allowPrompt){
+        fetch(settingsUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-dd-admin-password': getDdRequestPassword()
+          },
+          body: JSON.stringify({
+            manualMultipliers: buildDdSavedManualMultipliers(),
+            refusedOffers: ddDashboardData && ddDashboardData.config && ddDashboardData.config.refusedOffers ? ddDashboardData.config.refusedOffers : {},
+            autoTrend: nextAutoTrend,
+            updatedBy: 'admin.html:auto-trend'
+          })
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if(data.error){
+              if(allowPrompt && isInvalidDdPasswordError(data.error)){
+                ddAdminPassword = '';
+                if(promptForDdAdminPassword()){
+                  showDdStatus('Retrying auto trend update with the DD admin password…');
+                  runDdAutoTrendSave(false);
+                  return;
+                }
+              }
+              renderDdTraits();
+              showDdStatus(data.error, 'error');
+              return;
+            }
+
+            setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
+            renderDdTraits();
+            showDdStatus((nextSuppressed ? 'Ignored' : 'Restored') + ' auto trend for ' + trendKey + '.', 'success');
+          })
+          .catch(function(){
+            renderDdTraits();
+            showDdStatus('Failed to update auto trend for ' + trendKey + '.', 'error');
+          });
+      }
+
+      runDdAutoTrendSave(true);
+    }
+
+    function collectDdAutoTrend(){
+      return {
+        enabled: ddAutoEnabled.checked,
+        maxTraitCount: Number(ddMaxTraitCount.value) || 800,
+        minSaleCount: Number(ddMinSaleCount.value) || 2,
+        minSalesPercent: Number(ddMinSalesPercent.value) || 0.005,
+        saleWeight: Number(ddSaleWeight.value) || 0.06,
+        salesPercentWeight: Number(ddSalesPercentWeight.value) || 10,
+        listingWeight: Number(ddListingWeight.value) || 1.5,
+        maxMultiplier: Number(ddMaxMultiplier.value) || 2.5,
+        disabledTrendKeys: getDdSavedDisabledTrendKeys()
+      };
+    }
+
+    function loadDdSettings(){
+      showDdStatus('Loading DD evaluator dashboard…');
+      ddReloadBtn.disabled = true;
+      fetch(settingsUrl())
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          ddReloadBtn.disabled = false;
+          if(data.error){
+            showDdStatus(data.error, 'error');
+            ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">DD dashboard is unavailable.</td></tr>';
+            if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Base price signals are unavailable.</td></tr>';
+            return;
+          }
+          setDdDashboardData(data, data.saveEnabled);
+          syncDdManualMultiplierDrafts();
+          applyDdConfigToForm(data.config || {});
+          renderDdCommunityOffers(Array.isArray(data.communityOffers) ? data.communityOffers : []);
+          renderDdEvaluationLog(Array.isArray(data.recentEvaluations) ? data.recentEvaluations : []);
+          showDdStatus(data.saveEnabled ? 'DD dashboard ready. Edit a trait row to reveal its Save button, or use Ignore Auto to suppress a falsely trending trait.' : 'DD dashboard ready in read-only mode. Configure DD_ADMIN_PASSWORD to enable saving.', data.saveEnabled ? 'success' : 'error');
+          renderDdTraits();
+        })
+        .catch(function(){
+          ddReloadBtn.disabled = false;
+          showDdStatus('Failed to load DD evaluator dashboard.', 'error');
+          ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">DD dashboard failed to load.</td></tr>';
+          if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Base price signals failed to load.</td></tr>';
+          ddCommunityOfferTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Community offer data failed to load.</td></tr>';
+          ddEvaluationLogTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Evaluation log failed to load.</td></tr>';
+        });
+    }
+
+    function saveDdSettings(){
+      if(!ddDashboardData || !ddDashboardData.saveEnabled){
+        showDdStatus('Saving is disabled until DD_ADMIN_PASSWORD is configured on the server.', 'error');
+        return;
+      }
+      if(!ensureDdAdminPassword()){
+        showDdStatus('DD admin password is required to save DD evaluator settings.', 'error');
+        return;
+      }
+
+      ddSaveBtn.disabled = true;
+      showDdStatus('Saving DD evaluator settings…');
+
+      function runDdSave(allowPrompt){
+        fetch(settingsUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-dd-admin-password': getDdRequestPassword()
+          },
+          body: JSON.stringify({
+            manualMultipliers: collectDdManualMultipliers(),
+            refusedOffers: collectDdRefusedOffers(),
+            autoTrend: collectDdAutoTrend(),
+            specialMultipliers: collectSpecialMultipliers(),
+            updatedBy: 'admin.html'
+          })
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if(data.error){
+              if(allowPrompt && isInvalidDdPasswordError(data.error)){
+                ddAdminPassword = '';
+                if(promptForDdAdminPassword()){
+                  showDdStatus('Retrying DD evaluator save with the DD admin password…');
+                  runDdSave(false);
+                  return;
+                }
+              }
+              ddSaveBtn.disabled = false;
+              showDdStatus(data.error, 'error');
+              return;
+            }
+            ddSaveBtn.disabled = false;
+            setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
+            syncDdManualMultiplierDrafts();
+            applyDdConfigToForm((data.dashboard && data.dashboard.config) || {});
+            renderDdCommunityOffers((data.dashboard && data.dashboard.communityOffers) || []);
+            renderDdEvaluationLog((data.dashboard && data.dashboard.recentEvaluations) || []);
+            renderDdTraits();
+            showDdStatus('DD evaluator settings saved. New evaluations will use the updated multipliers.', 'success');
+          })
+          .catch(function(){
+            ddSaveBtn.disabled = false;
+            showDdStatus('Failed to save DD evaluator settings.', 'error');
+          });
+      }
+
+      runDdSave(true);
+    }
+
+    function openModal(b){b.setAttribute('aria-hidden','false');document.body.classList.add('modal-open');}
+    function closeModalEl(b){b.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open');}
+
+    /* ---- Login ---- */
+    loginForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      loginError.hidden = true;
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Logging in\u2026';
+
+      var pw = document.getElementById('adminPw').value;
+      var url = SCRIPT_URL + '?action=admin-login&password=' + encodeURIComponent(pw);
+
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Log In \u2192';
+          if(data.error){
+            loginError.textContent = data.error;
+            loginError.hidden = false;
+            return;
+          }
+          password = pw;
+          loginPanel.hidden = true;
+          dashboard.hidden = false;
+          loadOrders();
+          loadDdSettings();
+        })
+        .catch(function(){
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Log In \u2192';
+          loginError.textContent = 'Could not reach server. Try again later.';
+          loginError.hidden = false;
+        });
+    });
+
+    /* ---- Logout ---- */
+    logoutBtn.addEventListener('click', function(){
+      password = '';
+      ddAdminPassword = '';
+      ddDashboardData = null;
+      setDdActivePanel('controls');
+      ddActiveCategoryFilter = 'all';
+      ddTraitViewFilter = 'all';
+      ddActiveBaseCategoryFilter = 'all';
+      document.querySelectorAll('#ddTraitCatFilters .dd-cat-chip').forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-dd-cat') === 'all'); });
+      document.querySelectorAll('#ddTraitViewFilters .dd-cat-chip').forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-dd-trait-view') === 'all'); });
+      dashboard.hidden = true;
+      loginPanel.hidden = false;
+      document.getElementById('adminPw').value = '';
+      if(ddEvaluationImportInput) ddEvaluationImportInput.value = '';
+      if(ddEvaluationImportHours) ddEvaluationImportHours.value = 48;
+      if(ddEvaluationImportFile) ddEvaluationImportFile.value = '';
+      ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">Log in to view DD evaluator settings.</td></tr>';
+      if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Log in to view base price signals.</td></tr>';
+      ddCommunityOfferTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Log in to manage refused community offers.</td></tr>';
+      ddEvaluationLogTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Log in to view recent inscription evaluations.</td></tr>';
+      ddSettingsMeta.textContent = 'Sign in to load live trend and sales data.';
+      if(ddBasePriceTraitMeta) ddBasePriceTraitMeta.textContent = 'Sign in to load base price signals.';
+      showDdStatus('', '');
+      showDdEvaluationImportStatus('', '');
+    });
+
+    /* ---- Load orders ---- */
+    function loadOrders(){
+      ordersLoading.hidden = false;
+      ordersEmpty.hidden = true;
+      ordersTable.hidden = true;
+
+      var url = SCRIPT_URL + '?action=admin-list&password=' + encodeURIComponent(password);
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          ordersLoading.hidden = true;
+          if(data.error){
+            ordersEmpty.textContent = data.error;
+            ordersEmpty.hidden = false;
+            return;
+          }
+          allOrders = data.orders || [];
+          renderOrders();
+        })
+        .catch(function(){
+          ordersLoading.hidden = true;
+          ordersEmpty.textContent = 'Failed to load orders.';
+          ordersEmpty.hidden = false;
+        });
+    }
+
+    /* ---- Render orders ---- */
+    function renderOrders(){
+      var filtered = allOrders;
+      if(currentFilter !== 'all'){
+        filtered = allOrders.filter(function(o){
+          return (o.status || 'Pending') === currentFilter;
+        });
+      }
+
+      if(filtered.length === 0){
+        ordersTable.hidden = true;
+        ordersEmpty.textContent = 'No orders found.';
+        ordersEmpty.hidden = false;
+        return;
+      }
+
+      ordersEmpty.hidden = true;
+      ordersTable.hidden = false;
+
+      // Sort newest first
+      filtered.sort(function(a,b){
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+
+      var html = '';
+      filtered.forEach(function(o){
+        var status = o.status || 'Pending';
+        var paid = (o.paymentConfirmed || 'No').toLowerCase() === 'yes';
+        html += '<tr data-orderid="' + esc(o.orderId) + '">';
+        html += '<td class="admin-cell-id" data-label="Order ID">' + esc(o.orderId) + '</td>';
+        html += '<td data-label="Date">' + esc(formatDate(o.timestamp)) + '</td>';
+        html += '<td data-label="Customer">' + esc(o.name) + '</td>';
+        html += '<td data-label="Service">' + esc(formatService(o.service)) + '</td>';
+        html += '<td data-label="Payment">' + esc(o.payment || '') + '</td>';
+        html += '<td data-label="Status">';
+        html += '<select class="admin-status-select" data-orderid="' + esc(o.orderId) + '">';
+        ['Pending','In Progress','Complete'].forEach(function(s){
+          html += '<option value="' + s + '"' + (s === status ? ' selected' : '') + '>' + s + '</option>';
+        });
+        html += '</select>';
+        html += '</td>';
+        html += '<td data-label="Paid">';
+        html += '<label class="admin-paid-label">';
+        html += '<input type="checkbox" class="admin-paid-check" data-orderid="' + esc(o.orderId) + '"' + (paid ? ' checked' : '') + '>';
+        html += '<span class="admin-paid-indicator ' + (paid ? 'paid-yes' : '') + '">' + (paid ? '\u2713' : '\u2717') + '</span>';
+        html += '</label>';
+        html += '</td>';
+        html += '<td data-label=""><button type="button" class="btn-outline admin-detail-btn" data-orderid="' + esc(o.orderId) + '">Details</button></td>';
+        html += '</tr>';
+      });
+
+      ordersTbody.innerHTML = html;
+
+      // Attach status change listeners
+      ordersTbody.querySelectorAll('.admin-status-select').forEach(function(sel){
+        sel.addEventListener('change', function(){
+          updateOrder(sel.getAttribute('data-orderid'), 'status', sel.value);
+        });
+      });
+
+      // Attach payment confirmed listeners
+      ordersTbody.querySelectorAll('.admin-paid-check').forEach(function(chk){
+        chk.addEventListener('change', function(){
+          var val = chk.checked ? 'Yes' : 'No';
+          var indicator = chk.nextElementSibling;
+          indicator.textContent = chk.checked ? '\u2713' : '\u2717';
+          indicator.classList.toggle('paid-yes', chk.checked);
+          updateOrder(chk.getAttribute('data-orderid'), 'paymentConfirmed', val);
+        });
+      });
+
+      // Attach detail buttons
+      ordersTbody.querySelectorAll('.admin-detail-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          showDetail(btn.getAttribute('data-orderid'));
+        });
+      });
+    }
+
+    /* ---- Update order ---- */
+    function updateOrder(orderId, field, value){
+      var url = SCRIPT_URL + '?action=admin-update&password=' + encodeURIComponent(password)
+        + '&orderId=' + encodeURIComponent(orderId)
+        + '&' + field + '=' + encodeURIComponent(value);
+
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if(data.error){
+            alert('Update failed: ' + data.error);
+            loadOrders();
+            return;
+          }
+          // Update local cache
+          allOrders.forEach(function(o){
+            if(o.orderId === orderId){
+              o[field] = value;
+            }
+          });
+        })
+        .catch(function(){
+          alert('Could not reach server. Try again.');
+          loadOrders();
+        });
+    }
+
+    /* ---- Show detail modal ---- */
+    function showDetail(orderId){
+      var order = null;
+      for(var i = 0; i < allOrders.length; i++){
+        if(allOrders[i].orderId === orderId){ order = allOrders[i]; break; }
+      }
+      if(!order) return;
+
+      detailTitle.textContent = 'Order: ' + order.orderId;
+
+      var html = '';
+      html += '<div class="order-result">';
+      html += row('Order ID', order.orderId);
+      html += row('Date', formatDate(order.timestamp));
+      html += row('Customer', order.name);
+      html += row('Email', order.email);
+      html += row('Service', formatService(order.service));
+      html += row('Payment Method', order.payment || '');
+      html += row('Status', '<span class="status-badge ' + badgeClass(order.status) + '">' + esc(order.status || 'Pending') + '</span>');
+      html += row('Payment Confirmed', (order.paymentConfirmed || 'No').toLowerCase() === 'yes'
+        ? '<span class="status-badge complete">Confirmed</span>'
+        : '<span class="status-badge pending">Awaiting</span>');
+
+      if(order.notes){
+        html += row('Notes', order.notes);
+      }
+
+      // Parse details
+      var details = {};
+      try { details = typeof order.details === 'string' ? JSON.parse(order.details) : (order.details || {}); } catch(e){}
+      for(var key in details){
+        if(details.hasOwnProperty(key)){
+          var label = key.replace(/_/g,' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
+          html += row(label, details[key]);
+        }
+      }
+
+      html += '</div>';
+      detailContent.innerHTML = html;
+      openModal(detailBg);
+    }
+
+    function row(label, value){
+      return '<div class="order-result-row"><span>' + esc(label) + '</span><span>' + (
+        // If value contains HTML tags (badges), use as-is; otherwise escape
+        (typeof value === 'string' && value.indexOf('<span') === 0) ? value : esc(value)
+      ) + '</span></div>';
+    }
+
+    /* ---- Filters ---- */
+    document.querySelectorAll('.admin-filter-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('.admin-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        currentFilter = btn.getAttribute('data-filter');
+        renderOrders();
+      });
+    });
+
+    ddPanelButtons.forEach(function(button){
+      button.addEventListener('click', function(){
+        setDdActivePanel(button.getAttribute('data-dd-panel-target'));
+      });
+    });
+
+    if(ddReloadBtn) ddReloadBtn.addEventListener('click', loadDdSettings);
+    if(ddSaveBtn) ddSaveBtn.addEventListener('click', saveDdSettings);
+    if(ddSaveSpecialMultipliersBtn) ddSaveSpecialMultipliersBtn.addEventListener('click', saveSpecialMultipliers);
+    if(ddAddComboBtn) ddAddComboBtn.addEventListener('click', function(){ addDdComboRow(null); });
+    if(ddCombosContainer){
+      ddCombosContainer.addEventListener('click', function(e){
+        var removeCombo = e.target && e.target.closest ? e.target.closest('.dd-combo-remove') : null;
+        if(removeCombo){ removeCombo.closest('.dd-combo-row').remove(); }
+      });
+    }
+    if(ddEvaluationImportBtn) ddEvaluationImportBtn.addEventListener('click', importDdEvaluationHistory);
+    if(ddEvaluationClearBtn) ddEvaluationClearBtn.addEventListener('click', clearDdEvaluationHistory);
+    if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.addEventListener('click', function(){ if(ddEvaluationImportFile) ddEvaluationImportFile.click(); });
+    if(ddEvaluationImportFile) ddEvaluationImportFile.addEventListener('change', function(event){ loadDdEvaluationImportFile(event.target.files && event.target.files[0]); });
+    function handleDdTraitTableInput(event){
+      var input = event.target;
+      if(!input || !input.matches('[data-trend-key]')) return;
+      var trendKey = String(input.getAttribute('data-trend-key') || '');
+      if(!trendKey) return;
+      setDdManualMultiplierDraft(trendKey, input.value);
+      updateDdTraitRowSaveState(input.closest('tr'));
+    }
+    function handleDdTraitTableClick(event){
+      var saveButton = event.target && event.target.closest ? event.target.closest('[data-dd-trait-save]') : null;
+      if(saveButton){
+        saveDdTraitRow(String(saveButton.getAttribute('data-trend-key') || ''), saveButton.closest('tr'));
+        return;
+      }
+      var autoButton = event.target && event.target.closest ? event.target.closest('[data-dd-trait-auto-toggle]') : null;
+      if(autoButton){
+        saveDdTraitAutoTrend(String(autoButton.getAttribute('data-trend-key') || ''), autoButton.closest('tr'));
+      }
+    }
+    if(ddTraitTbody) ddTraitTbody.addEventListener('input', handleDdTraitTableInput);
+    if(ddTraitTbody) ddTraitTbody.addEventListener('click', handleDdTraitTableClick);
+    document.addEventListener('click', function(event){
+      var sortBtn = event.target && event.target.closest ? event.target.closest('.dd-th-sort') : null;
+      if(sortBtn && ddTraitTbody && sortBtn.closest('table') === ddTraitTbody.closest('table')){
+        var sk = sortBtn.getAttribute('data-dd-sort');
+        if(sk){
+          if(ddTraitSortKey === sk){
+            ddTraitSortDir = ddTraitSortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            ddTraitSortKey = sk;
+            ddTraitSortDir = (sk === 'trait' || sk === 'value' || sk === 'source' || sk === 'trendReason') ? 'asc' : 'desc';
+          }
+          renderDdTraits();
+        }
+        return;
+      }
+      var viewChip = event.target && event.target.closest ? event.target.closest('[data-dd-trait-view]') : null;
+      if(viewChip && viewChip.closest('#ddTraitViewFilters')){
+        var vf = String(viewChip.getAttribute('data-dd-trait-view') || 'all');
+        ddTraitViewFilter = vf;
+        var par = viewChip.parentNode;
+        if(par) par.querySelectorAll('[data-dd-trait-view]').forEach(function(c){ c.classList.toggle('active', c === viewChip); });
+        renderDdTraits();
+        return;
+      }
+      var chip = event.target && event.target.closest ? event.target.closest('[data-dd-cat]') : null;
+      if(!chip) return;
+      var cat = String(chip.getAttribute('data-dd-cat') || 'all');
+      var parent = chip.parentNode;
+      if(parent) parent.querySelectorAll('.dd-cat-chip').forEach(function(c){ c.classList.toggle('active', c === chip); });
+      var pid = parent ? parent.id : '';
+      if(pid === 'ddBaseCatFilters'){ ddActiveBaseCategoryFilter = cat; renderDdBasePriceTraits(); }
+      else { ddActiveCategoryFilter = cat; renderDdTraits(); }
+    });
+    if(ddTraitSearch) ddTraitSearch.addEventListener('input', renderDdTraits);
+    if(ddBasePriceTraitSearch) ddBasePriceTraitSearch.addEventListener('input', renderDdBasePriceTraits);
+    if(ddAddCommunityOfferBtn) ddAddCommunityOfferBtn.addEventListener('click', function(){
+      var rows = collectDdCommunityOfferRows(true);
+      rows.push({ dogNumber: null, minOfferUsd: null, note: '', updatedAt: null, updatedBy: null });
+      renderDdCommunityOffers(rows);
+    });
+    if(ddCommunityOfferTbody) ddCommunityOfferTbody.addEventListener('input', function(event){
+      updateDdCommunityOfferRow(event.target.closest('tr[data-community-index]'));
+    });
+    if(ddCommunityOfferTbody) ddCommunityOfferTbody.addEventListener('click', function(event){
+      var removeBtn = event.target.closest('[data-remove-community-index]');
+      if(!removeBtn) return;
+      var rows = collectDdCommunityOfferRows(true);
+      rows.splice(Number(removeBtn.getAttribute('data-remove-community-index')), 1);
+      renderDdCommunityOffers(rows.filter(function(entry, index){
+        return index >= 0;
+      }));
+    });
+
+    /* ---- Modal close ---- */
+    if(detailClose) detailClose.addEventListener('click', function(){ closeModalEl(detailBg); });
+    if(detailBg) detailBg.addEventListener('click', function(e){ if(e.target===detailBg) closeModalEl(detailBg); });
+    document.addEventListener('keydown', function(e){
+      if(e.key==='Escape' && detailBg.getAttribute('aria-hidden')==='false') closeModalEl(detailBg);
+    });
+
+    /* ---- Community suggestions queue (DD admin API) ---- */
+    var suggestionApiBase = '/api/dd-evaluator';
+    var traitPwEl = document.getElementById('traitPw');
+    var queueBody = document.getElementById('queueBody');
+    var queueTableWrap = document.getElementById('queueTableWrap');
+    var queueMeta = document.getElementById('queueMeta');
+    var queueMsg = document.getElementById('queueMsg');
+    var csLoadPending = document.getElementById('csLoadPending');
+    var clLoreTbody = document.getElementById('clLoreTbody');
+    var clLoreTableWrap = document.getElementById('clLoreTableWrap');
+    var clLoreMeta = document.getElementById('clLoreMeta');
+    var clLoreMsg = document.getElementById('clLoreMsg');
+    var clLoreLoadBtn = document.getElementById('clLoreLoadBtn');
+    var clLoreAddBtn = document.getElementById('clLoreAddBtn');
+    var clLorePendingWrap = document.getElementById('clLorePendingWrap');
+    var clLorePendingTbody = document.getElementById('clLorePendingTbody');
+
+    function getCsAdminPassword(){
+      var a = traitPwEl ? String(traitPwEl.value || '').trim() : '';
+      if(a) return a;
+      return String(ddAdminPassword || '').trim();
+    }
+
+    if(traitPwEl){
+      traitPwEl.addEventListener('change', function(){
+        var v = String(traitPwEl.value || '').trim();
+        if(v) ddAdminPassword = v;
+      });
+    }
+
+    function csAuthHeaders(){
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-dd-admin-password': getCsAdminPassword()
+      };
+    }
+
+    function appendClLoreRow(dog, lore, isDraft, loreMultiplier){
+      if(!clLoreTbody) return;
+      var tr = document.createElement('tr');
+      var tdDog = document.createElement('td');
+      tdDog.className = 'dd-lore-dog-col';
+      var inpDog = document.createElement('input');
+      inpDog.type = 'number';
+      inpDog.className = 'dd-lore-dog';
+      inpDog.min = '1';
+      inpDog.max = '10000';
+      inpDog.setAttribute('aria-label', 'Dog inscription number');
+      if(!isDraft){
+        inpDog.value = String(dog);
+        inpDog.readOnly = true;
+        tr.setAttribute('data-dog', String(dog));
+      } else {
+        tr.setAttribute('data-cl-draft', '1');
+      }
+      tdDog.appendChild(inpDog);
+      var tdMult = document.createElement('td');
+      var inpMult = document.createElement('input');
+      inpMult.type = 'number';
+      inpMult.className = 'dd-lore-mult';
+      inpMult.step = '0.05';
+      inpMult.min = '-0.99';
+      inpMult.max = '100';
+      inpMult.setAttribute('aria-label', 'Lore price multiplier');
+      inpMult.title = '1 = no extra effect on the DD estimate. Above 1 boosts; negative uses (1+m), e.g. −0.2 → ×0.8.';
+      var lm = loreMultiplier != null && Number.isFinite(Number(loreMultiplier)) ? Number(loreMultiplier) : 1;
+      inpMult.value = String(lm);
+      tdMult.appendChild(inpMult);
+      var tdLore = document.createElement('td');
+      var ta = document.createElement('textarea');
+      ta.className = 'dd-lore-textarea';
+      ta.rows = 5;
+      ta.setAttribute('aria-label', 'Lore text');
+      ta.value = lore || '';
+      tdLore.appendChild(ta);
+      var tdAct = document.createElement('td');
+      tdAct.className = 'dd-trait-action';
+      var actWrap = document.createElement('div');
+      actWrap.className = 'dd-lore-actions';
+      var btnSave = document.createElement('button');
+      btnSave.type = 'button';
+      btnSave.className = 'btn-primary dd-lore-save';
+      btnSave.textContent = 'Save';
+      actWrap.appendChild(btnSave);
+      if(isDraft){
+        var btnCan = document.createElement('button');
+        btnCan.type = 'button';
+        btnCan.className = 'btn-outline dd-lore-cancel';
+        btnCan.textContent = 'Cancel';
+        actWrap.appendChild(btnCan);
+      } else {
+        var btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.className = 'btn-outline dd-lore-delete';
+        btnDel.textContent = 'Delete';
+        actWrap.appendChild(btnDel);
+      }
+      tdAct.appendChild(actWrap);
+      tr.appendChild(tdDog);
+      tr.appendChild(tdMult);
+      tr.appendChild(tdLore);
+      tr.appendChild(tdAct);
+      clLoreTbody.appendChild(tr);
+    }
+
+    function renderClLorePending(items){
+      if(!clLorePendingWrap || !clLorePendingTbody) return;
+      clLorePendingTbody.innerHTML = '';
+      var loreRows = (items || []).filter(function(it){
+        return it && String(it.kind || '') === 'lore_only';
+      });
+      if(!loreRows.length){
+        clLorePendingWrap.hidden = true;
+        return;
+      }
+      clLorePendingWrap.hidden = false;
+      loreRows.forEach(function(row){
+        var pay = row.payload || {};
+        var dog = pay.dogNumber != null ? String(pay.dogNumber) : '';
+        var lore = pay.lore != null ? String(pay.lore) : '';
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><code>' + esc(String(row.id || '').slice(0, 13)) + '…</code></td>' +
+          '<td class="dd-lore-dog-col">' + esc(dog) + '</td>' +
+          '<td><pre class="cs-queue-pre">' + esc(lore) + '</pre></td>' +
+          '<td class="dd-settings-small">Open <strong>Suggestions queue</strong> → Load pending → Approve</td>';
+        clLorePendingTbody.appendChild(tr);
+      });
+    }
+
+    function fetchPendingLoreForAdmin(){
+      return fetch(suggestionApiBase + '/admin/suggestions?status=pending', {
+        method: 'GET',
+        headers: csAuthHeaders(),
+        cache: 'no-store',
+      }).then(function(res2){
+        return res2.text().then(function(text2){
+          var data2 = {};
+          try { data2 = text2 ? JSON.parse(text2) : {}; } catch(e3){}
+          if(!res2.ok){
+            return [];
+          }
+          return data2.items || [];
+        });
+      }).catch(function(){
+        return [];
+      });
+    }
+
+    function loadCommunityLoreTable(){
+      if(clLoreMsg){ clLoreMsg.textContent = ''; clLoreMsg.className = 'cs-queue-msg'; }
+      if(!getCsAdminPassword()){
+        if(clLoreMsg){ clLoreMsg.textContent = 'Enter the DD admin password (Suggestions queue field or DD save prompt).'; clLoreMsg.classList.add('err'); }
+        if(clLoreTableWrap) clLoreTableWrap.hidden = true;
+        if(clLorePendingWrap) clLorePendingWrap.hidden = true;
+        return;
+      }
+      fetch(suggestionApiBase + '/admin/community-notes/list', {
+        method: 'GET',
+        headers: csAuthHeaders(),
+        cache: 'no-store',
+      })
+        .then(function(res){
+          return res.text().then(function(text){
+            return { res: res, text: text };
+          });
+        })
+        .then(function(o){
+          var res = o.res;
+          var text = o.text;
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch(eParse){}
+          if(!res.ok){
+            if(clLoreMsg){
+              clLoreMsg.textContent = (data && data.error) ? data.error : (res.status + (text ? ': ' + text.slice(0, 200) : ''));
+              clLoreMsg.classList.add('err');
+            }
+            renderClLorePending([]);
+            return null;
+          }
+          return data;
+        })
+        .then(function(data){
+          if(!data) return;
+          var publishedCount = data.count != null ? data.count : (data.entries || []).length;
+          if(clLoreMeta) clLoreMeta.textContent = 'Published entries: ' + publishedCount;
+          if(!clLoreTbody) return;
+          clLoreTbody.innerHTML = '';
+          var entries = data.entries || [];
+          entries.forEach(function(e){
+            appendClLoreRow(e.dogNumber, e.lore, false, e.loreMultiplier);
+          });
+          if(clLoreTableWrap) clLoreTableWrap.hidden = false;
+          if(entries.length === 0 && clLoreMsg){
+            clLoreMsg.textContent = 'No published lore in storage yet (or the notes file is empty). Pending submissions—if any—are listed below.';
+          }
+          return fetchPendingLoreForAdmin();
+        })
+        .then(function(pendingItems){
+          if(!pendingItems) return;
+          renderClLorePending(pendingItems);
+          if(clLoreMeta && pendingItems.length){
+            var pendLore = pendingItems.filter(function(it){ return it && String(it.kind || '') === 'lore_only'; }).length;
+            if(pendLore){
+              clLoreMeta.textContent = clLoreMeta.textContent + ' · Pending lore-only in queue: ' + pendLore;
+            }
+          }
+        })
+        .catch(function(err){
+          if(clLoreMsg){
+            clLoreMsg.textContent = err && err.message ? err.message : 'Request failed';
+            clLoreMsg.classList.add('err');
+          }
+          renderClLorePending([]);
+        });
+    }
+
+    function clSaveRow(tr){
+      if(!tr || !clLoreMsg) return;
+      clLoreMsg.textContent = '';
+      clLoreMsg.className = 'cs-queue-msg';
+      if(!getCsAdminPassword()){
+        clLoreMsg.textContent = 'Enter the DD admin password.';
+        clLoreMsg.classList.add('err');
+        return;
+      }
+      var inp = tr.querySelector('.dd-lore-dog');
+      var ta = tr.querySelector('.dd-lore-textarea');
+      var n = parseInt(String(inp && inp.value || '').replace(/[^0-9]/g, ''), 10);
+      var lore = ta ? String(ta.value || '').trim() : '';
+      if(!n || n < 1 || n > 10000){
+        clLoreMsg.textContent = 'Dog number must be between 1 and 10000.';
+        clLoreMsg.classList.add('err');
+        return;
+      }
+      if(!lore){
+        clLoreMsg.textContent = 'Lore text cannot be empty.';
+        clLoreMsg.classList.add('err');
+        return;
+      }
+      if(lore.length > 8000){
+        clLoreMsg.textContent = 'Lore is too long (max 8000 characters).';
+        clLoreMsg.classList.add('err');
+        return;
+      }
+      var inpLm = tr.querySelector('.dd-lore-mult');
+      var lmRaw = inpLm ? Number(inpLm.value) : 1;
+      var loreMultiplier = Number.isFinite(lmRaw) ? lmRaw : 1;
+      if(loreMultiplier > 100 || loreMultiplier < -0.99){
+        clLoreMsg.textContent = 'Lore multiplier must be between −0.99 and 100.';
+        clLoreMsg.classList.add('err');
+        return;
+      }
+      fetch(suggestionApiBase + '/admin/community-notes/save', {
+        method: 'POST',
+        headers: csAuthHeaders(),
+        body: JSON.stringify({ dogNumber: n, lore: lore, loreMultiplier: loreMultiplier })
+      }).then(function(res){
+        return res.text().then(function(text){
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch(e2){}
+          if(!res.ok){
+            clLoreMsg.textContent = (data && data.error) ? data.error : (res.status + (text ? ': ' + text.slice(0, 200) : ''));
+            clLoreMsg.classList.add('err');
+            return;
+          }
+          clLoreMsg.textContent = 'Saved lore for dog #' + n + '.';
+          clLoreMsg.classList.add('ok');
+          if(queueMeta && data.communityNotesDogCount != null){
+            queueMeta.textContent = 'Community lore entries (dog count): ' + data.communityNotesDogCount;
+          }
+          loadCommunityLoreTable();
+        });
+      }).catch(function(err){
+        clLoreMsg.textContent = err && err.message ? err.message : 'Request failed';
+        clLoreMsg.classList.add('err');
+      });
+    }
+
+    function clDeleteRow(tr){
+      if(!tr || !clLoreMsg) return;
+      var dogAttr = tr.getAttribute('data-dog');
+      var n = dogAttr ? parseInt(dogAttr, 10) : NaN;
+      if(!n || n < 1 || n > 10000){
+        var inp = tr.querySelector('.dd-lore-dog');
+        n = parseInt(String(inp && inp.value || '').replace(/[^0-9]/g, ''), 10);
+      }
+      if(!n || n < 1 || n > 10000){
+        clLoreMsg.textContent = 'Could not read dog number for this row.';
+        clLoreMsg.classList.add('err');
+        return;
+      }
+      if(!window.confirm('Remove published lore for dog #' + n + '?')) return;
+      clLoreMsg.textContent = '';
+      clLoreMsg.className = 'cs-queue-msg';
+      if(!getCsAdminPassword()){
+        clLoreMsg.textContent = 'Enter the DD admin password.';
+        clLoreMsg.classList.add('err');
+        return;
+      }
+      fetch(suggestionApiBase + '/admin/community-notes/delete', {
+        method: 'POST',
+        headers: csAuthHeaders(),
+        body: JSON.stringify({ dogNumber: n })
+      }).then(function(res){
+        return res.text().then(function(text){
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch(e2){}
+          if(!res.ok){
+            clLoreMsg.textContent = (data && data.error) ? data.error : (res.status + (text ? ': ' + text.slice(0, 200) : ''));
+            clLoreMsg.classList.add('err');
+            return;
+          }
+          clLoreMsg.textContent = data.removed ? ('Removed lore for dog #' + n + '.') : ('No entry found for dog #' + n + '.');
+          clLoreMsg.classList.add(data.removed ? 'ok' : 'err');
+          if(queueMeta && data.communityNotesDogCount != null){
+            queueMeta.textContent = 'Community lore entries (dog count): ' + data.communityNotesDogCount;
+          }
+          loadCommunityLoreTable();
+        });
+      }).catch(function(err){
+        clLoreMsg.textContent = err && err.message ? err.message : 'Request failed';
+        clLoreMsg.classList.add('err');
+      });
+    }
+
+    if(clLoreLoadBtn) clLoreLoadBtn.addEventListener('click', loadCommunityLoreTable);
+    if(clLoreAddBtn) clLoreAddBtn.addEventListener('click', function(){
+      if(!getCsAdminPassword()){
+        if(clLoreMsg){
+          clLoreMsg.textContent = 'Enter the DD admin password first.';
+          clLoreMsg.className = 'cs-queue-msg';
+          clLoreMsg.classList.add('err');
+        }
+        return;
+      }
+      if(clLoreTableWrap) clLoreTableWrap.hidden = false;
+      appendClLoreRow(0, '', true);
+      if(clLoreMsg){ clLoreMsg.textContent = ''; clLoreMsg.className = 'cs-queue-msg'; }
+    });
+    if(clLoreTbody){
+      clLoreTbody.addEventListener('click', function(ev){
+        var t = ev.target;
+        if(t && t.classList && t.classList.contains('dd-lore-save')){
+          clSaveRow(t.closest('tr'));
+        } else if(t && t.classList && t.classList.contains('dd-lore-delete')){
+          clDeleteRow(t.closest('tr'));
+        } else if(t && t.classList && t.classList.contains('dd-lore-cancel')){
+          var tr = t.closest('tr');
+          if(tr) tr.remove();
+        }
+      });
+    }
+
+    function csReview(id, actionName){
+      queueMsg.textContent = '';
+      queueMsg.className = 'cs-queue-msg';
+      if(!getCsAdminPassword()){
+        queueMsg.textContent = 'Enter the DD admin password (field above or DD save prompt).';
+        queueMsg.classList.add('err');
+        return;
+      }
+      fetch(suggestionApiBase + '/admin/suggestions/' + encodeURIComponent(id) + '/review', {
+        method: 'POST',
+        headers: csAuthHeaders(),
+        body: JSON.stringify({ action: actionName })
+      }).then(function(res){
+        return res.text().then(function(text){
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch(e2){}
+          if(!res.ok){
+            queueMsg.textContent = (data && data.error) ? data.error : (res.status + ' ' + (res.statusText || '') + (text ? ': ' + text.slice(0, 200) : ''));
+            queueMsg.classList.add('err');
+            return;
+          }
+          queueMsg.textContent = 'Saved.';
+          queueMsg.classList.add('ok');
+          if(csLoadPending) csLoadPending.click();
+        });
+      }).catch(function(err){
+        queueMsg.textContent = err && err.message ? err.message : 'Request failed';
+        queueMsg.classList.add('err');
+      });
+    }
+
+    if(csLoadPending){
+      csLoadPending.addEventListener('click', function(){
+        queueMsg.textContent = '';
+        queueMsg.className = 'cs-queue-msg';
+        if(queueMeta) queueMeta.textContent = '';
+        if(!getCsAdminPassword()){
+          queueMsg.textContent = 'Enter the DD admin password.';
+          queueMsg.classList.add('err');
+          if(queueTableWrap) queueTableWrap.hidden = true;
+          return;
+        }
+        fetch(suggestionApiBase + '/admin/suggestions?status=pending', { headers: csAuthHeaders() })
+          .then(function(res){
+            return res.text().then(function(text){
+              var data = {};
+              try { data = text ? JSON.parse(text) : {}; } catch(e2){
+                queueMsg.textContent = res.status + ' ' + (res.statusText || '') + (text ? ': ' + text.slice(0, 200) : '');
+                queueMsg.classList.add('err');
+                if(queueTableWrap) queueTableWrap.hidden = true;
+                return;
+              }
+              if(!res.ok){
+                queueMsg.textContent = (data && data.error) ? data.error : ('HTTP ' + res.status + (res.statusText ? ' ' + res.statusText : ''));
+                queueMsg.classList.add('err');
+                if(queueTableWrap) queueTableWrap.hidden = true;
+                return;
+              }
+              if(queueMeta) queueMeta.textContent = 'Community lore entries (dog count): ' + (data.communityNotesDogCount != null ? data.communityNotesDogCount : 0);
+              if(queueBody) queueBody.innerHTML = '';
+              var items = data.items || [];
+              if(!items.length){
+                queueMsg.textContent = 'No pending suggestions.';
+                if(queueTableWrap) queueTableWrap.hidden = true;
+                return;
+              }
+              if(queueTableWrap) queueTableWrap.hidden = false;
+              items.forEach(function(row){
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                  '<td><code>' + esc(String(row.id).slice(0, 13)) + '…</code></td>' +
+                  '<td>' + esc(row.kind) + '</td>' +
+                  '<td><pre class="cs-queue-pre">' + esc(JSON.stringify(row.payload, null, 2)) + '</pre></td>' +
+                  '<td>' + esc(row.submittedAt || '') + '</td>' +
+                  '<td class="cs-queue-actions"></td>';
+                var tdAct = tr.querySelector('.cs-queue-actions');
+                var bOk = document.createElement('button');
+                bOk.type = 'button';
+                bOk.className = 'btn-primary';
+                bOk.textContent = 'Approve';
+                bOk.addEventListener('click', function(){ csReview(row.id, 'approve'); });
+                var bNo = document.createElement('button');
+                bNo.type = 'button';
+                bNo.className = 'btn-outline';
+                bNo.textContent = 'Reject';
+                bNo.addEventListener('click', function(){ csReview(row.id, 'reject'); });
+                tdAct.appendChild(bOk);
+                tdAct.appendChild(bNo);
+                if(queueBody) queueBody.appendChild(tr);
+              });
+            });
+          }).catch(function(err){
+            queueMsg.textContent = err && err.message ? err.message : 'Request failed';
+            queueMsg.classList.add('err');
+            if(queueTableWrap) queueTableWrap.hidden = true;
+          });
+      });
+    }
+
+    setDdActivePanel(ddActivePanel);
+
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "269": {
+    "name": "Doginal Dog #269",
+    "rarity": "Classic",
+    "rank": 8502,
+    "listed": true,
+    "priceDoge": 48000,
+    "priceUsd": 4734.14,
+    "background": "Yellow",
+    "furColor": "Orange",
+    "file": "dog-00269.json"
+  },
+  "7742": {
+    "name": "Doginal Dog #7742",
+    "rarity": "Collector",
+    "rank": 5529,
+    "listed": false,
+    "priceDoge": null,
+    "priceUsd": null,
+    "background": "Yellow",
+    "furColor": "Gray",
+    "file": "dog-07742.json"
+  }
+}
