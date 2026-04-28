@@ -327,6 +327,7 @@
     /* Trait breakdown */
     .eval-traits{padding:1.5rem}
     .eval-trait-grid{display:grid;gap:.5rem}
+    .eval-trait-meta{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.75rem;font-size:.72rem;color:#555}
     .eval-trait-chip{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem .75rem;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:.4rem;font-size:.82rem;transition:background .15s}
     .eval-trait-chip:hover{background:#1a1a1a}
     .eval-trait-chip.top-sale-row{border-color:rgba(212,175,55,.4);background:rgba(212,175,55,.06)}
@@ -342,7 +343,12 @@
     .eval-trending-badge{background:rgba(255,100,50,.15);color:#ff6432;border:1px solid rgba(255,100,50,.4)}
     .eval-rare-badge{display:inline-flex;align-items:center;border-radius:4px;padding:3px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;line-height:1;vertical-align:middle;box-sizing:border-box;background:rgba(93,221,93,.12);color:#8df58d;border:1px solid rgba(93,221,93,.35)}
     .eval-trait-chip.trending-row{border-color:rgba(255,100,50,.3);background:rgba(255,100,50,.04)}
-    .eval-trait-meta{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.75rem;font-size:.72rem;color:#555}
+    .eval-trait-chip.combo-row{border-color:rgba(147,197,253,.28);background:rgba(147,197,253,.05)}
+    .eval-combo-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;padding:3px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;line-height:1;vertical-align:middle;box-sizing:border-box;background:rgba(147,197,253,.12);color:#93c5fd;border:1px solid rgba(147,197,253,.4)}
+
+    /* Community lore (approved notes) — directly under price boxes */
+    .eval-community-lore{padding:1.25rem 1.5rem;border-top:1px solid #2a2a2a;border-bottom:1px solid #2a2a2a;background:rgba(255,255,255,.03)}
+    .eval-community-lore-body{margin:0;font-size:.84rem;line-height:1.55;color:#c8c4b8;white-space:pre-wrap;word-break:break-word}
 
     /* Own sale highlight */
     .eval-own-sale{padding:1rem 1.5rem;border-bottom:1px solid #2a2a2a;background:rgba(212,175,55,.04);display:flex;align-items:center;gap:1rem}
@@ -351,6 +357,9 @@
     .eval-own-sale-copy{display:flex;flex-direction:column;justify-content:center;gap:.2rem;min-width:0}
     .eval-own-sale-label{font-size:.95rem;text-transform:uppercase;letter-spacing:.1em;color:#d4af37;font-weight:700;line-height:1.2}
     .eval-own-sale-value{font-size:1.35rem;font-weight:700;color:#d4af37;line-height:1.1}
+    .eval-refused-floor{border-top:1px solid #2a2a2a}
+    .eval-refused-floor-sub{font-size:.9rem;color:rgba(212,175,55,.82);margin-top:.08rem;font-weight:500}
+    .eval-refused-floor-note{font-size:.78rem;color:rgba(200,195,175,.67);margin-top:.35rem;max-width:40rem;line-height:1.4;white-space:pre-wrap;word-break:break-word}
 
     /* Timestamp */
     .eval-timestamp{padding:0 1.5rem 1rem;text-align:right;font-size:.65rem;color:#444}
@@ -840,11 +849,10 @@
     <ul class="nav-list">
       <li><a href="../index.html" class="nav-link">Home</a></li>
       <li><a href="../about.html" class="nav-link">About</a></li>
-      <li><a href="../projects.html" class="nav-link">Projects</a></li>
       <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
       <li><a href="../services.html" class="nav-link">Services</a></li>
-      <li><a href="../nail-designer/" class="nav-link">Nail Designer</a></li>
       <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="../community-suggestions.html" class="nav-link">Community suggestions</a></li>
       <li><a href="../contact.html" class="nav-link">Connect</a></li>
     </ul>
   </nav>
@@ -924,6 +932,7 @@
               <li><strong>Trending multiplier.</strong> Traits seeing high current demand (like Wizard, Beret, Suit) get an additional boost.</li>
               <li><strong>Own sale history.</strong> If this specific dog has sold recently, its sale price acts as a floor&mdash;the estimate won&rsquo;t go below it.</li>
               <li><strong>Collection floor guarantee.</strong> No dog is ever estimated below the collection floor price.</li>
+              <li><strong>Refused community offers.</strong> When a minimum refused offer is recorded for a dog (in USD, converted live to DOGE), the estimate won&rsquo;t go below that amount. The evaluator shows it as Refused Community Offer Floor.</li>
             </ul>
 
             <h4>Sale price attribution</h4>
@@ -1220,15 +1229,18 @@
         var trendingBadge = t.trending
           ? ' <span class="eval-trending-badge">🔥 TRENDING ' + t.trending + 'x</span>'
           : '';
+        var comboBadge = t.comboPart
+          ? ' <span class="eval-combo-badge" title="Combo: ' + esc(t.comboPart.label) + '">🔗 ' + esc(t.comboPart.label) + '</span>'
+          : '';
         var rareBadge = t.displayBadge
           ? ' <span class="eval-rare-badge">' + esc(t.displayBadge) + '</span>'
           : '';
-        var rowClass = 'eval-trait-chip' + (t.isTopSale ? ' top-sale-row' : '') + (t.trending ? ' trending-row' : '');
+        var rowClass = 'eval-trait-chip' + (t.isTopSale ? ' top-sale-row' : '') + (t.trending ? ' trending-row' : '') + (t.comboPart ? ' combo-row' : '');
         return '<div class="' + rowClass + '">' +
           '<span class="eval-trait-key">' + esc(t.trait) + countInfo + '</span>' +
           '<span class="eval-trait-val">' + esc(traitValue) + rareBadge + '</span>' +
           '<span class="eval-trait-floor' + (isUnlisted ? ' unlisted' : '') + '">' +
-            priceLabel + saleInfo + topSaleBadge + trendingBadge +
+            priceLabel + saleInfo + topSaleBadge + trendingBadge + comboBadge +
           '</span></div>';
       }).join('');
 
@@ -1241,6 +1253,33 @@
             '<div><span>vs Estimate:</span> <strong class="' + verdictColor(la.verdict) + '">' + (la.diffPercent > 0 ? '+' : '') + la.diffPercent + '%</strong></div>' +
             '<div><strong class="' + verdictColor(la.verdict) + '">' + verdictIcon(la.verdict) + ' ' + esc(la.verdict) + '</strong></div>' +
           '</div></div>';
+      }
+
+      var loreText = (d.communityLore != null && String(d.communityLore).trim() !== '')
+        ? String(d.communityLore).trim()
+        : (est.communityLore != null && String(est.communityLore).trim() !== '' ? String(est.communityLore).trim() : '');
+      var loreHtml = '';
+      if (loreText) {
+        loreHtml = '<div class="eval-community-lore"><h3 class="eval-section-title">Community lore</h3><p class="eval-community-lore-body">' + esc(loreText) + '</p></div>';
+      }
+
+      var rof = est.refusedOfferFloor;
+      var refusedFloorHtml = '';
+      if (rof && rof.minOfferDoge != null && Number(rof.minOfferDoge) > 0) {
+        var rofDoge = Number(rof.minOfferDoge);
+        var rofUsd = rof.minOfferUsd != null && rof.minOfferUsd !== ''
+          ? Number(rof.minOfferUsd)
+          : (est.dogeUsd != null ? rofDoge * est.dogeUsd : null);
+        refusedFloorHtml =
+          '<div class="eval-own-sale eval-refused-floor">' +
+            '<div class="eval-own-sale-media"><img src="../assets/DDSHOP.gif" alt="" /></div>' +
+            '<div class="eval-own-sale-copy">' +
+              '<div class="eval-own-sale-label">Refused Community Offer Floor</div>' +
+              '<div class="eval-own-sale-value">Minimum ' + fmtDoge(rofDoge) + '</div>' +
+              (rofUsd != null && isFinite(rofUsd) ? '<div class="eval-refused-floor-sub">' + fmtUsd(rofUsd) + '</div>' : '') +
+              (rof.note ? '<div class="eval-refused-floor-note">' + esc(String(rof.note)) + '</div>' : '') +
+            '</div>' +
+          '</div>';
       }
 
       resultEl.innerHTML =
@@ -1265,6 +1304,10 @@
             '<div class="eval-price-box"><div class="eval-price-label">Collection Floor</div><div class="eval-price-value white">' + fmtDoge(est.collectionFloor) + '</div>' + (est.dogeUsd && est.collectionFloor ? '<div class="eval-price-sub">' + fmtUsd(est.collectionFloor * est.dogeUsd) + '</div>' : '') + '</div>' +
           '</div>' +
 
+          refusedFloorHtml +
+
+          loreHtml +
+
           listingHtml +
 
           (est.ownTopSale ? '<div class="eval-own-sale"><div class="eval-own-sale-media"><img src="../assets/DDSHOP.gif" alt="" /></div><div class="eval-own-sale-copy"><div class="eval-own-sale-label">This Dog Sold Recently</div><div class="eval-own-sale-value">Sold for ' + fmtDoge(est.ownTopSale) + '</div></div></div>' : '') +
@@ -1279,6 +1322,9 @@
               (est.valueMultiplier ? '<span>1/1 multiplier: ' + est.valueMultiplier + 'x</span>' : '') +
               (est.trendingMultiplier ? '<span>🔥 Trending: ' + est.trendingMultiplier + 'x</span>' : '') +
               (est.specialMultiplier ? '<span>⚡ Special: ' + est.specialMultiplier + 'x</span>' : '') +
+              (est.comboMatch ? '<span>🔗 Combo: ' + esc(est.comboMatch.label) + (est.comboMatch.multiplier ? ' (' + est.comboMatch.multiplier + 'x)' : '') +
+                (est.comboMatch.inscriptionIds && est.comboMatch.inscriptionIds.length ? ' · insc. ' + esc(est.comboMatch.inscriptionIds.join(', ')) : '') +
+                '</span>' : '') +
               '<span>Rarity multiplier: ' + (d.rarityMultiplier ? d.rarityMultiplier + 'x' : '\u2014') + '</span>' +
             '</div>' +
           '</div>' +
@@ -1457,6 +1503,40 @@
       return 'Server returned ' + res.status;
     }
 
+    function extractLoreFromPayload(d) {
+      if (!d || typeof d !== 'object') return '';
+      var est = d.estimation || {};
+      if (d.communityLore != null && String(d.communityLore).trim() !== '') return String(d.communityLore).trim();
+      if (est.communityLore != null && String(est.communityLore).trim() !== '') return String(est.communityLore).trim();
+      return '';
+    }
+
+    function applyLoreToEvaluation(data, loreText) {
+      if (!loreText || !data) return;
+      data.communityLore = loreText;
+      if (!data.estimation || typeof data.estimation !== 'object') data.estimation = {};
+      data.estimation.communityLore = loreText;
+    }
+
+    async function fetchCommunityLoreSupplement(dogNumber) {
+      var u = encodeURIComponent(dogNumber);
+      var urls = [
+        API_BASE + '/api/dd-evaluator.php?action=community-lore&dogNumber=' + u,
+        API_BASE + '/api/dd-evaluator/community/lore/' + u
+      ];
+      for (var i = 0; i < urls.length; i++) {
+        try {
+          var res = await fetch(urls[i], { headers: { accept: 'application/json' } });
+          if (!res.ok) continue;
+          var body = await res.json().catch(function() { return null; });
+          if (body && body.communityLore != null && String(body.communityLore).trim() !== '') {
+            return String(body.communityLore).trim();
+          }
+        } catch (_err) {}
+      }
+      return '';
+    }
+
     async function getEvaluation(dogNumber) {
       var urls = getEvaluationUrls(dogNumber);
       var lastError = null;
@@ -1487,6 +1567,11 @@
 
           if (data.error) {
             throw new Error(data.error);
+          }
+
+          if (!extractLoreFromPayload(data)) {
+            var extraLore = await fetchCommunityLoreSupplement(dogNumber);
+            if (extraLore) applyLoreToEvaluation(data, extraLore);
           }
 
           return data;

@@ -61,9 +61,17 @@ Options -Indexes -MultiViews
 
 RewriteEngine On
 
+RewriteRule ^dd-evaluator/community/status/?$ dd-evaluator.php?action=community-status [L,QSA,NC]
+RewriteRule ^dd-evaluator/community/lore/([0-9]+)/?$ dd-evaluator.php?action=community-lore&dogNumber=$1 [L,QSA,NC]
+RewriteRule ^dd-evaluator/community/suggestions/?$ dd-evaluator.php?action=community-suggestions [L,QSA,NC]
 RewriteRule ^dd-evaluator/evaluate/([0-9]+)/?$ dd-evaluator.php?action=evaluate&dogNumber=$1 [L,QSA,NC]
 RewriteRule ^dd-evaluator/wallet/([A-Za-z0-9]+)/?$ dd-evaluator.php?action=wallet&address=$1 [L,QSA,NC]
 RewriteRule ^dd-evaluator/rank-lookup/([0-9]+)/?$ dd-evaluator.php?action=rank-lookup&rank=$1 [L,QSA,NC]
 RewriteRule ^dd-evaluator/snapshot/status/?$ dd-evaluator.php?action=snapshot_status [L,QSA,NC]
 RewriteRule ^dd-evaluator/admin/trending/?$ dd-evaluator.php?action=admin-trending [L,QSA,NC]
 RewriteRule ^dd-evaluator/admin/evaluations-import/?$ dd-evaluator.php?action=admin-evaluations-import [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/suggestions/([^\s/?#]+)/review/?$ dd-evaluator.php?action=admin-suggestions-review&suggestionId=$1 [L,NC]
+RewriteRule ^dd-evaluator/admin/suggestions/?$ dd-evaluator.php?action=admin-suggestions [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/community-notes/list/?$ dd-evaluator.php?action=admin-community-notes-list [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/community-notes/save/?$ dd-evaluator.php?action=admin-community-notes-save [L,QSA,NC]
+RewriteRule ^dd-evaluator/admin/community-notes/delete/?$ dd-evaluator.php?action=admin-community-notes-delete [L,QSA,NC]

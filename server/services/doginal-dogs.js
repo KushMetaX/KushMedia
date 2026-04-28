@@ -689,7 +689,6 @@ async function getInscriptionRecord(dogNumber) {
     };
   } catch (error) {
     const fallback = createFallbackRecord(dogNumber, brandColors);
-    fallback.error = error.message;
     return fallback;
   }
 }

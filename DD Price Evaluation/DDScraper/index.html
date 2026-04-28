@@ -159,15 +159,28 @@
 
       const est = d.estimation || {};
       const la  = d.listingAnalysis;
+      const loreText = (d.communityLore != null && String(d.communityLore).trim() !== '')
+        ? String(d.communityLore).trim()
+        : (est.communityLore != null && String(est.communityLore).trim() !== '' ? String(est.communityLore).trim() : '');
+      const loreBlock = loreText ? `
+        <div class="p-6 border-b border-doge-border bg-doge-dark/40">
+          <h3 class="text-sm font-semibold text-doge-muted uppercase tracking-wider mb-2">Community lore</h3>
+          <p class="text-sm text-gray-300 whitespace-pre-wrap">${escapeHtml(loreText)}</p>
+        </div>` : '';
 
       // Trait chips
-      const traitHtml = (d.traitBreakdown || []).map(t => `
+      const traitHtml = (d.traitBreakdown || []).map(t => {
+        const comboNote = t.comboPart
+          ? `<span class="ml-2 text-xs text-sky-300 font-semibold">🔗 ${escapeHtml(t.comboPart.label)}</span>`
+          : '';
+        return `
         <div class="trait-chip flex items-center justify-between gap-4 px-3 py-2 rounded-md bg-doge-dark border border-doge-border text-sm">
           <span class="text-gray-400 capitalize">${escapeHtml(t.trait)}</span>
-          <span class="text-white font-medium">${escapeHtml(t.value)}</span>
+          <span class="text-white font-medium">${escapeHtml(t.value)}${comboNote}</span>
           <span class="text-doge-muted text-xs ml-auto">${t.floor != null ? fmtDoge(t.floor) : '<span class=&quot;text-purple-400&quot;>unlisted</span>'}</span>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       resultEl.innerHTML = `
       <div class="fade-up bg-doge-card border border-doge-border rounded-2xl overflow-hidden">
@@ -207,6 +220,8 @@
             ${est.dogeUsd && est.collectionFloor ? `<div class="text-sm text-gray-400 mt-1">${fmtUsd(est.collectionFloor * est.dogeUsd)}</div>` : ''}
           </div>
         </div>
+
+        ${loreBlock}
 
         ${la ? `
         <!-- Listing analysis -->

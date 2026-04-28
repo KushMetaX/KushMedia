@@ -2,35 +2,90 @@
 
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const express = require('express');
+const { timingSafeEqualString } = require('../security-utils');
 const router = express.Router();
 
-function getExpectedDdAdminPassword() {
-  const envPassword = String(process.env.DD_ADMIN_PASSWORD || process.env.KUSH_ADMIN_PASSWORD || '').trim();
-  if (envPassword) {
-    return envPassword;
-  }
+const CLIENT_INTERNAL_ERROR = 'An unexpected error occurred.';
 
-  const filePath = process.env.DD_ADMIN_PASSWORD_FILE
-    ? path.resolve(process.env.DD_ADMIN_PASSWORD_FILE)
-    : path.resolve(__dirname, '..', '..', 'server', 'data', '.dd-admin-password');
+const serverDataDir = path.resolve(__dirname, '..', 'data');
 
+function readTrimmedSecretFromFile(filePath) {
   if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     return null;
   }
-
   const raw = fs.readFileSync(filePath, 'utf8');
   return raw ? String(raw).trim() : null;
 }
 
+/** Env first, else single-line file (trimmed). */
+function resolveSecret(envPrimary, legacyEnvKeys, fileEnvKey, defaultFilenameUnderServerData) {
+  const direct = String(process.env[envPrimary] || '').trim();
+  if (direct) return direct;
+  for (const key of legacyEnvKeys || []) {
+    const v = String(process.env[key] || '').trim();
+    if (v) return v;
+  }
+  const fp = process.env[fileEnvKey]
+    ? path.resolve(process.env[fileEnvKey])
+    : path.join(serverDataDir, defaultFilenameUnderServerData);
+  return readTrimmedSecretFromFile(fp);
+}
+
+function getAdminUiPassword() {
+  return resolveSecret('DD_ADMIN_UI_PASSWORD', [], 'DD_ADMIN_UI_PASSWORD_FILE', '.dd-admin-ui-password');
+}
+
+function getExpectedDdAdminPassword() {
+  return resolveSecret('DD_ADMIN_PASSWORD', ['KUSH_ADMIN_PASSWORD'], 'DD_ADMIN_PASSWORD_FILE', '.dd-admin-password');
+}
+
+function getCommunitySubmitPassword() {
+  return resolveSecret('DD_COMMUNITY_PASSWORD', [], 'DD_COMMUNITY_PASSWORD_FILE', '.dd-community-password');
+}
+
+function resolveAdminHtmlGatePassword() {
+  const ui = getAdminUiPassword();
+  if (ui) return ui;
+  const trait = getExpectedDdAdminPassword();
+  return trait || null;
+}
+
+function decodeBasicPasswordSegment(authHeader) {
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Basic ')) {
+    return null;
+  }
+  try {
+    const decoded = Buffer.from(authHeader.slice(6).trim(), 'base64').toString('utf8');
+    const colon = decoded.indexOf(':');
+    return colon >= 0 ? decoded.slice(colon + 1) : decoded;
+  } catch (_err) {
+    return null;
+  }
+}
+
 function getDdRequestPassword(req) {
-  return String(req.headers['x-dd-admin-password'] || req.query.password || '').trim();
+  const headerPw = String(req.headers['x-dd-admin-password'] || '').trim();
+  if (headerPw) return headerPw;
+
+  const basicPw = decodeBasicPasswordSegment(req.headers.authorization);
+  const traitSecret = getExpectedDdAdminPassword();
+  if (
+    basicPw != null && traitSecret != null
+    && timingSafeEqualString(traitSecret, basicPw)
+  ) {
+    return traitSecret;
+  }
+
+  return String(req.query.password || '').trim();
 }
 
 function verifyDdAdminPassword(req, res) {
   const expected = getExpectedDdAdminPassword();
-  if (!expected || getDdRequestPassword(req) !== expected) {
+  const candidate = getDdRequestPassword(req);
+  if (!expected || !timingSafeEqualString(expected, candidate)) {
     res.status(401).json({ error: 'Invalid DD admin password.' });
     return false;
   }
@@ -41,11 +96,352 @@ function getTrendingConfigPath() {
   if (process.env.DD_TRENDING_CONFIG_PATH) {
     return path.resolve(process.env.DD_TRENDING_CONFIG_PATH);
   }
-  return path.resolve(__dirname, '..', '..', 'server', 'data', 'dd-trending-config.json');
+  return path.join(serverDataDir, 'dd-trending-config.json');
 }
 
 function getEvaluationLogPath() {
-  return path.resolve(__dirname, '..', '..', 'server', 'data', 'dd-evaluation-log.ndjson');
+  if (process.env.DD_EVALUATION_LOG_PATH) {
+    return path.resolve(process.env.DD_EVALUATION_LOG_PATH);
+  }
+  return path.join(serverDataDir, 'dd-evaluation-log.ndjson');
+}
+
+function getCommunitySuggestionsPath() {
+  if (process.env.DD_COMMUNITY_SUGGESTIONS_PATH) {
+    return path.resolve(process.env.DD_COMMUNITY_SUGGESTIONS_PATH);
+  }
+  return path.join(serverDataDir, 'dd-community-suggestions.json');
+}
+
+function getCommunityNotesPath() {
+  if (process.env.DD_COMMUNITY_NOTES_PATH) {
+    return path.resolve(process.env.DD_COMMUNITY_NOTES_PATH);
+  }
+  return path.join(serverDataDir, 'dd-community-notes.json');
+}
+
+const DD_TRAIT_KEYS = new Set([
+  'background', 'furColor', 'furPattern', 'head',
+  'clothes', 'mouth', 'eyes', 'accessory',
+]);
+
+const communitySubmitBuckets = new Map();
+
+function rateLimitCommunitySuggestions(req, res, next) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const windowMs = 15 * 60 * 1000;
+  const max = 60;
+  const now = Date.now();
+  let bucket = communitySubmitBuckets.get(ip);
+  if (!bucket || now > bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + windowMs };
+    communitySubmitBuckets.set(ip, bucket);
+  }
+  bucket.count += 1;
+  if (bucket.count > max) {
+    return res.status(429).json({ error: 'Too many submissions. Try again later.' });
+  }
+  next();
+}
+
+function readSuggestionsStore() {
+  const configPath = getCommunitySuggestionsPath();
+  if (!fs.existsSync(configPath)) {
+    return { version: 1, items: [] };
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.items)) {
+      return { version: 1, items: [] };
+    }
+    return { version: 1, items: parsed.items };
+  } catch (_err) {
+    return { version: 1, items: [] };
+  }
+}
+
+function writeSuggestionsStore(store) {
+  const configPath = getCommunitySuggestionsPath();
+  const dir = path.dirname(configPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+  }
+  fs.writeFileSync(configPath, JSON.stringify(store, null, 2) + '\n', 'utf8');
+}
+
+function normalizeCommunityLoreNoteValue(raw) {
+  if (raw == null) {
+    return '';
+  }
+  if (typeof raw === 'string') {
+    return raw.trim();
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    if (typeof raw.lore === 'string') {
+      return raw.lore.trim();
+    }
+    if (typeof raw.text === 'string') {
+      return raw.text.trim();
+    }
+    if (typeof raw.body === 'string') {
+      return raw.body.trim();
+    }
+  }
+  return '';
+}
+
+function readCommunityNotesStore() {
+  const configPath = getCommunityNotesPath();
+  if (!fs.existsSync(configPath)) {
+    return { version: 1, notes: {} };
+  }
+  try {
+    let text = fs.readFileSync(configPath, 'utf8');
+    if (text.charCodeAt(0) === 0xFEFF) {
+      text = text.slice(1);
+    }
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') {
+      return { version: 1, notes: {} };
+    }
+    const notes = {};
+    if (parsed.notes && typeof parsed.notes === 'object') {
+      for (const [k, v] of Object.entries(parsed.notes)) {
+        const norm = normalizeCommunityLoreNoteValue(v);
+        if (norm) {
+          notes[String(k)] = norm;
+        }
+      }
+    }
+    for (const [k, v] of Object.entries(parsed)) {
+      if (k === 'version' || k === 'notes') continue;
+      const norm = normalizeCommunityLoreNoteValue(v);
+      if (norm) {
+        notes[String(k)] = norm;
+      }
+    }
+    return { version: 1, notes };
+  } catch (_err) {
+    return { version: 1, notes: {} };
+  }
+}
+
+function writeCommunityNotesStore(store) {
+  const configPath = getCommunityNotesPath();
+  const dir = path.dirname(configPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+  }
+  fs.writeFileSync(configPath, JSON.stringify(store, null, 2) + '\n', 'utf8');
+}
+
+function communityNotesDogCount() {
+  const ns = readCommunityNotesStore();
+  return Object.keys(ns.notes || {}).length;
+}
+
+/** Match approved notes even if JSON keys differ slightly (e.g. "7742" vs 7742). */
+function lookupCommunityLoreText(notes, dogNumber) {
+  if (!notes || typeof notes !== 'object' || dogNumber == null) {
+    return null;
+  }
+  const n = Number(dogNumber);
+  if (!Number.isInteger(n) || n < 1 || n > 10000) {
+    return null;
+  }
+  const preferredKeys = [String(n), String(Math.trunc(n))];
+  for (const k of preferredKeys) {
+    const t = normalizeCommunityLoreNoteValue(notes[k]);
+    if (t) {
+      return t;
+    }
+  }
+  for (const [k, v] of Object.entries(notes)) {
+    const t = normalizeCommunityLoreNoteValue(v);
+    if (!t) {
+      continue;
+    }
+    const ks = String(k).trim();
+    if (/^\d+$/.test(ks) && Number(ks) === n) {
+      return t;
+    }
+  }
+  return null;
+}
+
+function attachCommunityLoreFromDisk(result) {
+  if (!result || result.error) {
+    return;
+  }
+  if (result.dogNumber == null) {
+    return;
+  }
+  const ns = readCommunityNotesStore();
+  const text = lookupCommunityLoreText(ns.notes || {}, result.dogNumber);
+  if (!text) {
+    return;
+  }
+  if (!result.communityLore) {
+    result.communityLore = text;
+  }
+  if (!result.estimation || typeof result.estimation !== 'object') {
+    result.estimation = {};
+  }
+  if (!result.estimation.communityLore) {
+    result.estimation.communityLore = text;
+  }
+}
+
+function slugComboId(label, suggestionId) {
+  const base = String(label || 'combo')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  const idFrag = String(suggestionId || '').replace(/-/g, '').slice(0, 12);
+  return `${base || 'combo'}-${idFrag}`;
+}
+
+function validateSuggestionPayload(kind, raw) {
+  if (!kind || typeof kind !== 'string') {
+    throw new Error('Missing suggestion kind.');
+  }
+  const k = kind.trim();
+  if (k === 'trait_multiplier') {
+    const traitKey = String(raw.traitKey || '').trim();
+    const traitValue = String(raw.traitValue || '').trim();
+    const multiplier = Number(raw.multiplier);
+    if (!DD_TRAIT_KEYS.has(traitKey)) {
+      throw new Error('Invalid traitKey.');
+    }
+    if (!traitValue) {
+      throw new Error('traitValue is required.');
+    }
+    if (!Number.isFinite(multiplier) || multiplier < 1) {
+      throw new Error('multiplier must be >= 1.');
+    }
+    return {
+      traitKey,
+      traitValue,
+      multiplier: +multiplier.toFixed(4),
+    };
+  }
+  if (k === 'combo') {
+    const label = String(raw.label || '').trim();
+    const multiplier = Number(raw.multiplier);
+    const conditions = Array.isArray(raw.conditions) ? raw.conditions : [];
+    if (!label) {
+      throw new Error('label is required.');
+    }
+    if (!Number.isFinite(multiplier) || multiplier <= 1) {
+      throw new Error('combo multiplier must be > 1.');
+    }
+    const normalizedCond = [];
+    for (const c of conditions) {
+      if (!c || typeof c !== 'object') continue;
+      const trait = String(c.trait || '').trim();
+      const value = String(c.value || '').trim();
+      if (!DD_TRAIT_KEYS.has(trait) || !value) continue;
+      normalizedCond.push({
+        trait,
+        op: c.op === 'contains' ? 'contains' : 'eq',
+        value,
+      });
+    }
+    if (normalizedCond.length === 0) {
+      throw new Error('combo requires at least one valid condition.');
+    }
+    return {
+      label,
+      multiplier: Math.max(1.01, multiplier),
+      conditions: normalizedCond,
+    };
+  }
+  if (k === 'suppress_trend') {
+    const trendKeyRaw = String(raw.trendKey || '').trim();
+    const colonIdx = trendKeyRaw.indexOf(':');
+    if (colonIdx < 1) {
+      throw new Error('trendKey must look like trait:value.');
+    }
+    const tr = trendKeyRaw.slice(0, colonIdx).trim();
+    const tv = trendKeyRaw.slice(colonIdx + 1).trim();
+    if (!DD_TRAIT_KEYS.has(tr) || !tv) {
+      throw new Error('Invalid trendKey.');
+    }
+    return { trendKey: `${tr}:${tv}` };
+  }
+  if (k === 'lore_only') {
+    const dogNumber = Number(raw.dogNumber);
+    const lore = String(raw.lore || '').trim();
+    if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
+      throw new Error('dogNumber must be 1–10000.');
+    }
+    if (!lore) {
+      throw new Error('lore is required.');
+    }
+    if (lore.length > 8000) {
+      throw new Error('lore is too long.');
+    }
+    return { dogNumber, lore };
+  }
+  throw new Error('Unknown suggestion kind.');
+}
+
+async function mergeApprovedSuggestion(item) {
+  let cfg = readTrendingConfig();
+  if (!cfg || typeof cfg !== 'object') {
+    const ev = await loadEvaluator();
+    cfg = await ev.getTrendingConfig(true);
+  } else {
+    cfg = JSON.parse(JSON.stringify(cfg));
+  }
+
+  const kind = item.kind;
+  const payload = item.payload || {};
+  let mergeResult = {};
+
+  if (kind === 'trait_multiplier') {
+    const multKey = `${payload.traitKey}:${payload.traitValue}`;
+    cfg.manualMultipliers = { ...(cfg.manualMultipliers || {}), [multKey]: payload.multiplier };
+    mergeResult = { manualMultiplierKey: multKey };
+    saveTrendingConfig(cfg);
+  } else if (kind === 'combo') {
+    const comboId = slugComboId(payload.label, item.id);
+    const combos = [...(((cfg.specialMultipliers || {}).combos) || [])];
+    const entry = {
+      id: comboId,
+      label: payload.label,
+      conditions: payload.conditions,
+      multiplier: payload.multiplier,
+      enabled: true,
+    };
+    const idx = combos.findIndex(c => String(c.id) === comboId);
+    if (idx >= 0) {
+      combos[idx] = entry;
+    } else {
+      combos.push(entry);
+    }
+    cfg.specialMultipliers = { ...(cfg.specialMultipliers || {}), combos };
+    mergeResult = { comboId };
+    saveTrendingConfig(cfg);
+  } else if (kind === 'suppress_trend') {
+    const keys = [...(((cfg.autoTrend || {}).disabledTrendKeys) || [])];
+    if (!keys.includes(payload.trendKey)) {
+      keys.push(payload.trendKey);
+    }
+    cfg.autoTrend = { ...(cfg.autoTrend || {}), disabledTrendKeys: keys };
+    mergeResult = { suppressedTrendKey: payload.trendKey };
+    saveTrendingConfig(cfg);
+  } else if (kind === 'lore_only') {
+    const ns = readCommunityNotesStore();
+    ns.notes = { ...(ns.notes || {}), [String(payload.dogNumber)]: payload.lore };
+    writeCommunityNotesStore(ns);
+    mergeResult = { dogNumber: payload.dogNumber };
+  }
+
+  const ev = await loadEvaluator();
+  await ev.getTrendingConfig(true);
+  return mergeResult;
 }
 
 function readTrendingConfig() {
@@ -265,9 +661,13 @@ router.get('/evaluate/batch', requireSnapshot, async (req, res) => {
 
   try {
     const results = await Promise.all(numbers.map(n => ev.evaluateDog(n)));
+    for (const r of results) {
+      attachCommunityLoreFromDisk(r);
+    }
     res.json({ count: results.length, evaluations: results });
   } catch (err) {
-    res.status(500).json({ error: `Batch evaluation failed: ${err.message}` });
+    console.error('[dd-evaluator] Batch evaluate:', err);
+    res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
   }
 });
 
@@ -280,9 +680,12 @@ router.get('/evaluate/:dogNumber', requireSnapshot, async (req, res) => {
   }
   try {
     const result = await ev.evaluateDog(dogNumber);
+    attachCommunityLoreFromDisk(result);
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: `Evaluation failed: ${err.message}` });
+    console.error('[dd-evaluator] Evaluate:', err);
+    res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
   }
 });
 
@@ -326,7 +729,8 @@ router.get('/wallet/:address', requireSnapshot, async (req, res) => {
     };
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: `Wallet evaluation failed: ${err.message}` });
+    console.error('[dd-evaluator] Wallet:', err);
+    res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
   }
 });
 
@@ -517,9 +921,217 @@ router.post('/admin/evaluations-import', async (req, res) => {
     const imported = appendEvaluationLog(entries);
     res.json({ ok: true, imported });
   } catch (err) {
-    res.status(500).json({ error: err.message || 'Failed to import evaluation log.' });
+    console.error('[dd-evaluator] Evaluations import:', err);
+    res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
+  }
+});
+
+router.get('/community/status', (req, res) => {
+  res.json({ communityPasswordRequired: getCommunitySubmitPassword() != null });
+});
+
+router.get('/community/lore/:dogNumber', (req, res) => {
+  const dogNumber = Number(req.params.dogNumber);
+  if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
+    return res.status(400).json({ error: 'Invalid dog number. Must be 1–10000.' });
+  }
+  const ns = readCommunityNotesStore();
+  const text = lookupCommunityLoreText(ns.notes || {}, dogNumber);
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.json({ dogNumber, communityLore: text || null });
+});
+
+router.post('/community/suggestions', rateLimitCommunitySuggestions, async (req, res) => {
+  const expectedComm = getCommunitySubmitPassword();
+  const rawBody = req.body && typeof req.body === 'object' ? req.body : {};
+  const headerComm = String(req.headers['x-dd-community-password'] || '').trim();
+  const bodyComm = String(rawBody.communityPassword || '').trim();
+  const provided = headerComm || bodyComm;
+
+  const bodyCopy = { ...rawBody };
+  delete bodyCopy.communityPassword;
+
+  if (expectedComm) {
+    if (!timingSafeEqualString(expectedComm, provided)) {
+      return res.status(401).json({ error: 'Invalid community password.' });
+    }
+  }
+
+  const kind = bodyCopy.kind;
+  let payload;
+  try {
+    payload = validateSuggestionPayload(kind, bodyCopy);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Invalid suggestion payload.' });
+  }
+
+  const store = readSuggestionsStore();
+  const record = {
+    id: crypto.randomUUID(),
+    status: 'pending',
+    kind: kind.trim(),
+    payload,
+    submittedAt: new Date().toISOString(),
+  };
+  store.items.push(record);
+  writeSuggestionsStore(store);
+  res.status(201).json({ ok: true, id: record.id });
+});
+
+router.get('/admin/community-notes/list', (req, res) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+  const ns = readCommunityNotesStore();
+  const notes = ns.notes || {};
+  const entries = Object.entries(notes)
+    .map(([k, v]) => {
+      const loreStr = normalizeCommunityLoreNoteValue(v);
+      if (!loreStr) {
+        return null;
+      }
+      const ks = String(k).trim();
+      if (!/^\d+$/.test(ks)) {
+        return null;
+      }
+      const dn = Number(ks);
+      if (!Number.isInteger(dn) || dn < 1 || dn > 10000) {
+        return null;
+      }
+      return { dogNumber: dn, lore: loreStr };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dogNumber - b.dogNumber);
+  res.set('Cache-Control', 'no-store');
+  res.json({ entries, count: entries.length });
+});
+
+router.post('/admin/community-notes/save', (req, res) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+  const dogNumber = Number(req.body?.dogNumber);
+  const lore = req.body?.lore != null ? String(req.body.lore).trim() : '';
+  if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
+    return res.status(400).json({ error: 'dogNumber must be 1–10000.' });
+  }
+  if (!lore) {
+    return res.status(400).json({ error: 'lore is required.' });
+  }
+  if (lore.length > 8000) {
+    return res.status(400).json({ error: 'lore is too long (max 8000 characters).' });
+  }
+  const ns = readCommunityNotesStore();
+  const notes = { ...(ns.notes || {}) };
+  for (const k of Object.keys(notes)) {
+    if (Number(k) === dogNumber || String(k) === String(dogNumber)) {
+      delete notes[k];
+    }
+  }
+  notes[String(dogNumber)] = lore;
+  writeCommunityNotesStore({ ...ns, notes });
+  res.json({
+    ok: true,
+    dogNumber,
+    communityNotesDogCount: communityNotesDogCount(),
+  });
+});
+
+router.post('/admin/community-notes/delete', async (req, res) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+  const dogNumber = Number(req.body?.dogNumber);
+  if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
+    return res.status(400).json({ error: 'dogNumber must be 1–10000.' });
+  }
+  const ns = readCommunityNotesStore();
+  const notes = { ...(ns.notes || {}) };
+  let removed = false;
+  for (const k of Object.keys(notes)) {
+    if (Number(k) === dogNumber || String(k) === String(dogNumber)) {
+      delete notes[k];
+      removed = true;
+    }
+  }
+  writeCommunityNotesStore({ ...ns, notes });
+  res.json({
+    ok: true,
+    dogNumber,
+    removed,
+    communityNotesDogCount: communityNotesDogCount(),
+  });
+});
+
+router.get('/admin/suggestions', async (req, res) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+  const statusFilter = String(req.query.status || '').trim().toLowerCase();
+  const store = readSuggestionsStore();
+  let items = store.items || [];
+  if (statusFilter === 'pending' || statusFilter === 'approved' || statusFilter === 'rejected') {
+    items = items.filter(it => it.status === statusFilter);
+  }
+  res.json({
+    items,
+    communityNotesDogCount: communityNotesDogCount(),
+  });
+});
+
+router.post('/admin/suggestions/:id/review', async (req, res) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+  const suggestionId = String(req.params.id || '').trim();
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const action = String(body.action || '').trim().toLowerCase();
+  const note = body.note != null ? String(body.note).trim() : '';
+
+  if (action !== 'approve' && action !== 'reject') {
+    return res.status(400).json({ error: 'action must be approve or reject.' });
+  }
+
+  const store = readSuggestionsStore();
+  const idx = store.items.findIndex(it => String(it.id) === suggestionId);
+  if (idx < 0) {
+    return res.status(404).json({ error: 'Suggestion not found.' });
+  }
+
+  const item = store.items[idx];
+  if (item.status !== 'pending') {
+    return res.status(400).json({ error: 'Suggestion is not pending.' });
+  }
+
+  const reviewedAt = new Date().toISOString();
+
+  if (action === 'reject') {
+    item.status = 'rejected';
+    item.reviewedAt = reviewedAt;
+    item.reviewNote = note || null;
+    store.items[idx] = item;
+    writeSuggestionsStore(store);
+    return res.json({ ok: true, suggestion: item });
+  }
+
+  try {
+    const mergeResult = await mergeApprovedSuggestion(item);
+    item.status = 'approved';
+    item.reviewedAt = reviewedAt;
+    item.reviewNote = note || null;
+    item.mergeResult = mergeResult;
+    store.items[idx] = item;
+    writeSuggestionsStore(store);
+    return res.json({ ok: true, suggestion: item });
+  } catch (err) {
+    console.error('Approve suggestion merge failed:', err);
+    return res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
   }
 });
 
 module.exports = router;
 module.exports.initEvaluator = initEvaluator;
+module.exports.getExpectedDdAdminPassword = getExpectedDdAdminPassword;
+module.exports.getAdminUiPassword = getAdminUiPassword;
+module.exports.getCommunitySubmitPassword = getCommunitySubmitPassword;
+module.exports.resolveAdminHtmlGatePassword = resolveAdminHtmlGatePassword;

@@ -86,6 +86,11 @@ const TRENDING_CONFIG_CANDIDATE_PATHS = Object.freeze([
   resolve(__dirname, '..', '..', 'server', 'data', 'dd-trending-config.json'),
 ].filter(Boolean));
 
+const COMMUNITY_NOTES_CANDIDATE_PATHS = Object.freeze([
+  process.env.DD_COMMUNITY_NOTES_PATH ? resolve(process.cwd(), process.env.DD_COMMUNITY_NOTES_PATH) : null,
+  resolve(__dirname, '..', '..', 'server', 'data', 'dd-community-notes.json'),
+].filter(Boolean));
+
 const EVALUATION_LOG_CANDIDATE_PATHS = Object.freeze([
   process.env.DD_EVALUATION_LOG_PATH ? resolve(process.cwd(), process.env.DD_EVALUATION_LOG_PATH) : null,
   resolve(__dirname, '..', '..', 'server', 'data', 'dd-evaluation-log.ndjson'),
@@ -348,6 +353,82 @@ function normalizeTrendingConfig(raw = {}) {
     updatedAt: raw?.updatedAt || DEFAULT_TRENDING_CONFIG.updatedAt,
     updatedBy: raw?.updatedBy || DEFAULT_TRENDING_CONFIG.updatedBy,
   };
+}
+
+function lookupLoreInNotesMap(notes, dogNumber) {
+  if (!notes || typeof notes !== 'object' || dogNumber == null) {
+    return null;
+  }
+  const n = Number(dogNumber);
+  if (!Number.isInteger(n) || n < 1 || n > 10000) {
+    return null;
+  }
+  for (const k of [String(n), String(Math.trunc(n))]) {
+    const v = notes[k];
+    if (typeof v === 'string' && v.trim()) {
+      return v.trim();
+    }
+  }
+  for (const [k, v] of Object.entries(notes)) {
+    if (typeof v !== 'string' || !v.trim()) {
+      continue;
+    }
+    const kn = Number(k);
+    if (Number.isInteger(kn) && kn === n) {
+      return v.trim();
+    }
+    if (String(k).trim() === String(n)) {
+      return v.trim();
+    }
+  }
+  return null;
+}
+
+async function readCommunityLoreForDog(dogNumber) {
+  for (const filePath of COMMUNITY_NOTES_CANDIDATE_PATHS) {
+    try {
+      const raw = await readFile(filePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      const notes = parsed?.notes && typeof parsed.notes === 'object' ? { ...parsed.notes } : {};
+      if (parsed && typeof parsed === 'object') {
+        for (const [k, v] of Object.entries(parsed)) {
+          if (k === 'version' || k === 'notes') continue;
+          if (typeof v === 'string') notes[k] = v;
+        }
+      }
+      const text = lookupLoreInNotesMap(notes, dogNumber);
+      if (text) {
+        return text;
+      }
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
+/** Mark trait breakdown rows that satisfied part of the matched combo. */
+function annotateTraitBreakdownForCombo(traitBreakdown, traits, matchedCombo) {
+  if (!matchedCombo || !Array.isArray(traitBreakdown)) return;
+  const conditions = Array.isArray(matchedCombo.conditions) ? matchedCombo.conditions : [];
+  if (conditions.length === 0) return;
+  for (const tb of traitBreakdown) {
+    if (tb.isSynthetic) continue;
+    const hit = conditions.some(cond => {
+      if (!cond || cond.trait !== tb.trait) return false;
+      const val = traits[tb.trait];
+      if (val == null) return false;
+      const sv = String(val).toLowerCase().trim();
+      const cv = String(cond.value || '').toLowerCase().trim();
+      if (!cv) return false;
+      return cond.op === 'contains' ? sv.includes(cv) : sv === cv;
+    });
+    if (hit) {
+      tb.comboPart = { id: matchedCombo.id, label: matchedCombo.label };
+    }
+  }
 }
 
 async function getTrendingConfig(forceRefresh = false) {
@@ -1331,9 +1412,10 @@ async function evaluateDog(dogNumber) {
   const traitMeta = _snapshot.traitMeta;
 
   // Fetch this dog's traits (live, for accuracy — it's one call)
-  const [traits, search] = await Promise.all([
+  const [traits, search, communityLore] = await Promise.all([
     getDogTraits(dogNumber),
-    searchDog(dogNumber)
+    searchDog(dogNumber),
+    readCommunityLoreForDog(dogNumber).catch(() => null),
   ]);
 
   if (!traits) {
@@ -1655,6 +1737,7 @@ async function evaluateDog(dogNumber) {
       multiplier: comboMultiplier,
     });
   }
+  annotateTraitBreakdownForCombo(traitBreakdown, traits, matchedCombo);
 
   // --- Angel numbers (quad/triple repeaters + trend numbers) ---
   const smAngel = smConfig.angelNumbers || {};
@@ -1736,8 +1819,13 @@ async function evaluateDog(dogNumber) {
     ? Math.round(displayEstimatedUsd / dogeUsd)
     : null;
 
+  const comboInscriptionIds = search?.inscriptionId
+    ? [String(search.inscriptionId)]
+    : [];
+
   return {
     dogNumber,
+    communityLore: communityLore || null,
     name: search?.name || `Doginal Dog #${dogNumber}`,
     inscriptionId: search?.inscriptionId || null,
     imageUrl: search?.imageUrl ? `${MARKET_BASE}${search.imageUrl}` : `${MARKET_BASE}/dogs/${dogNumber}.png`,
@@ -1772,7 +1860,13 @@ async function evaluateDog(dogNumber) {
       colorMatchMultiplier: colorMatch ? colorMatchMultiplier : null,
       minimalDog: isMinimalDog ? { type: minimalType, label: minimalLabel, extraTraitCount } : null,
       minimalMultiplier: isMinimalDog ? minimalMultiplier : null,
-      comboMatch: matchedCombo ? { id: matchedCombo.id, label: matchedCombo.label } : null,
+      comboMatch: matchedCombo ? {
+        id: matchedCombo.id,
+        label: matchedCombo.label,
+        multiplier: comboMultiplier,
+        inscriptionIds: comboInscriptionIds,
+        dogNumber,
+      } : null,
       comboMultiplier: matchedCombo ? comboMultiplier : null,
       angelNumber: isAngelNumber ? { type: angelType, label: angelLabel } : null,
       angelMultiplier: isAngelNumber ? angelMultiplier : null,
@@ -1791,6 +1885,7 @@ async function evaluateDog(dogNumber) {
       } : null,
       collectionFloor: collectionStats.floor,
       dogeUsd,
+      communityLore: communityLore || null,
       method: [
         'rarest_trait_top_sale + trait_bonus + rarity_multiplier',
         valueMultiplier !== 1 ? 'one_of_one_multiplier' : null,

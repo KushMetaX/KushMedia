@@ -106,12 +106,16 @@
     .ddw-top-sale-badge svg { width: 12px; height: 12px; fill: #d4af37; }
     .ddw-trending-badge { display: inline-flex; align-items: center; gap: 3px; background: rgba(255,100,50,.15); color: #ff6432; border: 1px solid rgba(255,100,50,.4); border-radius: 4px; padding: 1px 6px; font-size: .65rem; font-weight: 700; white-space: nowrap; }
     .ddw-trait.trending-row { border-color: rgba(255,100,50,.3); background: rgba(255,100,50,.04); }
+    .ddw-trait.combo-row { border-color: rgba(147,197,253,.35); background: rgba(147,197,253,.06); }
+    .ddw-combo-badge { display: inline-flex; align-items: center; gap: 3px; background: rgba(147,197,253,.12); color: #93c5fd; border: 1px solid rgba(147,197,253,.4); border-radius: 4px; padding: 1px 6px; font-size: .65rem; font-weight: 700; white-space: nowrap; }
     .ddw-own-sale { padding: 14px 20px; border-bottom: 1px solid var(--border); background: rgba(212,175,55,.04); }
     .ddw-own-sale-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gold); font-weight: 600; display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
     .ddw-own-sale-label svg { width: 14px; height: 14px; fill: var(--gold); }
     .ddw-own-sale-value { font-size: 1.1rem; font-weight: 700; color: var(--gold); }
 
     .ddw-meta { display: flex; flex-wrap: wrap; gap: 14px; padding: 8px 20px 4px; font-size: .7rem; color: var(--muted); }
+    .ddw-lore { padding: 16px 20px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.02); }
+    .ddw-lore-body { margin: 8px 0 0; font-size: .85rem; line-height: 1.55; color: #c8c4b8; white-space: pre-wrap; word-break: break-word; }
     .ddw-ts { padding: 4px 20px 14px; text-align: right; font-size: .65rem; color: var(--muted); opacity: .7; }
 
     .ddw-footer { text-align: center; font-size: .7rem; color: var(--muted); padding: 12px 0 4px; border-top: 1px solid var(--border); margin-top: 8px; }
@@ -183,6 +187,14 @@
       clearStatus();
       const est = d.estimation || {};
       const la = d.listingAnalysis;
+      const loreText = (d.communityLore != null && String(d.communityLore).trim() !== '')
+        ? String(d.communityLore).trim()
+        : (est.communityLore != null && String(est.communityLore).trim() !== '' ? String(est.communityLore).trim() : '');
+      const loreBlock = loreText ? `
+        <div class="ddw-lore">
+          <div class="ddw-section-title">Community lore</div>
+          <p class="ddw-lore-body">${esc(loreText)}</p>
+        </div>` : '';
       const pawSvg = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21c-1.5 0-3.5-2-4.5-3.5S5 14 5 12.5 6.5 10 8 10s2.5.5 3 1.5c.3.6.7 1 1 1s.7-.4 1-1C13.5 10.5 14.5 10 16 10s3 1 3 2.5S18 16 17 17.5 13.5 21 12 21zM6.5 9C5.1 9 4 7.9 4 6.5S5.1 4 6.5 4 9 5.1 9 6.5 7.9 9 6.5 9zm4-2C9.7 7 9 6.3 9 5.5S9.7 4 10.5 4s1.5.7 1.5 1.5S11.3 7 10.5 7zm3 0c-.8 0-1.5-.7-1.5-1.5S12.7 4 13.5 4s1.5.7 1.5 1.5S14.3 7 13.5 7zm4 2C16.1 9 15 7.9 15 6.5S16.1 4 17.5 4 20 5.1 20 6.5 18.9 9 17.5 9z"/></svg>';
 
       const traits = (d.traitBreakdown || []).map(t => {
@@ -202,12 +214,15 @@
         const trendBadge = t.trending
           ? ` <span class="ddw-trending-badge">🔥 TRENDING ${t.trending}x</span>`
           : '';
-        const rowClass = (t.isTopSale ? ' top-sale-row' : '') + (t.trending ? ' trending-row' : '');
+        const comboBadge = t.comboPart
+          ? ` <span class="ddw-combo-badge">🔗 ${esc(t.comboPart.label)}</span>`
+          : '';
+        const rowClass = (t.isTopSale ? ' top-sale-row' : '') + (t.trending ? ' trending-row' : '') + (t.comboPart ? ' combo-row' : '');
         return `
         <div class="ddw-trait${rowClass}">
           <span class="ddw-trait-key">${esc(t.trait)}${countInfo}</span>
           <span class="ddw-trait-val">${esc(t.value)}</span>
-          <span class="ddw-trait-floor${isUnlisted ? ' unlisted' : ''}">${priceLabel}${saleInfo}${topBadge}${trendBadge}</span>
+          <span class="ddw-trait-floor${isUnlisted ? ' unlisted' : ''}">${priceLabel}${saleInfo}${topBadge}${trendBadge}${comboBadge}</span>
         </div>`;
       }).join('');
 
@@ -237,6 +252,8 @@
             ${est.dogeUsd && est.collectionFloor ? `<div class="ddw-price-sub">${fmtU(est.collectionFloor * est.dogeUsd)}</div>` : ''}
           </div>
         </div>
+
+        ${loreBlock}
 
         ${la ? `
         <div class="ddw-analysis">

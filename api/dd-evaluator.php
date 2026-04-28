@@ -7,12 +7,13 @@
  *
  * Usage:
  *   /api/dd-evaluator.php?action=evaluate&dogNumber=7742
+ *   /api/dd-evaluator.php?action=community-lore&dogNumber=7742
  *   /api/dd-evaluator.php?action=snapshot_status
  */
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, x-dd-admin-password');
+header('Access-Control-Allow-Headers: Content-Type, x-dd-admin-password, x-dd-community-password');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -23,7 +24,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $MARKET_BASE = 'https://market.doginaldogs.com';
 $TRAIT_KEYS = array('background', 'furColor', 'furPattern', 'head', 'clothes', 'mouth', 'eyes', 'accessory');
-$action = isset($_GET['action']) ? $_GET['action'] : '';
+$action = isset($_GET['action']) ? trim(strtolower(strval($_GET['action']))) : '';
 $CATALOG_CANDIDATE_PATHS = array();
 $catalogEnvPath = getenv('DD_CATALOG_PATH');
 $catalogDisabled = getenv('DD_DISABLE_CATALOG');
@@ -54,6 +55,12 @@ if ($ddAdminPasswordFileEnvPath) {
     $DD_ADMIN_PASSWORD_FILE_CANDIDATE_PATHS[] = $ddAdminPasswordFileEnvPath;
 }
 $DD_ADMIN_PASSWORD_FILE_CANDIDATE_PATHS[] = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'server' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.dd-admin-password';
+$DD_COMMUNITY_PASSWORD_FILE_CANDIDATE_PATHS = array();
+$ddCommunityPasswordFileEnvPath = getenv('DD_COMMUNITY_PASSWORD_FILE');
+if ($ddCommunityPasswordFileEnvPath) {
+    $DD_COMMUNITY_PASSWORD_FILE_CANDIDATE_PATHS[] = $ddCommunityPasswordFileEnvPath;
+}
+$DD_COMMUNITY_PASSWORD_FILE_CANDIDATE_PATHS[] = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'server' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . '.dd-community-password';
 $DD_IMPORT_LOOKBACK_HOURS = 48;
 $DD_IMPORT_MAX_EVENTS = 2000;
 
@@ -128,10 +135,14 @@ function fetchUrl($url, $accept = 'application/json') {
 }
 
 function sendJson($payload, $status = 200, $cacheSeconds = null) {
-    if ($cacheSeconds !== null) {
-        header('Cache-Control: public, max-age=' . intval($cacheSeconds));
-    }
     http_response_code($status);
+    if ($cacheSeconds !== null) {
+        if ($cacheSeconds <= 0) {
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        } else {
+            header('Cache-Control: public, max-age=' . intval($cacheSeconds));
+        }
+    }
     echo json_encode($payload);
     exit;
 }
@@ -230,6 +241,428 @@ function getExpectedDdAdminPassword() {
     }
 
     return '';
+}
+
+function getExpectedCommunityPassword() {
+    global $DD_COMMUNITY_PASSWORD_FILE_CANDIDATE_PATHS;
+
+    $primary = getenv('DD_COMMUNITY_PASSWORD');
+    $password = trim(strval($primary ? $primary : ''));
+    if ($password !== '') {
+        return $password;
+    }
+
+    foreach ($DD_COMMUNITY_PASSWORD_FILE_CANDIDATE_PATHS as $path) {
+        if (!$path || !is_file($path) || !is_readable($path)) {
+            continue;
+        }
+
+        $filePassword = trim(strval(@file_get_contents($path)));
+        if ($filePassword !== '') {
+            return $filePassword;
+        }
+    }
+
+    return '';
+}
+
+function getCommunitySuggestionsStorePath() {
+    $env = getenv('DD_COMMUNITY_SUGGESTIONS_PATH');
+    if ($env && trim(strval($env)) !== '') {
+        return trim(strval($env));
+    }
+
+    return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'server' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'dd-community-suggestions.json';
+}
+
+function readSuggestionsStorePhp() {
+    $path = getCommunitySuggestionsStorePath();
+    if (!is_file($path)) {
+        return array('version' => 1, 'items' => array());
+    }
+
+    $raw = @file_get_contents($path);
+    $parsed = json_decode($raw, true);
+    if (!is_array($parsed) || !isset($parsed['items']) || !is_array($parsed['items'])) {
+        return array('version' => 1, 'items' => array());
+    }
+
+    return array('version' => 1, 'items' => $parsed['items']);
+}
+
+function writeSuggestionsStorePhp($store) {
+    $path = getCommunitySuggestionsStorePath();
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+
+    $json = json_encode($store, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+    if (@file_put_contents($path, $json, LOCK_EX) === false) {
+        throw new Exception('Unable to write suggestions store.');
+    }
+}
+
+function getCommunityNotesStorePath() {
+    $env = getenv('DD_COMMUNITY_NOTES_PATH');
+    if ($env && trim(strval($env)) !== '') {
+        return trim(strval($env));
+    }
+
+    return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'server' . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'dd-community-notes.json';
+}
+
+/** Coerce note payloads to plain strings for evaluator + admin list. */
+function normalizeCommunityLoreNoteValuePhp($v) {
+    if (is_string($v)) {
+        return trim($v);
+    }
+    if (!is_array($v)) {
+        return '';
+    }
+    if (isset($v['lore']) && is_string($v['lore'])) {
+        return trim($v['lore']);
+    }
+    if (isset($v['text']) && is_string($v['text'])) {
+        return trim($v['text']);
+    }
+    if (isset($v['body']) && is_string($v['body'])) {
+        return trim($v['body']);
+    }
+
+    return '';
+}
+
+function readCommunityNotesStorePhp() {
+    $path = getCommunityNotesStorePath();
+    if (!is_file($path)) {
+        return array('version' => 1, 'notes' => array());
+    }
+
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return array('version' => 1, 'notes' => array());
+    }
+    $raw = preg_replace('/^\xEF\xBB\xBF/', '', $raw);
+    $parsed = json_decode($raw, true);
+    if (!is_array($parsed)) {
+        return array('version' => 1, 'notes' => array());
+    }
+
+    $notes = array();
+    if (isset($parsed['notes']) && is_array($parsed['notes'])) {
+        foreach ($parsed['notes'] as $k => $v) {
+            $norm = normalizeCommunityLoreNoteValuePhp($v);
+            if ($norm !== '') {
+                $notes[strval($k)] = $norm;
+            }
+        }
+    }
+    foreach ($parsed as $k => $v) {
+        if ($k === 'version' || $k === 'notes') {
+            continue;
+        }
+        $norm = normalizeCommunityLoreNoteValuePhp($v);
+        if ($norm !== '') {
+            $notes[strval($k)] = $norm;
+        }
+    }
+
+    return array('version' => 1, 'notes' => $notes);
+}
+
+function writeCommunityNotesStorePhp($store) {
+    $path = getCommunityNotesStorePath();
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+
+    $json = json_encode($store, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+    if (@file_put_contents($path, $json, LOCK_EX) === false) {
+        throw new Exception('Unable to write community notes store.');
+    }
+}
+
+function communityNotesDogCountPhp() {
+    $ns = readCommunityNotesStorePhp();
+    return count(isset($ns['notes']) && is_array($ns['notes']) ? $ns['notes'] : array());
+}
+
+function lookupCommunityLoreInNotesMapPhp($nmap, $dogNumber) {
+    if (!is_array($nmap)) {
+        return null;
+    }
+    $n = intval($dogNumber);
+    if ($n < 1 || $n > 10000) {
+        return null;
+    }
+    $preferred = array(strval($n), strval(intval($dogNumber)));
+    foreach ($preferred as $k) {
+        if (isset($nmap[$k])) {
+            $t = normalizeCommunityLoreNoteValuePhp($nmap[$k]);
+            if ($t !== '') {
+                return $t;
+            }
+        }
+    }
+    foreach ($nmap as $k => $v) {
+        $t = normalizeCommunityLoreNoteValuePhp($v);
+        if ($t === '') {
+            continue;
+        }
+        $ks = trim(strval($k));
+        if ($ks !== '' && ctype_digit($ks) && intval($ks) === $n) {
+            return $t;
+        }
+    }
+    return null;
+}
+
+function ddAdminSlugComboId($label, $suggestionId) {
+    $base = strtolower(preg_replace('/[^a-z0-9]+/i', '-', strval($label ? $label : 'combo')));
+    $base = trim($base, '-');
+    if (strlen($base) > 48) {
+        $base = substr($base, 0, 48);
+    }
+    if ($base === '') {
+        $base = 'combo';
+    }
+    $idFrag = substr(str_replace('-', '', strval($suggestionId)), 0, 12);
+
+    return $base . '-' . $idFrag;
+}
+
+function mergeApprovedSuggestionPhp($item) {
+    $kind = isset($item['kind']) ? strval($item['kind']) : '';
+    $payload = isset($item['payload']) && is_array($item['payload']) ? $item['payload'] : array();
+    $mergeResult = array();
+
+    $cfg = getTrendingConfigData(true);
+
+    if ($kind === 'trait_multiplier') {
+        $traitKey = isset($payload['traitKey']) ? strval($payload['traitKey']) : '';
+        $traitValue = isset($payload['traitValue']) ? strval($payload['traitValue']) : '';
+        $multKey = $traitKey . ':' . $traitValue;
+        $mm = isset($cfg['manualMultipliers']) && is_array($cfg['manualMultipliers']) ? $cfg['manualMultipliers'] : array();
+        $mm[$multKey] = isset($payload['multiplier']) ? floatval($payload['multiplier']) : 1.0;
+        updateTrendingConfigData(array(
+            'manualMultipliers' => $mm,
+            'updatedBy' => 'community-approve',
+        ));
+        $mergeResult['manualMultiplierKey'] = $multKey;
+    } elseif ($kind === 'combo') {
+        $sm = isset($cfg['specialMultipliers']) && is_array($cfg['specialMultipliers']) ? $cfg['specialMultipliers'] : array();
+        $combos = isset($sm['combos']) && is_array($sm['combos']) ? $sm['combos'] : array();
+        $comboId = ddAdminSlugComboId(isset($payload['label']) ? $payload['label'] : 'combo', isset($item['id']) ? $item['id'] : '');
+        $entry = array(
+            'id' => $comboId,
+            'label' => isset($payload['label']) ? strval($payload['label']) : '',
+            'conditions' => isset($payload['conditions']) && is_array($payload['conditions']) ? $payload['conditions'] : array(),
+            'multiplier' => max(1.01, floatval(isset($payload['multiplier']) ? $payload['multiplier'] : 1.01)),
+            'enabled' => true,
+        );
+        $idx = -1;
+        foreach ($combos as $i => $c) {
+            if (is_array($c) && isset($c['id']) && strval($c['id']) === $comboId) {
+                $idx = intval($i);
+                break;
+            }
+        }
+        if ($idx >= 0) {
+            $combos[$idx] = $entry;
+        } else {
+            $combos[] = $entry;
+        }
+        $sm['combos'] = $combos;
+        updateTrendingConfigData(array(
+            'specialMultipliers' => $sm,
+            'updatedBy' => 'community-approve',
+        ));
+        $mergeResult['comboId'] = $comboId;
+    } elseif ($kind === 'suppress_trend') {
+        $trendKey = isset($payload['trendKey']) ? strval($payload['trendKey']) : '';
+        $auto = isset($cfg['autoTrend']) && is_array($cfg['autoTrend']) ? $cfg['autoTrend'] : array();
+        $keys = isset($auto['disabledTrendKeys']) && is_array($auto['disabledTrendKeys']) ? $auto['disabledTrendKeys'] : array();
+        if ($trendKey !== '' && !in_array($trendKey, $keys, true)) {
+            $keys[] = $trendKey;
+        }
+        $auto['disabledTrendKeys'] = $keys;
+        updateTrendingConfigData(array(
+            'autoTrend' => $auto,
+            'updatedBy' => 'community-approve',
+        ));
+        $mergeResult['suppressedTrendKey'] = $trendKey;
+    } elseif ($kind === 'lore_only') {
+        $dogNumber = strval(isset($payload['dogNumber']) ? $payload['dogNumber'] : '');
+        $lore = isset($payload['lore']) ? strval($payload['lore']) : '';
+        $ns = readCommunityNotesStorePhp();
+        $notes = isset($ns['notes']) && is_array($ns['notes']) ? $ns['notes'] : array();
+        $notes[$dogNumber] = $lore;
+        $ns['notes'] = $notes;
+        writeCommunityNotesStorePhp($ns);
+        $mergeResult['dogNumber'] = $payload['dogNumber'];
+    } else {
+        throw new Exception('Unknown suggestion kind.');
+    }
+
+    return $mergeResult;
+}
+
+function assertDdAdminApiPasswordOr401() {
+    $expected = getExpectedDdAdminPassword();
+    $provided = trim(strval(getRequestHeader('x-dd-admin-password')));
+    if ($expected === '' || $provided === '' || !hash_equals($expected, $provided)) {
+        sendError('Invalid DD admin password.', 401);
+    }
+}
+
+function ddCommunitySuggestionsRateLimited($ip) {
+    $max = 60;
+    $window = 15 * 60;
+    $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dd-cs-rl-' . md5(strval($ip)) . '.json';
+    $now = time();
+
+    $resetAt = $now + $window;
+    $count = 1;
+
+    if (is_file($path)) {
+        $prev = json_decode(@file_get_contents($path), true);
+        if (is_array($prev) && isset($prev['resetAt']) && isset($prev['count'])) {
+            $prevReset = intval($prev['resetAt']);
+            $prevCount = intval($prev['count']);
+            if ($now <= $prevReset) {
+                if ($prevCount >= $max) {
+                    return true;
+                }
+                $resetAt = $prevReset;
+                $count = $prevCount + 1;
+            }
+        }
+    }
+
+    @file_put_contents($path, json_encode(array('resetAt' => $resetAt, 'count' => $count)), LOCK_EX);
+    return false;
+}
+
+function ddSuggestionUuid() {
+    $bytes = random_bytes(16);
+    $bytes[6] = chr(ord($bytes[6]) & 0x0f | 0x40);
+    $bytes[8] = chr(ord($bytes[8]) & 0x3f | 0x80);
+    $hex = bin2hex($bytes);
+
+    return substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-' . substr($hex, 12, 4) . '-' . substr($hex, 16, 4) . '-' . substr($hex, 20, 12);
+}
+
+function validateSuggestionPayloadPhp($kind, $raw) {
+    global $TRAIT_KEYS;
+
+    if (!$kind || !is_string($kind)) {
+        throw new Exception('Missing suggestion kind.');
+    }
+
+    $k = trim($kind);
+
+    if ($k === 'trait_multiplier') {
+        $traitKey = trim(strval(isset($raw['traitKey']) ? $raw['traitKey'] : ''));
+        $traitValue = trim(strval(isset($raw['traitValue']) ? $raw['traitValue'] : ''));
+        $multiplier = floatval(isset($raw['multiplier']) ? $raw['multiplier'] : 0);
+
+        if (!in_array($traitKey, $TRAIT_KEYS, true)) {
+            throw new Exception('Invalid traitKey.');
+        }
+        if ($traitValue === '') {
+            throw new Exception('traitValue is required.');
+        }
+        if (!is_finite($multiplier) || $multiplier < 1) {
+            throw new Exception('multiplier must be >= 1.');
+        }
+
+        return array(
+            'traitKey' => $traitKey,
+            'traitValue' => $traitValue,
+            'multiplier' => round($multiplier, 4),
+        );
+    }
+
+    if ($k === 'combo') {
+        $label = trim(strval(isset($raw['label']) ? $raw['label'] : ''));
+        $multiplier = floatval(isset($raw['multiplier']) ? $raw['multiplier'] : 0);
+        $conditions = isset($raw['conditions']) && is_array($raw['conditions']) ? $raw['conditions'] : array();
+
+        if ($label === '') {
+            throw new Exception('label is required.');
+        }
+        if (!is_finite($multiplier) || $multiplier <= 1) {
+            throw new Exception('combo multiplier must be > 1.');
+        }
+
+        $normalizedCond = array();
+        foreach ($conditions as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+
+            $trait = trim(strval(isset($c['trait']) ? $c['trait'] : ''));
+            $value = trim(strval(isset($c['value']) ? $c['value'] : ''));
+            if (!in_array($trait, $TRAIT_KEYS, true) || $value === '') {
+                continue;
+            }
+
+            $op = (isset($c['op']) && strval($c['op']) === 'contains') ? 'contains' : 'eq';
+            $normalizedCond[] = array(
+                'trait' => $trait,
+                'op' => $op,
+                'value' => $value,
+            );
+        }
+
+        if (count($normalizedCond) === 0) {
+            throw new Exception('combo requires at least one valid condition.');
+        }
+
+        return array(
+            'label' => $label,
+            'multiplier' => max(1.01, $multiplier),
+            'conditions' => $normalizedCond,
+        );
+    }
+
+    if ($k === 'suppress_trend') {
+        $trendKeyRaw = trim(strval(isset($raw['trendKey']) ? $raw['trendKey'] : ''));
+        $colonIdx = strpos($trendKeyRaw, ':');
+        if ($colonIdx < 1) {
+            throw new Exception('trendKey must look like trait:value.');
+        }
+
+        $tr = trim(substr($trendKeyRaw, 0, $colonIdx));
+        $tv = trim(substr($trendKeyRaw, $colonIdx + 1));
+
+        if (!in_array($tr, $TRAIT_KEYS, true) || $tv === '') {
+            throw new Exception('Invalid trendKey.');
+        }
+
+        return array('trendKey' => $tr . ':' . $tv);
+    }
+
+    if ($k === 'lore_only') {
+        $dogNumber = intval(isset($raw['dogNumber']) ? $raw['dogNumber'] : 0);
+        $lore = trim(strval(isset($raw['lore']) ? $raw['lore'] : ''));
+
+        if ($dogNumber < 1 || $dogNumber > 10000) {
+            throw new Exception('dogNumber must be 1–10000.');
+        }
+        if ($lore === '') {
+            throw new Exception('lore is required.');
+        }
+        if (strlen($lore) > 8000) {
+            throw new Exception('lore is too long.');
+        }
+
+        return array('dogNumber' => $dogNumber, 'lore' => $lore);
+    }
+
+    throw new Exception('Unknown suggestion kind.');
 }
 
 function requireDdAdminPassword() {
@@ -2179,7 +2612,7 @@ function getTrendingDashboardData() {
     global $TRAIT_KEYS, $DD_IMPORT_LOOKBACK_HOURS;
 
     $snapshot = getTraitMarketSnapshot();
-    $config = getTrendingConfigData();
+    $config = getTrendingConfigData(true);
     $summary = buildTrendingSummary(
         isset($snapshot['traitStats']) ? $snapshot['traitStats'] : array(),
         isset($snapshot['saleTraitStats']) ? $snapshot['saleTraitStats'] : array(),
@@ -2584,7 +3017,7 @@ function evaluateDog($dogNumber) {
     global $TRAIT_KEYS;
 
     $displayOverride = getDogDisplayOverride($dogNumber);
-    $trendingConfig = getTrendingConfigData();
+    $trendingConfig = getTrendingConfigData(true);
     $refusedOfferFloor = isset($trendingConfig['refusedOffers'][strval($dogNumber)]) ? $trendingConfig['refusedOffers'][strval($dogNumber)] : null;
 
     $traits = getDogTraitsRecord($dogNumber);
@@ -2593,6 +3026,11 @@ function evaluateDog($dogNumber) {
     }
 
     $search = getSearchResult($dogNumber);
+
+    $communityLore = null;
+    $notesStore = readCommunityNotesStorePhp();
+    $nmap = isset($notesStore['notes']) && is_array($notesStore['notes']) ? $notesStore['notes'] : array();
+    $communityLore = lookupCommunityLoreInNotesMapPhp($nmap, $dogNumber);
 
     $traitStats = array();
     $traitMeta = array('counts' => array());
@@ -3048,6 +3486,38 @@ function evaluateDog($dogNumber) {
         );
     }
 
+    if ($matchedCombo !== null) {
+        $comboConds = isset($matchedCombo['conditions']) && is_array($matchedCombo['conditions']) ? $matchedCombo['conditions'] : array();
+        foreach ($traitBreakdown as &$tb) {
+            if (!empty($tb['isSynthetic'])) {
+                continue;
+            }
+            foreach ($comboConds as $cond) {
+                if (!is_array($cond) || !isset($cond['trait']) || $cond['trait'] !== $tb['trait']) {
+                    continue;
+                }
+                $val = isset($traits[$tb['trait']]) ? $traits[$tb['trait']] : null;
+                if ($val === null) {
+                    continue;
+                }
+                $sv = strtolower(trim(strval($val)));
+                $cv = strtolower(trim(isset($cond['value']) ? strval($cond['value']) : ''));
+                if ($cv === '') {
+                    continue;
+                }
+                $isContains = isset($cond['op']) && $cond['op'] === 'contains';
+                if ($isContains ? (strpos($sv, $cv) !== false) : ($sv === $cv)) {
+                    $tb['comboPart'] = array(
+                        'id' => isset($matchedCombo['id']) ? strval($matchedCombo['id']) : '',
+                        'label' => isset($matchedCombo['label']) ? strval($matchedCombo['label']) : '',
+                    );
+                    break;
+                }
+            }
+        }
+        unset($tb);
+    }
+
     // --- Angel numbers (quad/triple repeaters + trend numbers) ---
     $smAngel = isset($smConfig['angelNumbers']) && is_array($smConfig['angelNumbers']) ? $smConfig['angelNumbers'] : array();
     $angelMultiplier = 1.0;
@@ -3099,6 +3569,7 @@ function evaluateDog($dogNumber) {
         );
     }
 
+    $refusedOfferValue = null;
     if ($refusedOfferFloor !== null) {
         if (isset($refusedOfferFloor['minOfferDoge']) && intval($refusedOfferFloor['minOfferDoge']) > 0) {
             $refusedOfferValue = intval($refusedOfferFloor['minOfferDoge']);
@@ -3136,6 +3607,7 @@ function evaluateDog($dogNumber) {
 
     return array(
         'dogNumber' => $dogNumber,
+        'communityLore' => $communityLore,
         'name' => ($search && !empty($search['name'])) ? $search['name'] : ('Doginal Dog #' . $dogNumber),
         'inscriptionId' => $search && !empty($search['inscriptionId']) ? $search['inscriptionId'] : null,
         'imageUrl' => '/api/doginal-proxy.php?action=image&dogNumber=' . $dogNumber,
@@ -3183,7 +3655,16 @@ function evaluateDog($dogNumber) {
             ) : null,
             'collectionFloor' => $collectionFloor,
             'dogeUsd' => $dogeUsd,
+            'communityLore' => $communityLore,
+            'comboMatch' => $matchedCombo !== null ? array(
+                'id' => isset($matchedCombo['id']) ? strval($matchedCombo['id']) : null,
+                'label' => isset($matchedCombo['label']) ? strval($matchedCombo['label']) : null,
+                'multiplier' => $comboMultiplier,
+                'inscriptionIds' => ($search && !empty($search['inscriptionId'])) ? array(strval($search['inscriptionId'])) : array(),
+                'dogNumber' => $dogNumber,
+            ) : null,
             'comboMultiplier' => $matchedCombo !== null ? $comboMultiplier : null,
+            'angelNumber' => $isAngelNumber ? array('type' => $angelType, 'label' => $angelLabel) : null,
             'angelMultiplier' => $isAngelNumber ? $angelMultiplier : null,
             'specialMultiplier' => count($specialMultiplierDetails) > 0 ? array_reduce($specialMultiplierDetails, function($acc, $detail) { return $acc * $detail['multiplier']; }, 1.0) : null,
             'specialMultiplierDetails' => count($specialMultiplierDetails) > 0 ? $specialMultiplierDetails : null,
@@ -3200,6 +3681,83 @@ function evaluateDog($dogNumber) {
         'listingAnalysis' => $listingAnalysis,
         'evaluatedAt' => gmdate('c')
     );
+}
+
+if ($action === 'community-status') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        sendError('Method not allowed.', 405);
+    }
+
+    sendJson(array(
+        'communityPasswordRequired' => getExpectedCommunityPassword() !== '',
+    ));
+}
+
+if ($action === 'community-lore') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        sendError('Method not allowed.', 405);
+    }
+
+    $dogNumber = validateDogNumber(isset($_GET['dogNumber']) ? $_GET['dogNumber'] : null);
+    $notesStore = readCommunityNotesStorePhp();
+    $nmap = isset($notesStore['notes']) && is_array($notesStore['notes']) ? $notesStore['notes'] : array();
+    $lore = lookupCommunityLoreInNotesMapPhp($nmap, $dogNumber);
+    sendJson(array(
+        'dogNumber' => $dogNumber,
+        'communityLore' => $lore,
+    ), 200, 0);
+}
+
+if ($action === 'community-suggestions') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendError('Method not allowed.', 405);
+    }
+
+    $remoteIp = isset($_SERVER['REMOTE_ADDR']) ? strval($_SERVER['REMOTE_ADDR']) : 'unknown';
+    if (ddCommunitySuggestionsRateLimited($remoteIp)) {
+        sendError('Too many submissions. Try again later.', 429);
+    }
+
+    $expectedComm = getExpectedCommunityPassword();
+    $rawBody = getJsonRequestBody();
+    $headerComm = trim(strval(getRequestHeader('x-dd-community-password')));
+    $bodyComm = isset($rawBody['communityPassword']) ? trim(strval($rawBody['communityPassword'])) : '';
+    $provided = $headerComm !== '' ? $headerComm : $bodyComm;
+
+    $bodyCopy = $rawBody;
+    unset($bodyCopy['communityPassword']);
+
+    if ($expectedComm !== '') {
+        if ($provided === '' || !hash_equals($expectedComm, $provided)) {
+            sendError('Invalid community password.', 401);
+        }
+    }
+
+    $kind = isset($bodyCopy['kind']) ? $bodyCopy['kind'] : '';
+
+    try {
+        $payload = validateSuggestionPayloadPhp($kind, $bodyCopy);
+    } catch (Exception $e) {
+        sendError($e->getMessage() !== '' ? $e->getMessage() : 'Invalid suggestion payload.', 400);
+    }
+
+    $store = readSuggestionsStorePhp();
+    $record = array(
+        'id' => ddSuggestionUuid(),
+        'status' => 'pending',
+        'kind' => trim(strval($kind)),
+        'payload' => $payload,
+        'submittedAt' => gmdate('c'),
+    );
+    $store['items'][] = $record;
+
+    try {
+        writeSuggestionsStorePhp($store);
+    } catch (Exception $e) {
+        sendError('Could not save suggestion.', 500);
+    }
+
+    sendJson(array('ok' => true, 'id' => $record['id']), 201);
 }
 
 if ($action === 'snapshot_status') {
@@ -3412,11 +3970,213 @@ if ($action === 'rank-lookup') {
     sendError('No dog found with rarity rank ' . $rank . '. The rank map covers ' . count($map) . ' dogs.', 404);
 }
 
+if ($action === 'admin-community-notes-list') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        sendError('Method not allowed.', 405);
+    }
+
+    assertDdAdminApiPasswordOr401();
+
+    $ns = readCommunityNotesStorePhp();
+    $notes = isset($ns['notes']) && is_array($ns['notes']) ? $ns['notes'] : array();
+    $entries = array();
+    foreach ($notes as $k => $v) {
+        $loreStr = normalizeCommunityLoreNoteValuePhp($v);
+        if ($loreStr === '') {
+            continue;
+        }
+        $ks = trim(strval($k));
+        if ($ks === '' || !ctype_digit($ks)) {
+            continue;
+        }
+        $dn = intval($ks);
+        if ($dn < 1 || $dn > 10000) {
+            continue;
+        }
+        $entries[] = array('dogNumber' => $dn, 'lore' => $loreStr);
+    }
+    usort($entries, function ($left, $right) {
+        return intval($left['dogNumber']) - intval($right['dogNumber']);
+    });
+
+    sendJson(array(
+        'entries' => $entries,
+        'count' => count($entries),
+    ), 200, 0);
+}
+
+if ($action === 'admin-community-notes-save') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendError('Method not allowed.', 405);
+    }
+
+    assertDdAdminApiPasswordOr401();
+    $rawBody = getJsonRequestBody();
+    $dogNumber = validateDogNumber(isset($rawBody['dogNumber']) ? $rawBody['dogNumber'] : null);
+    $lore = isset($rawBody['lore']) ? trim(strval($rawBody['lore'])) : '';
+    if ($lore === '') {
+        sendError('lore is required.', 400);
+    }
+    if (strlen($lore) > 8000) {
+        sendError('lore is too long (max 8000 characters).', 400);
+    }
+
+    $ns = readCommunityNotesStorePhp();
+    $notes = isset($ns['notes']) && is_array($ns['notes']) ? $ns['notes'] : array();
+    foreach (array_keys($notes) as $k) {
+        if (intval($k) === intval($dogNumber) || strval($k) === strval($dogNumber)) {
+            unset($notes[$k]);
+        }
+    }
+    $notes[strval($dogNumber)] = $lore;
+    $ns['notes'] = $notes;
+    try {
+        writeCommunityNotesStorePhp($ns);
+    } catch (Exception $e) {
+        sendError('Could not save community notes.', 500);
+    }
+
+    sendJson(array(
+        'ok' => true,
+        'dogNumber' => $dogNumber,
+        'communityNotesDogCount' => communityNotesDogCountPhp(),
+    ), 200, 0);
+}
+
+if ($action === 'admin-community-notes-delete') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendError('Method not allowed.', 405);
+    }
+
+    assertDdAdminApiPasswordOr401();
+    $rawBody = getJsonRequestBody();
+    $dogNumber = validateDogNumber(isset($rawBody['dogNumber']) ? $rawBody['dogNumber'] : null);
+
+    $ns = readCommunityNotesStorePhp();
+    $notes = isset($ns['notes']) && is_array($ns['notes']) ? $ns['notes'] : array();
+    $removed = false;
+    foreach (array_keys($notes) as $k) {
+        if (intval($k) === intval($dogNumber) || strval($k) === strval($dogNumber)) {
+            unset($notes[$k]);
+            $removed = true;
+        }
+    }
+    $ns['notes'] = $notes;
+    try {
+        writeCommunityNotesStorePhp($ns);
+    } catch (Exception $e) {
+        sendError('Could not save community notes.', 500);
+    }
+
+    sendJson(array(
+        'ok' => true,
+        'dogNumber' => $dogNumber,
+        'removed' => $removed,
+        'communityNotesDogCount' => communityNotesDogCountPhp(),
+    ), 200, 0);
+}
+
+if ($action === 'admin-suggestions') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        sendError('Method not allowed.', 405);
+    }
+
+    assertDdAdminApiPasswordOr401();
+
+    $statusFilter = strtolower(trim(strval(isset($_GET['status']) ? $_GET['status'] : '')));
+    $store = readSuggestionsStorePhp();
+    $items = isset($store['items']) && is_array($store['items']) ? $store['items'] : array();
+    if ($statusFilter === 'pending' || $statusFilter === 'approved' || $statusFilter === 'rejected') {
+        $filtered = array();
+        foreach ($items as $it) {
+            if (is_array($it) && isset($it['status']) && strval($it['status']) === $statusFilter) {
+                $filtered[] = $it;
+            }
+        }
+        $items = $filtered;
+    }
+
+    sendJson(array(
+        'items' => $items,
+        'communityNotesDogCount' => communityNotesDogCountPhp(),
+    ));
+}
+
+if ($action === 'admin-suggestions-review') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendError('Method not allowed.', 405);
+    }
+
+    assertDdAdminApiPasswordOr401();
+
+    $suggestionId = isset($_GET['suggestionId']) ? trim(strval($_GET['suggestionId'])) : '';
+    $rawBody = getJsonRequestBody();
+    $reviewVerb = isset($rawBody['action']) ? strtolower(trim(strval($rawBody['action']))) : '';
+    $note = isset($rawBody['note']) ? trim(strval($rawBody['note'])) : '';
+
+    if ($suggestionId === '') {
+        sendError('Missing suggestion id.', 400);
+    }
+    if ($reviewVerb !== 'approve' && $reviewVerb !== 'reject') {
+        sendError('action must be approve or reject.', 400);
+    }
+
+    $store = readSuggestionsStorePhp();
+    $items = isset($store['items']) && is_array($store['items']) ? $store['items'] : array();
+    $idx = -1;
+    foreach ($items as $i => $it) {
+        if (is_array($it) && isset($it['id']) && strval($it['id']) === $suggestionId) {
+            $idx = intval($i);
+            break;
+        }
+    }
+
+    if ($idx < 0) {
+        sendError('Suggestion not found.', 404);
+    }
+
+    $item = $items[$idx];
+    $st = isset($item['status']) ? strval($item['status']) : '';
+    if ($st !== 'pending') {
+        sendError('Suggestion is not pending.', 400);
+    }
+
+    $reviewedAt = gmdate('c');
+
+    if ($reviewVerb === 'reject') {
+        $item['status'] = 'rejected';
+        $item['reviewedAt'] = $reviewedAt;
+        $item['reviewNote'] = $note !== '' ? $note : null;
+        $items[$idx] = $item;
+        $store['items'] = $items;
+        try {
+            writeSuggestionsStorePhp($store);
+        } catch (Exception $e) {
+            sendError('Could not save.', 500);
+        }
+        sendJson(array('ok' => true, 'suggestion' => $item));
+    }
+
+    try {
+        $mergeResult = mergeApprovedSuggestionPhp($item);
+        $item['status'] = 'approved';
+        $item['reviewedAt'] = $reviewedAt;
+        $item['reviewNote'] = $note !== '' ? $note : null;
+        $item['mergeResult'] = $mergeResult;
+        $items[$idx] = $item;
+        $store['items'] = $items;
+        writeSuggestionsStorePhp($store);
+        sendJson(array('ok' => true, 'suggestion' => $item));
+    } catch (Exception $e) {
+        sendError('Approve suggestion merge failed: ' . $e->getMessage(), 500);
+    }
+}
+
 if ($action === 'evaluate') {
     try {
         $dogNumber = validateDogNumber(isset($_GET['dogNumber']) ? $_GET['dogNumber'] : null);
         $result = evaluateDog($dogNumber);
-        sendJson($result, 200, 180);
+        sendJson($result, 200, 0);
     } catch (Exception $e) {
         sendError('Evaluation failed: ' . $e->getMessage(), 502);
     }
@@ -3432,4 +4192,4 @@ if ($action === 'wallet') {
     }
 }
 
-sendError('Unknown action. Use evaluate, wallet, market-pulse, rank-lookup, or snapshot_status.');
+sendError('Unknown action. Use evaluate, wallet, market-pulse, rank-lookup, snapshot_status, community-status, community-lore, community-suggestions, or admin routes.');
