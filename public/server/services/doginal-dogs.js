@@ -133,6 +133,41 @@ function normalizeCatalogTraits(traits) {
   };
 }
 
+let catalogRarityOrderPromise = null;
+
+async function buildCatalogRarityDogOrder() {
+  const catalog = await loadDogCatalog();
+  if (!catalog || !catalog.dogs || typeof catalog.dogs !== 'object') {
+    return null;
+  }
+  const dogsMap = catalog.dogs;
+  const rows = [];
+  for (let d = 1; d <= 10000; d++) {
+    const entry = dogsMap[String(d)];
+    let rank = 999999;
+    if (
+      entry &&
+      entry.ok !== false &&
+      entry.traits &&
+      Number.isFinite(Number(entry.traits.rarityRank))
+    ) {
+      rank = Number(entry.traits.rarityRank);
+    }
+    rows.push({ dog: d, rank });
+  }
+  rows.sort((a, b) => (a.rank !== b.rank ? a.rank - b.rank : a.dog - b.dog));
+  return rows.map(r => r.dog);
+}
+
+/** Rarity browsing order derived from server-side DoginalDogsCatalog (cached). */
+async function getCatalogRarityDogOrder() {
+  if (!catalogRarityOrderPromise) {
+    catalogRarityOrderPromise = buildCatalogRarityDogOrder();
+  }
+  const order = await catalogRarityOrderPromise;
+  return order && order.length === 10000 ? order : null;
+}
+
 async function loadDogCatalog() {
   if (CATALOG_DISABLED) {
     return null;
@@ -738,5 +773,6 @@ module.exports = {
   getBrandColors,
   getBrandAsset,
   getDogImage,
-  getInscriptionRecord
+  getInscriptionRecord,
+  getCatalogRarityDogOrder
 };

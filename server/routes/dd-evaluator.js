@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const express = require('express');
 const { timingSafeEqualString } = require('../security-utils');
+const ddPaywall = require('./dd-paywall');
+const doginalDogsService = require('../services/doginal-dogs');
 const router = express.Router();
 
 const CLIENT_INTERNAL_ERROR = 'An unexpected error occurred.';
@@ -310,6 +312,7 @@ function attachCommunityLoreFromDisk(result) {
   }
 }
 
+function slugComboId(label, suggestionId) {
   const base = String(label || 'combo')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -357,12 +360,14 @@ function validateSuggestionPayload(kind, raw) {
     for (const c of conditions) {
       if (!c || typeof c !== 'object') continue;
       const trait = String(c.trait || '').trim();
-      const value = String(c.value || '').trim();
-      if (!DD_TRAIT_KEYS.has(trait) || !value) continue;
+      const valueRaw = String(c.value || '').trim();
+      if (!DD_TRAIT_KEYS.has(trait) || !valueRaw) continue;
+      const vl = valueRaw.toLowerCase();
+      const normVal = vl === 'any' ? 'Any' : vl === 'none' ? 'None' : valueRaw;
       normalizedCond.push({
         trait,
         op: c.op === 'contains' ? 'contains' : 'eq',
-        value: value.toLowerCase() === 'any' ? 'Any' : value,
+        value: normVal,
       });
     }
     if (normalizedCond.length === 0) {
@@ -660,8 +665,24 @@ async function buildWalletProfile(api, address, dogNumbers) {
 /**
  * Call once from server startup to build the initial snapshot and
  * schedule the 12-hour refresh cycle.
+ *
+ * On low-memory CloudLinux / shared hosts, the first market fetch uses Node's fetch
+ * (undici + wasm llhttp) and can throw RangeError OOM. Set DD_SKIP_STARTUP_REFRESH=1
+ * to skip this so /api/auth and static pages still work; DD evaluator routes stay 503
+ * until snapshot exists (e.g. run a worker on a machine with more RAM, or raise LVE limits).
  */
 async function initEvaluator(log = console.log) {
+  const skipRaw = String(process.env.DD_SKIP_STARTUP_REFRESH || '').trim().toLowerCase();
+  if (
+    skipRaw === '1'
+    || skipRaw === 'true'
+    || skipRaw === 'yes'
+    || skipRaw === 'on'
+  ) {
+    log('[dd-evaluator] Skipping startup snapshot refresh (DD_SKIP_STARTUP_REFRESH).');
+    return;
+  }
+
   const ev = await loadEvaluator();
   const hours = Number(process.env.DD_REFRESH_HOURS || 12);
   await ev.startRefreshLoop(hours * 60 * 60 * 1000, log);
@@ -679,8 +700,27 @@ async function requireSnapshot(_req, res, next) {
 
 /* ---- Routes ---- */
 
+router.get('/dogidex/rarity-order', async (_req, res) => {
+  try {
+    const order = await doginalDogsService.getCatalogRarityDogOrder();
+    if (!order || order.length !== 10000) {
+      return res.status(404).json({ ok: false, error: 'catalog_unavailable' });
+    }
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({
+      ok: true,
+      source: 'DoginalDogsCatalog',
+      collectionSize: 10000,
+      order,
+    });
+  } catch (err) {
+    console.error('[dd-evaluator] dogidex/rarity-order:', err && err.message ? err.message : err);
+    res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
 // GET /api/dd-evaluator/evaluate/batch?dogs=1,2,3
-router.get('/evaluate/batch', requireSnapshot, async (req, res) => {
+router.get('/evaluate/batch', requireSnapshot, ddPaywall.mwBatchEvaluate(), async (req, res) => {
   const ev = await loadEvaluator();
   const dogsParam = req.query.dogs || '';
   const numbers = String(dogsParam).split(',')
@@ -707,7 +747,7 @@ router.get('/evaluate/batch', requireSnapshot, async (req, res) => {
 });
 
 // GET /api/dd-evaluator/evaluate/:dogNumber
-router.get('/evaluate/:dogNumber', requireSnapshot, async (req, res) => {
+router.get('/evaluate/:dogNumber', requireSnapshot, ddPaywall.mwEvaluateDog(), async (req, res) => {
   const ev = await loadEvaluator();
   const dogNumber = Number(req.params.dogNumber);
   if (isNaN(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
@@ -725,7 +765,7 @@ router.get('/evaluate/:dogNumber', requireSnapshot, async (req, res) => {
 });
 
 // GET /api/dd-evaluator/wallet/:address
-router.get('/wallet/:address', requireSnapshot, async (req, res) => {
+router.get('/wallet/:address', requireSnapshot, ddPaywall.mwWallet(), async (req, res) => {
   const address = String(req.params.address || '').trim();
   if (!/^[A-Za-z0-9]{24,80}$/.test(address)) {
     return res.status(400).json({ error: 'Invalid wallet address.' });
@@ -934,8 +974,22 @@ router.post('/admin/trending', async (req, res) => {
     return res.status(400).json({ error: 'Request body must be a JSON object.' });
   }
 
-  saveTrendingConfig(config);
-  res.json({ ok: true, savedAt: new Date().toISOString() });
+  try {
+    const evaluator = await loadEvaluator();
+    await evaluator.updateTrendingConfig(config);
+    const dashboard = await evaluator.getTrendingDashboardData();
+    const saveEnabled = getExpectedDdAdminPassword() != null;
+    dashboard.saveEnabled = saveEnabled;
+    res.json({
+      ok: true,
+      savedAt: new Date().toISOString(),
+      dashboard,
+      saveEnabled,
+    });
+  } catch (err) {
+    console.error('[dd-evaluator] admin/trending POST:', err);
+    res.status(500).json({ error: 'Failed to save trending config.' });
+  }
 });
 
 router.post('/admin/evaluations-import', async (req, res) => {

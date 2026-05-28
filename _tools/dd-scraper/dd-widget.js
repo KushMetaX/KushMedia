@@ -275,7 +275,8 @@
           <div class="ddw-section-title">Trait Breakdown</div>
           ${traits}
           <div class="ddw-meta">
-            ${est.rarestTrait ? `<span>Rarest: ${esc(est.rarestTrait.value)} ${esc(est.rarestTrait.trait)} (${est.rarestTrait.count}/10k)</span>` : ''}
+            ${est.rarestTrait ? `<span>Rarest layer: ${esc(est.rarestTrait.value)} ${esc(est.rarestTrait.trait)} (${est.rarestTrait.count}/10k)</span>` : ''}
+            ${est.compoundAnchor && est.compoundAnchor.traits && est.compoundAnchor.traits.length ? `<span>Compound anchor: max blend over up to ${esc(String(est.compoundAnchor.maxTraits))} layers (each ≤${esc(String(est.compoundAnchor.maxSupply))}/10k)${est.compoundAnchor.winningTrait ? ` · strongest: ${esc(est.compoundAnchor.winningTrait.value)} ${esc(est.compoundAnchor.winningTrait.trait)}` : ''}</span>` : ''}
             ${est.basePriceDoge ? `<span>Base price: ${fmtD(est.basePriceDoge)}</span>` : ''}
             ${est.traitBonus > 0 ? `<span>Trait bonus: +${fmtD(est.traitBonus)}</span>` : ''}
             ${est.trendingMultiplier ? `<span>🔥 Trending: ${est.trendingMultiplier}x</span>` : ''}

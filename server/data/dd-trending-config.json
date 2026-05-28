@@ -105,18 +105,50 @@
                 "multiplier": 1.15
             },
             "trendNumbers": {
-                "67": {
-                    "enabled": true,
-                    "multiplier": 1.1
-                },
-                "69": {
-                    "enabled": true,
-                    "multiplier": 1.1
-                },
-                "420": {
-                    "enabled": true,
-                    "multiplier": 1.1
-                }
+                "1": {"enabled": true, "multiplier": 1.20},
+                "10": {"enabled": true, "multiplier": 1.06},
+                "13": {"enabled": true, "multiplier": 1.05},
+                "21": {"enabled": true, "multiplier": 1.05},
+                "42": {"enabled": true, "multiplier": 1.10},
+                "67": {"enabled": true, "multiplier": 1.12},
+                "69": {"enabled": true, "multiplier": 1.20},
+                "96": {"enabled": true, "multiplier": 1.07},
+                "100": {"enabled": true, "multiplier": 1.06},
+                "111": {"enabled": true, "multiplier": 1.14},
+                "123": {"enabled": true, "multiplier": 1.09},
+                "222": {"enabled": true, "multiplier": 1.14},
+                "234": {"enabled": true, "multiplier": 1.06},
+                "321": {"enabled": true, "multiplier": 1.08},
+                "333": {"enabled": true, "multiplier": 1.15},
+                "420": {"enabled": true, "multiplier": 1.20},
+                "555": {"enabled": true, "multiplier": 1.10},
+                "666": {"enabled": true, "multiplier": 1.19},
+                "777": {"enabled": true, "multiplier": 1.14},
+                "888": {"enabled": true, "multiplier": 1.14},
+                "999": {"enabled": true, "multiplier": 1.14},
+                "1000": {"enabled": true, "multiplier": 1.07},
+                "1111": {"enabled": true, "multiplier": 1.12},
+                "1234": {"enabled": true, "multiplier": 1.16},
+                "1337": {"enabled": true, "multiplier": 1.18},
+                "2222": {"enabled": true, "multiplier": 1.12},
+                "2345": {"enabled": true, "multiplier": 1.12},
+                "2468": {"enabled": true, "multiplier": 1.08},
+                "3000": {"enabled": true, "multiplier": 1.06},
+                "3333": {"enabled": true, "multiplier": 1.14},
+                "3456": {"enabled": true, "multiplier": 1.17},
+                "4321": {"enabled": true, "multiplier": 1.13},
+                "4444": {"enabled": true, "multiplier": 1.11},
+                "4567": {"enabled": true, "multiplier": 1.18},
+                "5432": {"enabled": true, "multiplier": 1.11},
+                "5555": {"enabled": true, "multiplier": 1.10},
+                "5678": {"enabled": true, "multiplier": 1.18},
+                "6666": {"enabled": true, "multiplier": 1.12},
+                "6789": {"enabled": true, "multiplier": 1.19},
+                "7777": {"enabled": true, "multiplier": 1.13},
+                "8888": {"enabled": true, "multiplier": 1.13},
+                "9876": {"enabled": true, "multiplier": 1.14},
+                "9999": {"enabled": true, "multiplier": 1.15},
+                "10000": {"enabled": true, "multiplier": 1.20}
             }
         }
     },

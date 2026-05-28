@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const express = require('express');
 const { timingSafeEqualString } = require('../security-utils');
+const ddPaywall = require('./dd-paywall');
+const doginalDogsService = require('../services/doginal-dogs');
 const router = express.Router();
 
 const CLIENT_INTERNAL_ERROR = 'An unexpected error occurred.';
@@ -120,12 +122,37 @@ function getCommunityNotesPath() {
   return path.join(serverDataDir, 'dd-community-notes.json');
 }
 
+function getTipIntentLogPath() {
+  if (process.env.DD_TIP_INTENT_LOG_PATH) {
+    return path.resolve(process.env.DD_TIP_INTENT_LOG_PATH);
+  }
+  return path.join(serverDataDir, 'dd-tip-intents.ndjson');
+}
+
 const DD_TRAIT_KEYS = new Set([
   'background', 'furColor', 'furPattern', 'head',
   'clothes', 'mouth', 'eyes', 'accessory',
 ]);
 
 const communitySubmitBuckets = new Map();
+const tipIntentBuckets = new Map();
+
+function rateLimitTipIntents(req, res, next) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const windowMs = 15 * 60 * 1000;
+  const max = 30;
+  const now = Date.now();
+  let bucket = tipIntentBuckets.get(ip);
+  if (!bucket || now > bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + windowMs };
+    tipIntentBuckets.set(ip, bucket);
+  }
+  bucket.count += 1;
+  if (bucket.count > max) {
+    return res.status(429).json({ error: 'Too many submissions. Try again later.' });
+  }
+  next();
+}
 
 function rateLimitCommunitySuggestions(req, res, next) {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
@@ -310,6 +337,7 @@ function attachCommunityLoreFromDisk(result) {
   }
 }
 
+function slugComboId(label, suggestionId) {
   const base = String(label || 'combo')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -357,12 +385,14 @@ function validateSuggestionPayload(kind, raw) {
     for (const c of conditions) {
       if (!c || typeof c !== 'object') continue;
       const trait = String(c.trait || '').trim();
-      const value = String(c.value || '').trim();
-      if (!DD_TRAIT_KEYS.has(trait) || !value) continue;
+      const valueRaw = String(c.value || '').trim();
+      if (!DD_TRAIT_KEYS.has(trait) || !valueRaw) continue;
+      const vl = valueRaw.toLowerCase();
+      const normVal = vl === 'any' ? 'Any' : vl === 'none' ? 'None' : valueRaw;
       normalizedCond.push({
         trait,
         op: c.op === 'contains' ? 'contains' : 'eq',
-        value: value.toLowerCase() === 'any' ? 'Any' : value,
+        value: normVal,
       });
     }
     if (normalizedCond.length === 0) {
@@ -519,6 +549,32 @@ function appendEvaluationLog(entries) {
   return lines.length;
 }
 
+function normalizeTipXHandle(raw) {
+  if (raw == null || raw === '') {
+    throw new Error('X handle is required.');
+  }
+  let s = String(raw).trim();
+  if (s.startsWith('@')) {
+    s = s.slice(1).trim();
+  }
+  if (!s) {
+    throw new Error('X handle is required.');
+  }
+  if (!/^[a-zA-Z0-9_]{1,15}$/.test(s)) {
+    throw new Error('X handle must be 1–15 letters, numbers, or underscores.');
+  }
+  return s.toLowerCase();
+}
+
+function appendTipIntentRecord(record) {
+  const logPath = getTipIntentLogPath();
+  const dir = path.dirname(logPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+  }
+  fs.appendFileSync(logPath, JSON.stringify(record) + '\n', 'utf8');
+}
+
 /* -------------------------------------------------------------------
  *  ESM bridge — the evaluator & api modules use ESM import/export.
  *  We load them via dynamic import() from CJS.
@@ -660,8 +716,24 @@ async function buildWalletProfile(api, address, dogNumbers) {
 /**
  * Call once from server startup to build the initial snapshot and
  * schedule the 12-hour refresh cycle.
+ *
+ * On low-memory CloudLinux / shared hosts, the first market fetch uses Node's fetch
+ * (undici + wasm llhttp) and can throw RangeError OOM. Set DD_SKIP_STARTUP_REFRESH=1
+ * to skip this so /api/auth and static pages still work; DD evaluator routes stay 503
+ * until snapshot exists (e.g. run a worker on a machine with more RAM, or raise LVE limits).
  */
 async function initEvaluator(log = console.log) {
+  const skipRaw = String(process.env.DD_SKIP_STARTUP_REFRESH || '').trim().toLowerCase();
+  if (
+    skipRaw === '1'
+    || skipRaw === 'true'
+    || skipRaw === 'yes'
+    || skipRaw === 'on'
+  ) {
+    log('[dd-evaluator] Skipping startup snapshot refresh (DD_SKIP_STARTUP_REFRESH).');
+    return;
+  }
+
   const ev = await loadEvaluator();
   const hours = Number(process.env.DD_REFRESH_HOURS || 12);
   await ev.startRefreshLoop(hours * 60 * 60 * 1000, log);
@@ -679,8 +751,27 @@ async function requireSnapshot(_req, res, next) {
 
 /* ---- Routes ---- */
 
+router.get('/dogidex/rarity-order', async (_req, res) => {
+  try {
+    const order = await doginalDogsService.getCatalogRarityDogOrder();
+    if (!order || order.length !== 10000) {
+      return res.status(404).json({ ok: false, error: 'catalog_unavailable' });
+    }
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({
+      ok: true,
+      source: 'DoginalDogsCatalog',
+      collectionSize: 10000,
+      order,
+    });
+  } catch (err) {
+    console.error('[dd-evaluator] dogidex/rarity-order:', err && err.message ? err.message : err);
+    res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
 // GET /api/dd-evaluator/evaluate/batch?dogs=1,2,3
-router.get('/evaluate/batch', requireSnapshot, async (req, res) => {
+router.get('/evaluate/batch', requireSnapshot, ddPaywall.mwBatchEvaluate(), async (req, res) => {
   const ev = await loadEvaluator();
   const dogsParam = req.query.dogs || '';
   const numbers = String(dogsParam).split(',')
@@ -707,7 +798,7 @@ router.get('/evaluate/batch', requireSnapshot, async (req, res) => {
 });
 
 // GET /api/dd-evaluator/evaluate/:dogNumber
-router.get('/evaluate/:dogNumber', requireSnapshot, async (req, res) => {
+router.get('/evaluate/:dogNumber', requireSnapshot, ddPaywall.mwEvaluateDog(), async (req, res) => {
   const ev = await loadEvaluator();
   const dogNumber = Number(req.params.dogNumber);
   if (isNaN(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
@@ -725,7 +816,7 @@ router.get('/evaluate/:dogNumber', requireSnapshot, async (req, res) => {
 });
 
 // GET /api/dd-evaluator/wallet/:address
-router.get('/wallet/:address', requireSnapshot, async (req, res) => {
+router.get('/wallet/:address', requireSnapshot, ddPaywall.mwWallet(), async (req, res) => {
   const address = String(req.params.address || '').trim();
   if (!/^[A-Za-z0-9]{24,80}$/.test(address)) {
     return res.status(400).json({ error: 'Invalid wallet address.' });
@@ -934,8 +1025,22 @@ router.post('/admin/trending', async (req, res) => {
     return res.status(400).json({ error: 'Request body must be a JSON object.' });
   }
 
-  saveTrendingConfig(config);
-  res.json({ ok: true, savedAt: new Date().toISOString() });
+  try {
+    const evaluator = await loadEvaluator();
+    await evaluator.updateTrendingConfig(config);
+    const dashboard = await evaluator.getTrendingDashboardData();
+    const saveEnabled = getExpectedDdAdminPassword() != null;
+    dashboard.saveEnabled = saveEnabled;
+    res.json({
+      ok: true,
+      savedAt: new Date().toISOString(),
+      dashboard,
+      saveEnabled,
+    });
+  } catch (err) {
+    console.error('[dd-evaluator] admin/trending POST:', err);
+    res.status(500).json({ error: 'Failed to save trending config.' });
+  }
 });
 
 router.post('/admin/evaluations-import', async (req, res) => {
@@ -974,6 +1079,57 @@ router.get('/community/lore/:dogNumber', (req, res) => {
   const text = lookupCommunityLoreText(ns.notes || {}, dogNumber);
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.json({ dogNumber, communityLore: text || null });
+});
+
+router.post('/tip-intent', rateLimitTipIntents, (req, res) => {
+  const raw = req.body && typeof req.body === 'object' ? req.body : {};
+  let xHandle;
+  try {
+    xHandle = normalizeTipXHandle(raw.xHandle != null ? raw.xHandle : raw.handle);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Invalid X handle.' });
+  }
+  const record = {
+    submittedAt: new Date().toISOString(),
+    xHandle,
+  };
+  try {
+    appendTipIntentRecord(record);
+    return res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('[dd-evaluator] tip-intent:', err);
+    return res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
+  }
+});
+
+router.get('/admin/tip-intents', (req, res) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+  const logPath = getTipIntentLogPath();
+  if (!fs.existsSync(logPath)) {
+    return res.json({ items: [] });
+  }
+  try {
+    const text = fs.readFileSync(logPath, 'utf8');
+    const items = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch (_e) {
+          return null;
+        }
+      })
+      .filter(row => row && typeof row === 'object');
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return res.json({ items });
+  } catch (err) {
+    console.error('[dd-evaluator] admin/tip-intents:', err);
+    return res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
+  }
 });
 
 router.post('/community/suggestions', rateLimitCommunitySuggestions, async (req, res) => {

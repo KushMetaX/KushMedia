@@ -5,12 +5,28 @@ const path = require('path');
 
 const dotenv = require('dotenv');
 const express = require('express');
+const cookieParser = require('cookie-parser');
 
 const nailDesignerRouter = require('./routes/nail-designer');
 const ddEvaluatorRouter = require('./routes/dd-evaluator');
+const authDexRouter = require('./routes/auth-dex');
+const { resolveSessionSecret } = require('./session-secret');
 const { timingSafeEqualString } = require('./security-utils');
 
-dotenv.config();
+(function loadDotenvFromStandardRoots() {
+	const roots = new Set([
+		path.resolve(__dirname, '..'),
+		path.resolve(__dirname, '..', '..'),
+		process.cwd(),
+		path.resolve(process.cwd(), 'public'),
+	]);
+	for (const root of roots) {
+		const fp = path.join(root, '.env');
+		if (fs.existsSync(fp)) {
+			dotenv.config({ path: fp, override: false });
+		}
+	}
+})();
 
 const app = express();
 const rootDir = path.resolve(__dirname, '..');
@@ -24,7 +40,21 @@ const port = Number.parseInt(process.env.PORT || '3000', 10);
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
+app.post(
+	'/api/webhooks/crypto-payments',
+	express.raw({ type: 'application/json', limit: '512kb' }),
+	(req, res) => {
+		Promise.resolve(authDexRouter.handleCryptoPayIpn(req, res)).catch((err) => {
+			console.error('[crypto-payments webhook]', err && err.message ? err.message : err);
+			if (!res.headersSent) {
+				res.status(500).send('Webhook handler error');
+			}
+		});
+	},
+);
+
 app.use(express.json({ limit: '100kb' }));
+app.use(cookieParser(resolveSessionSecret() || ''));
 
 function pathLooksSensitive(rawPath) {
 	if (!rawPath || typeof rawPath !== 'string') {
@@ -69,7 +99,7 @@ app.use((request, response, next) => {
 	response.set('X-Frame-Options', 'DENY');
 	response.set(
 		'Permissions-Policy',
-		'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()'
+		'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
 	);
 	const xfProto = request.get('x-forwarded-proto');
 	const secure = request.secure || xfProto === 'https';
@@ -98,9 +128,21 @@ app.use((request, response, next) => {
 
 app.use('/api/nail-designer', nailDesignerRouter);
 app.use('/api/dd-evaluator', ddEvaluatorRouter);
+app.use('/api/auth', authDexRouter);
+/** Same router; `/kmx-auth` avoids LiteSpeed/APACHE trapping `/api/*` for the PHP folder (503 HTML instead of Passenger). */
+app.use('/kmx-auth', authDexRouter);
+/** Fallback mount if the host blocks or mishandles `/kmx-auth` POST (evaluator retries bridge on HTML error bodies). */
+app.use('/kk-auth', authDexRouter);
+/** Third mount under the evaluator URL prefix — APISIX/LiteSpeed often proxy `/dd-evaluator/*` differently than `/kmx-auth`. */
+app.use('/dd-evaluator/auth', authDexRouter);
 
 app.get('/healthz', (request, response) => {
-  response.json({ ok: true, service: 'kushbrand-site' });
+	response.json({
+		ok: true,
+		service: 'kushbrand-site',
+		// Liveness only; auth is optional for /healthz. See Network tab on POST /kmx-auth/* (or legacy /api/auth/*).
+		authSessionConfigured: Boolean(resolveSessionSecret()),
+	});
 });
 
 app.get('/nail-designer', (request, response) => {
@@ -109,6 +151,20 @@ app.get('/nail-designer', (request, response) => {
 
 app.get('/dd-evaluator', (request, response) => {
 	response.sendFile(path.join(siteRoot, 'dd-evaluator', 'index.html'));
+});
+
+app.get('/map', (request, response) => {
+	response.sendFile(path.join(siteRoot, 'map', 'index.html'));
+});
+
+app.get('/api/voyager/config', (request, response) => {
+	const token =
+		process.env.MAPBOX_ACCESS_TOKEN ||
+		process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ||
+		process.env.VOYAGER_MAPBOX_TOKEN ||
+		'';
+	response.setHeader('Cache-Control', 'private, max-age=300');
+	response.json({ mapboxToken: token });
 });
 
 function sendDdAdminHtml(response) {

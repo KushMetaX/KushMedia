@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Voyager - mapped &amp; planned — KushMetaX</title>
+  <meta name="description" content="Voyager by KushMetaX — mapped and planned.">
+  <link rel="icon" href="assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/Kush.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css">
+  <style>
+    /* ===== Page-local theme overrides for Voyager =====
+       Scoped to .voyager-page so it never bleeds into the rest of the site. */
+    .voyager-page {
+      --vg-ocean:  #1e6f8c;
+      --vg-teal:   #2dd4bf;
+      --vg-deep:   #0b3a4a;
+      --vg-fog:    rgba(45, 212, 191, 0.18);
+    }
+
+    .voyager-hero {
+      position: relative;
+      padding: calc(var(--header-h) + 72px) 0 64px;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .voyager-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(80% 60% at 20% 0%, rgba(45,212,191,0.18) 0%, transparent 60%),
+        radial-gradient(70% 50% at 90% 100%, rgba(30,111,140,0.22) 0%, transparent 60%),
+        linear-gradient(180deg, #050b10 0%, #000 100%);
+    }
+    .voyager-hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.20;
+      background-image:
+        linear-gradient(rgba(45,212,191,0.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45,212,191,0.35) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+      -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+    }
+
+    .voyager-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--vg-fog);
+      border: 1px solid rgba(45, 212, 191, 0.35);
+      color: var(--vg-teal);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .voyager-eyebrow-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--vg-teal);
+      box-shadow: 0 0 12px var(--vg-teal);
+    }
+
+    .voyager-title {
+      font-family: var(--font-logo);
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 700;
+      line-height: 1.05;
+      color: var(--white);
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+    }
+    .voyager-title .gradient {
+      background: linear-gradient(135deg, var(--vg-teal) 0%, var(--vg-ocean) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .voyager-lede {
+      color: var(--grey-light);
+      font-size: clamp(15px, 1.6vw, 18px);
+      max-width: 620px;
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+
+    .voyager-cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .voyager-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 28px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, var(--vg-teal) 0%, var(--vg-ocean) 100%);
+      color: #04181c;
+      border: 1px solid rgba(45, 212, 191, 0.7);
+      box-shadow: 0 10px 32px rgba(45, 212, 191, 0.25);
+      transition: transform 200ms var(--ease), box-shadow 200ms var(--ease);
+    }
+    .voyager-cta:hover,
+    .voyager-cta:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 40px rgba(45, 212, 191, 0.45);
+    }
+    .voyager-cta svg { width: 18px; height: 18px; }
+
+    .voyager-cta-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 15px 22px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: background 200ms var(--ease), border-color 200ms var(--ease);
+    }
+    .voyager-cta-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--vg-teal);
+    }
+
+    .voyager-nav-wrap {
+      padding: 20px 0 100px;
+      border-top: 1px solid rgba(45, 212, 191, 0.10);
+    }
+
+    @media (max-width: 720px) {
+      .voyager-hero { padding-top: calc(var(--header-h) + 40px); }
+    }
+  </style>
+</head>
+<body class="voyager-page">
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+        <span class="header-logo-text">KushMetaX</span>
+      </a>
+      <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== NAV OVERLAY ===== -->
+  <nav class="nav-overlay" aria-label="Main navigation">
+    <ul class="nav-list">
+      <li><a href="index.html" class="nav-link">Home</a></li>
+      <li><a href="about.html" class="nav-link">About</a></li>
+      <li><a href="projects.html" class="nav-link">Projects</a></li>
+      <li><a href="gallery.html" class="nav-link">Gallery</a></li>
+      <li><a href="services.html" class="nav-link">Services</a></li>
+      <li><a href="dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="voyager.html" class="nav-link">Voyager</a></li>
+      <li><a href="contact.html" class="nav-link">Connect</a></li>
+    </ul>
+  </nav>
+
+  <!-- ===== HERO ===== -->
+  <main>
+    <section class="voyager-hero">
+      <div class="container">
+        <span class="voyager-eyebrow">
+          <span class="voyager-eyebrow-dot"></span>
+          KushMetaX Tool — Live
+        </span>
+        <h1 class="voyager-title">Voyager - <span class="gradient">mapped &amp; planned</span></h1>
+        <p class="voyager-lede">
+          <strong>Voyager</strong> is an interactive discovery and itinerary planning platform — a private KushMetaX tool for invited collaborators only.
+        </p>
+
+        <div class="voyager-cta-row">
+          <a class="voyager-cta-secondary" href="contact.html">
+            Request access →
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="voyager-nav-wrap">
+      <div class="container">
+        <div class="content-nav">
+          <a href="projects.html">← All Projects</a>
+          <a href="contact.html">Get in touch →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-content">
+      <div class="footer-links">
+        <a href="https://doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Doginal Dogs</a>
+        <a href="https://market.doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Marketplace</a>
+      </div>
+      <div class="footer-social">
+        <a href="https://x.com/KushMetaX" target="_blank" rel="noopener noreferrer" aria-label="Follow @KushMetaX on X">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <a href="https://x.com/KennelDAO" target="_blank" rel="noopener noreferrer" aria-label="Follow @KennelDAO on X">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/@KushMetaX" target="_blank" rel="noopener noreferrer" aria-label="KushMetaX on YouTube">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="https://www.instagram.com/kushmetax/" target="_blank" rel="noopener noreferrer" aria-label="Follow @kushmetax on Instagram">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+        </a>
+      </div>
+      <p class="footer-copy">&copy; 2026 KushMetaX. All rights reserved.</p>
+      </div>
+      <div class="footer-mascot-wrap">
+        <span class="footer-mascot-text">KushMetaX</span>
+        <img src="assets/SWB.gif" alt="" class="footer-mascot">
+      </div>
+    </div>
+  </footer>
+
+  <script src="brand.js"></script>
+</body>
+</html>

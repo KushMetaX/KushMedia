@@ -155,6 +155,117 @@ function sendError($message, $status = 400, $extra = array()) {
     sendJson($payload, $status, 30);
 }
 
+/**
+ * Guest quotas on the PHP evaluate path (mirrors Node public/server/routes/dd-paywall.js).
+ * Does not grant Plus bypass — authenticated Plus users should use the Node API only.
+ */
+function dd_paywall_env_int($key, $default) {
+    $v = getenv($key);
+    if ($v === false || trim(strval($v)) === '') {
+        return $default;
+    }
+    return intval($v);
+}
+
+function dd_paywall_client_ip_php() {
+    $xff = isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? trim(strval($_SERVER['HTTP_X_FORWARDED_FOR'])) : '';
+    if ($xff !== '') {
+        $parts = explode(',', $xff);
+        $first = trim(strval($parts[0]));
+        if ($first !== '') {
+            return $first;
+        }
+    }
+    return isset($_SERVER['REMOTE_ADDR']) ? strval($_SERVER['REMOTE_ADDR']) : 'unknown';
+}
+
+function dd_paywall_free_inscriptions_cap() {
+    $n = dd_paywall_env_int('DD_FREE_INSCRIPTION_PER_DAY', 2);
+    return max(0, min(10000, $n));
+}
+
+function dd_paywall_free_rarity_cap() {
+    $n = dd_paywall_env_int('DD_FREE_RARITY_LOOKUPS_PER_DAY', 1);
+    return max(0, min(10000, $n));
+}
+
+function dd_paywall_quota_storage_path($day) {
+    $cleanDay = preg_replace('/[^0-9\\-]/', '', strval($day));
+    return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dd-php-quota-' . $cleanDay . '.json';
+}
+
+function dd_paywall_quota_try_consume($bucketKey, $cap) {
+    $day = gmdate('Y-m-d');
+    $ip = dd_paywall_client_ip_php();
+
+    header('DD-Quota-Free-Limit-Inscribe: ' . strval(dd_paywall_free_inscriptions_cap()));
+    header('DD-Quota-Free-Limit-Rarity: ' . strval(dd_paywall_free_rarity_cap()));
+    header('DD-Quota-Free-Ip: ' . $ip);
+
+    if ($cap === 0) {
+        $msg = ($bucketKey === 'rarity')
+            ? 'Rarity valuations are gated for guests. KushMetaX Doginal Dogs Plus unlocks unlimited access.'
+            : 'Inscription valuations are gated for guests. KushMetaX Doginal Dogs Plus unlocks unlimited access.';
+        sendJson(array('code' => 'dd_guest_quota_exceeded', 'error' => $msg), 429, 0);
+    }
+
+    $path = dd_paywall_quota_storage_path($day);
+    $fp = @fopen($path, 'c+');
+    if (!$fp) {
+        sendError('Guest quota storage unavailable.', 503);
+    }
+
+    if (!flock($fp, LOCK_EX)) {
+        fclose($fp);
+        sendError('Quota service busy.', 503);
+    }
+
+    $raw = stream_get_contents($fp);
+    $data = array('day' => $day, 'buckets' => array());
+    if ($raw !== false && trim(strval($raw)) !== '') {
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded) && isset($decoded['day']) && strval($decoded['day']) === $day && isset($decoded['buckets']) && is_array($decoded['buckets'])) {
+            $data = $decoded;
+        }
+    }
+
+    if (!isset($data['buckets'][$ip]) || !is_array($data['buckets'][$ip])) {
+        $data['buckets'][$ip] = array('inscribe' => 0, 'rarity' => 0);
+    }
+
+    $usedIns = intval(isset($data['buckets'][$ip]['inscribe']) ? $data['buckets'][$ip]['inscribe'] : 0);
+    $usedRar = intval(isset($data['buckets'][$ip]['rarity']) ? $data['buckets'][$ip]['rarity'] : 0);
+    $used = ($bucketKey === 'rarity') ? $usedRar : $usedIns;
+
+    if ($used >= $cap) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        $msg = ($bucketKey === 'rarity')
+            ? ('Free tier allows ' . $cap . ' rarity-rank valuations per UTC day at this IP (' . $ip . '). Subscribe for unlimited valuations and wallet estimates.')
+            : ('Free tier allows ' . $cap . ' inscription valuations per UTC day at this IP (' . $ip . '). Subscribe for unlimited valuations and wallet estimates.');
+        sendJson(array('code' => 'dd_guest_quota_exceeded', 'error' => $msg), 429, 0);
+    }
+
+    if ($bucketKey === 'rarity') {
+        $data['buckets'][$ip]['rarity'] = $usedRar + 1;
+    } else {
+        $data['buckets'][$ip]['inscribe'] = $usedIns + 1;
+    }
+    $data['day'] = $day;
+
+    if (!ftruncate($fp, 0)) {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        sendError('Quota service busy.', 503);
+    }
+
+    rewind($fp);
+    fwrite($fp, json_encode($data));
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
 function getWritableCachePath($candidates) {
     foreach ($candidates as $path) {
         if (!$path) {
@@ -593,8 +704,8 @@ function validateSuggestionPayloadPhp($kind, $raw) {
         if ($label === '') {
             throw new Exception('label is required.');
         }
-        if (!is_finite($multiplier) || $multiplier <= 1) {
-            throw new Exception('combo multiplier must be > 1.');
+        if (!is_finite($multiplier) || $multiplier == 0.0) {
+            throw new Exception('combo multiplier must be non-zero.');
         }
 
         $normalizedCond = array();
@@ -607,6 +718,13 @@ function validateSuggestionPayloadPhp($kind, $raw) {
             $value = trim(strval(isset($c['value']) ? $c['value'] : ''));
             if (!in_array($trait, $TRAIT_KEYS, true) || $value === '') {
                 continue;
+            }
+
+            $vl = strtolower($value);
+            if ($vl === 'any') {
+                $value = 'Any';
+            } elseif ($vl === 'none') {
+                $value = 'None';
             }
 
             $op = (isset($c['op']) && strval($c['op']) === 'contains') ? 'contains' : 'eq';
@@ -623,7 +741,7 @@ function validateSuggestionPayloadPhp($kind, $raw) {
 
         return array(
             'label' => $label,
-            'multiplier' => max(1.01, $multiplier),
+            'multiplier' => round($multiplier, 4),
             'conditions' => $normalizedCond,
         );
     }
@@ -876,6 +994,230 @@ function normalizeNumber($value) {
     }
 
     return null;
+}
+
+/** Positive: direct multiplier; negative: (1 + m), same as Node evaluator. */
+function normalize_signed_price_multiplier_php($m) {
+    if ($m === null) {
+        return 1.0;
+    }
+    $x = floatval($m);
+    if (!is_finite($x) || $x == 0.0) {
+        return 1.0;
+    }
+    if ($x > 0) {
+        return max(0.01, min(100.0, $x));
+    }
+    return max(0.01, 1.0 + $x);
+}
+
+/** Floor-first blend on the rarest trait (mirrors _tools/dd-scraper/evaluator.js). */
+function blend_rarest_trait_base_price_php(array $tb) {
+    if (!empty($tb['isSynthetic'])) {
+        return null;
+    }
+    $floor = normalizeNumber(isset($tb['floor']) ? $tb['floor'] : null);
+    $saleMedian = normalizeNumber(isset($tb['saleMedian']) ? $tb['saleMedian'] : null);
+    $saleFloorStat = normalizeNumber(isset($tb['saleFloor']) ? $tb['saleFloor'] : null);
+    $topSale = normalizeNumber(isset($tb['topSale']) ? $tb['topSale'] : null);
+    $saleCount = isset($tb['saleCount']) ? max(0, intval($tb['saleCount'])) : 0;
+    $listed = isset($tb['listed']) ? max(0, intval($tb['listed'])) : 0;
+
+    $saleSignal = null;
+    if ($saleCount >= 2 && $saleMedian !== null && $saleMedian > 0) {
+        $saleSignal = $saleMedian;
+    } elseif ($saleMedian !== null && $saleMedian > 0) {
+        $saleSignal = $saleMedian;
+    } elseif ($saleFloorStat !== null && $saleFloorStat > 0) {
+        $saleSignal = $saleFloorStat;
+    } elseif ($topSale !== null && $topSale > 0) {
+        $saleSignal = $topSale;
+    }
+
+    $hasFloor = $floor !== null && $floor > 0;
+    $hasSale = $saleSignal !== null && $saleSignal > 0;
+
+    if (!$hasFloor && !$hasSale) {
+        return ($topSale !== null && $topSale > 0) ? $topSale : null;
+    }
+    if (!$hasFloor && $hasSale) {
+        return $saleSignal;
+    }
+    if ($hasFloor && !$hasSale) {
+        return $floor;
+    }
+
+    $wFloor = 0.58 + min($listed, 12) * 0.022 - min($saleCount, 12) * 0.028;
+    if ($wFloor < 0.28) {
+        $wFloor = 0.28;
+    }
+    if ($wFloor > 0.78) {
+        $wFloor = 0.78;
+    }
+
+    $blended = $wFloor * $floor + (1.0 - $wFloor) * $saleSignal;
+
+    if ($topSale !== null && $topSale > $floor) {
+        $excess = $topSale - $floor;
+        $capFrac = 0.42;
+        if ($saleCount >= 10) {
+            $capFrac = 0.72;
+        } elseif ($saleCount >= 5) {
+            $capFrac = 0.58;
+        } elseif ($saleCount >= 2) {
+            $capFrac = 0.48;
+        }
+        $ceiling = $floor + $excess * $capFrac;
+        if ($blended > $ceiling) {
+            $blended = $ceiling;
+        }
+    }
+
+    if (!is_finite($blended) || $blended <= 0) {
+        $fallback = $floor;
+        if ($saleSignal > $fallback) {
+            $fallback = $saleSignal;
+        }
+        if ($topSale !== null && $topSale > $fallback) {
+            $fallback = $topSale;
+        }
+        return $fallback > 0 ? $fallback : null;
+    }
+    return $blended;
+}
+
+/** Rarest trait anchor trait count &lt;100 and no listing/sale rows in snapshot — matches Node evaluator. */
+function qualifies_rarest_trait_thin_market_boost_php(array $tb) {
+    if (!empty($tb['isSynthetic'])) {
+        return false;
+    }
+    $tc = isset($tb['traitCount']) ? $tb['traitCount'] : null;
+    if ($tc === null || intval($tc) >= 100) {
+        return false;
+    }
+    $listed = isset($tb['listed']) ? intval($tb['listed']) : 0;
+    $saleCount = isset($tb['saleCount']) ? intval($tb['saleCount']) : 0;
+    return $listed === 0 && $saleCount === 0;
+}
+
+/**
+ * Top-N rarest layers (by supply <= maxSupply): base = max(blend each). Mirrors evaluator.js.
+ *
+ * @return array{basePriceDoge: float|null, compoundRows: array, winningTrait: ?array, compoundIndices: array<int, true>}
+ */
+function compute_compound_anchor_base_php(array $traitBreakdown) {
+    $maxN = 3;
+    $maxSupply = 2500;
+    $eligible = array();
+    foreach ($traitBreakdown as $i => $tb) {
+        if (!empty($tb['isSynthetic'])) {
+            continue;
+        }
+        if (!isset($tb['traitCount']) || $tb['traitCount'] === null) {
+            continue;
+        }
+        if (intval($tb['traitCount']) > $maxSupply) {
+            continue;
+        }
+        $eligible[] = array('idx' => $i, 'tb' => $tb);
+    }
+    usort($eligible, function ($a, $b) {
+        $ca = intval($a['tb']['traitCount']);
+        $cb = intval($b['tb']['traitCount']);
+        if ($ca !== $cb) {
+            return $ca - $cb;
+        }
+        return strcmp($a['tb']['trait'], $b['tb']['trait']);
+    });
+    $slice = array_slice($eligible, 0, $maxN);
+    $withBlends = array();
+    $compoundRows = array();
+    $basePriceDoge = null;
+    foreach ($slice as $item) {
+        $tb = $item['tb'];
+        $blend = blend_rarest_trait_base_price_php($tb);
+        $withBlends[] = array('tb' => $tb, 'blend' => $blend);
+        $compoundRows[] = array(
+            'trait' => $tb['trait'],
+            'value' => $tb['value'],
+            'count' => $tb['traitCount'],
+            'blendDoge' => ($blend !== null && $blend > 0) ? intval(round($blend)) : null,
+        );
+        if ($blend !== null && $blend > 0 && ($basePriceDoge === null || $blend > $basePriceDoge)) {
+            $basePriceDoge = $blend;
+        }
+    }
+    $winningTrait = null;
+    if ($basePriceDoge !== null) {
+        foreach ($withBlends as $wb) {
+            if ($wb['blend'] !== null && abs(floatval($wb['blend']) - floatval($basePriceDoge)) < 1e-9) {
+                $winningTrait = $wb['tb'];
+                break;
+            }
+        }
+    }
+    $compoundIndices = array();
+    foreach ($slice as $item) {
+        $compoundIndices[intval($item['idx'])] = true;
+    }
+    return array(
+        'basePriceDoge' => $basePriceDoge,
+        'compoundRows' => $compoundRows,
+        'winningTrait' => $winningTrait,
+        'compoundIndices' => $compoundIndices,
+        'maxTraits' => $maxN,
+        'maxSupply' => $maxSupply,
+    );
+}
+
+/** Default dog # vanity multipliers (merged when trendNumbers omitted in config). */
+function default_angel_trend_numbers_map() {
+    return array(
+        '1' => array('enabled' => true, 'multiplier' => 1.20),
+        '10' => array('enabled' => true, 'multiplier' => 1.06),
+        '13' => array('enabled' => true, 'multiplier' => 1.05),
+        '21' => array('enabled' => true, 'multiplier' => 1.05),
+        '42' => array('enabled' => true, 'multiplier' => 1.10),
+        '67' => array('enabled' => true, 'multiplier' => 1.12),
+        '69' => array('enabled' => true, 'multiplier' => 1.20),
+        '96' => array('enabled' => true, 'multiplier' => 1.07),
+        '100' => array('enabled' => true, 'multiplier' => 1.06),
+        '111' => array('enabled' => true, 'multiplier' => 1.14),
+        '123' => array('enabled' => true, 'multiplier' => 1.09),
+        '222' => array('enabled' => true, 'multiplier' => 1.14),
+        '234' => array('enabled' => true, 'multiplier' => 1.06),
+        '321' => array('enabled' => true, 'multiplier' => 1.08),
+        '333' => array('enabled' => true, 'multiplier' => 1.15),
+        '420' => array('enabled' => true, 'multiplier' => 1.20),
+        '555' => array('enabled' => true, 'multiplier' => 1.10),
+        '666' => array('enabled' => true, 'multiplier' => 1.19),
+        '777' => array('enabled' => true, 'multiplier' => 1.14),
+        '888' => array('enabled' => true, 'multiplier' => 1.14),
+        '999' => array('enabled' => true, 'multiplier' => 1.14),
+        '1000' => array('enabled' => true, 'multiplier' => 1.07),
+        '1111' => array('enabled' => true, 'multiplier' => 1.12),
+        '1234' => array('enabled' => true, 'multiplier' => 1.16),
+        '1337' => array('enabled' => true, 'multiplier' => 1.18),
+        '2222' => array('enabled' => true, 'multiplier' => 1.12),
+        '2345' => array('enabled' => true, 'multiplier' => 1.12),
+        '2468' => array('enabled' => true, 'multiplier' => 1.08),
+        '3000' => array('enabled' => true, 'multiplier' => 1.06),
+        '3333' => array('enabled' => true, 'multiplier' => 1.14),
+        '3456' => array('enabled' => true, 'multiplier' => 1.17),
+        '4321' => array('enabled' => true, 'multiplier' => 1.13),
+        '4444' => array('enabled' => true, 'multiplier' => 1.11),
+        '4567' => array('enabled' => true, 'multiplier' => 1.18),
+        '5432' => array('enabled' => true, 'multiplier' => 1.11),
+        '5555' => array('enabled' => true, 'multiplier' => 1.10),
+        '5678' => array('enabled' => true, 'multiplier' => 1.18),
+        '6666' => array('enabled' => true, 'multiplier' => 1.12),
+        '6789' => array('enabled' => true, 'multiplier' => 1.19),
+        '7777' => array('enabled' => true, 'multiplier' => 1.13),
+        '8888' => array('enabled' => true, 'multiplier' => 1.13),
+        '9876' => array('enabled' => true, 'multiplier' => 1.14),
+        '9999' => array('enabled' => true, 'multiplier' => 1.15),
+        '10000' => array('enabled' => true, 'multiplier' => 1.20),
+    );
 }
 
 function validateDogNumber($raw) {
@@ -1159,19 +1501,45 @@ function normalizeSpecialMultipliers($raw) {
                 'value' => strval($cond['value']),
             );
         }
-        if (empty($validConditions)) continue;
-        $multiplier = max(1.0, isset($combo['multiplier']) ? floatval($combo['multiplier']) : 1.0);
-        if ($multiplier <= 1.0) continue;
+        if (empty($validConditions)) {
+            continue;
+        }
+        $multiplierRaw = isset($combo['multiplier']) ? floatval($combo['multiplier']) : 0.0;
+        if (!is_finite($multiplierRaw) || $multiplierRaw == 0.0) {
+            continue;
+        }
         $combos[] = array(
             'id'         => isset($combo['id']) ? strval($combo['id']) : '',
             'label'      => isset($combo['label']) ? strval($combo['label']) : '',
             'conditions' => $validConditions,
-            'multiplier' => $multiplier,
+            'multiplier' => $multiplierRaw,
             'enabled'    => !isset($combo['enabled']) || (bool)$combo['enabled'],
         );
     }
 
     $angelRaw = isset($raw['angelNumbers']) && is_array($raw['angelNumbers']) ? $raw['angelNumbers'] : array();
+    $trendRaw = (isset($angelRaw['trendNumbers']) && is_array($angelRaw['trendNumbers']))
+        ? $angelRaw['trendNumbers']
+        : null;
+    $trendSource = $trendRaw !== null ? $trendRaw : default_angel_trend_numbers_map();
+    $trendNumbers = array();
+    foreach ($trendSource as $key => $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $n = intval($key);
+        if ($n < 1 || $n > 10000) {
+            continue;
+        }
+        $sk = strval($n);
+        $mult = isset($entry['multiplier']) ? floatval($entry['multiplier']) : 1.05;
+        $mult = max(1.0, min(1.2, $mult));
+        $trendNumbers[$sk] = array(
+            'enabled'    => !isset($entry['enabled']) || (bool)$entry['enabled'],
+            'multiplier' => $mult,
+        );
+    }
+
     $angelNumbers = array(
         'quadRepeater' => array(
             'enabled'    => !isset($angelRaw['quadRepeater']['enabled']) || (bool)$angelRaw['quadRepeater']['enabled'],
@@ -1181,20 +1549,7 @@ function normalizeSpecialMultipliers($raw) {
             'enabled'    => !isset($angelRaw['tripleRepeater']['enabled']) || (bool)$angelRaw['tripleRepeater']['enabled'],
             'multiplier' => max(1.0, isset($angelRaw['tripleRepeater']['multiplier']) ? floatval($angelRaw['tripleRepeater']['multiplier']) : 1.15),
         ),
-        'trendNumbers' => array(
-            '67' => array(
-                'enabled'    => !isset($angelRaw['trendNumbers']['67']['enabled']) || (bool)$angelRaw['trendNumbers']['67']['enabled'],
-                'multiplier' => max(1.0, isset($angelRaw['trendNumbers']['67']['multiplier']) ? floatval($angelRaw['trendNumbers']['67']['multiplier']) : 1.10),
-            ),
-            '69' => array(
-                'enabled'    => !isset($angelRaw['trendNumbers']['69']['enabled']) || (bool)$angelRaw['trendNumbers']['69']['enabled'],
-                'multiplier' => max(1.0, isset($angelRaw['trendNumbers']['69']['multiplier']) ? floatval($angelRaw['trendNumbers']['69']['multiplier']) : 1.10),
-            ),
-            '420' => array(
-                'enabled'    => !isset($angelRaw['trendNumbers']['420']['enabled']) || (bool)$angelRaw['trendNumbers']['420']['enabled'],
-                'multiplier' => max(1.0, isset($angelRaw['trendNumbers']['420']['multiplier']) ? floatval($angelRaw['trendNumbers']['420']['multiplier']) : 1.10),
-            ),
-        ),
+        'trendNumbers' => $trendNumbers,
     );
 
     return array(
@@ -2425,6 +2780,7 @@ function summarizeEvaluation($evaluation, $dogeUsd) {
         'askingPriceUsd' => ($askingPriceDoge !== null && $dogeUsd !== null) ? round($askingPriceDoge * $dogeUsd, 2) : null,
         'valueMultiplier' => isset($estimation['valueMultiplier']) ? $estimation['valueMultiplier'] : null,
         'rarestTrait' => isset($estimation['rarestTrait']) ? $estimation['rarestTrait'] : null,
+        'compoundAnchor' => isset($estimation['compoundAnchor']) ? $estimation['compoundAnchor'] : null,
         'displayEstimatedUsdNote' => isset($estimation['displayEstimatedUsdNote']) ? $estimation['displayEstimatedUsdNote'] : null,
     );
 }
@@ -3253,31 +3609,44 @@ function evaluateDog($dogNumber) {
     unset($tb);
 
     // --- Valuation logic ---
-    // Base = highest of: rarest trait's listing floor, rarest trait's top sale
-    $basePriceDoge = null;
-    if ($rarestTrait) {
-        $rFloor = $rarestTrait['floor'];
-        $rSale  = $rarestTrait['topSale'];
-        if ($rFloor !== null && $rSale !== null) {
-            $basePriceDoge = max($rFloor, $rSale);
-        } elseif ($rFloor !== null) {
-            $basePriceDoge = $rFloor;
-        } elseif ($rSale !== null) {
-            $basePriceDoge = $rSale;
+    // Compound anchor: max(blend) over top-N rarest traits (supply <= cap).
+    $compoundResult = compute_compound_anchor_base_php($traitBreakdown);
+    $basePriceDoge = $compoundResult['basePriceDoge'];
+    $compoundIndices = isset($compoundResult['compoundIndices']) ? $compoundResult['compoundIndices'] : array();
+
+    $rarestTraitThinMarketBoost = null;
+    $winningCompound = isset($compoundResult['winningTrait']) ? $compoundResult['winningTrait'] : null;
+    if ($winningCompound && qualifies_rarest_trait_thin_market_boost_php($winningCompound)) {
+        $thinBoost = 1.08;
+        if ($basePriceDoge !== null && $basePriceDoge > 0) {
+            $basePriceDoge = $basePriceDoge * $thinBoost;
+            $rarestTraitThinMarketBoost = $thinBoost;
         }
     }
+    if ($basePriceDoge === null && $rarestTrait && qualifies_rarest_trait_thin_market_boost_php($rarestTrait)
+        && $collectionFloor !== null && $collectionFloor > 0) {
+        $thinBoost = 1.08;
+        $basePriceDoge = $collectionFloor * $thinBoost;
+        $rarestTraitThinMarketBoost = $thinBoost;
+    }
 
-    // If this dog itself has sold, use the higher of own sale vs trait-based price
+    // This inscription's own sale clears at least that price — floors base
     if ($ownTopSale !== null) {
         $basePriceDoge = $basePriceDoge !== null ? max($basePriceDoge, $ownTopSale) : $ownTopSale;
     }
 
-    // Other RARE traits can raise the value (skip common ones with count > 500)
+    // Other RARE traits can raise the value (skip common ones with count > 500; skip compound-anchor layers)
     $traitBonus = 0;
-    foreach ($traitBreakdown as $tb) {
-        if ($rarestIdx !== null && $tb === $traitBreakdown[$rarestIdx]) continue;
-        if (!empty($tb['isSynthetic'])) continue;
-        if ($tb['traitCount'] === null || $tb['traitCount'] > 500) continue;
+    foreach ($traitBreakdown as $i => $tb) {
+        if (isset($compoundIndices[$i])) {
+            continue;
+        }
+        if (!empty($tb['isSynthetic'])) {
+            continue;
+        }
+        if ($tb['traitCount'] === null || $tb['traitCount'] > 500) {
+            continue;
+        }
         $tbPrice = $tb['topSale'] !== null ? $tb['topSale'] : $tb['floor'];
         if ($tbPrice !== null && $basePriceDoge !== null && $tbPrice > $basePriceDoge) {
             $traitBonus += ($tbPrice - $basePriceDoge) * 0.2;
@@ -3449,70 +3818,145 @@ function evaluateDog($dogNumber) {
         );
     }
 
-    // --- Custom combo multipliers ---
+    // --- Custom combo multipliers (Any = trait present any value; None = empty slot) ---
     $smCombos = isset($smConfig['combos']) && is_array($smConfig['combos']) ? $smConfig['combos'] : array();
     $comboMultiplier = 1.0;
-    $matchedCombo = null;
+    $matchedCombos = array();
     foreach ($smCombos as $combo) {
-        if (!is_array($combo)) continue;
-        if (isset($combo['enabled']) && !$combo['enabled']) continue;
+        if (!is_array($combo)) {
+            continue;
+        }
+        if (isset($combo['enabled']) && !$combo['enabled']) {
+            continue;
+        }
         $conditions = isset($combo['conditions']) && is_array($combo['conditions']) ? $combo['conditions'] : array();
-        if (empty($conditions)) continue;
+        if (empty($conditions)) {
+            continue;
+        }
         $allMatch = true;
         foreach ($conditions as $cond) {
             $traitName = isset($cond['trait']) ? $cond['trait'] : '';
             $val = isset($traits[$traitName]) ? $traits[$traitName] : null;
-            if ($val === null) { $allMatch = false; break; }
-            $sv = strtolower(trim(strval($val)));
-            $cv = strtolower(trim(isset($cond['value']) ? $cond['value'] : ''));
-            if ($cv === '') { $allMatch = false; break; }
+            $present = ($val !== null && trim(strval($val)) !== '');
+            $sv = $present ? strtolower(trim(strval($val))) : '';
+            $cv = strtolower(trim(isset($cond['value']) ? strval($cond['value']) : ''));
+            if ($cv === '') {
+                $allMatch = false;
+                break;
+            }
+            if ($cv === 'any') {
+                if (!$present) {
+                    $allMatch = false;
+                    break;
+                }
+                continue;
+            }
+            if ($cv === 'none') {
+                if ($present) {
+                    $allMatch = false;
+                    break;
+                }
+                continue;
+            }
+            if (!$present) {
+                $allMatch = false;
+                break;
+            }
             if (isset($cond['op']) && $cond['op'] === 'contains') {
-                if (strpos($sv, $cv) === false) { $allMatch = false; break; }
-            } else {
-                if ($sv !== $cv) { $allMatch = false; break; }
+                if (strpos($sv, $cv) === false) {
+                    $allMatch = false;
+                    break;
+                }
+            } elseif ($sv !== $cv) {
+                $allMatch = false;
+                break;
             }
         }
         if ($allMatch) {
-            $cm = max(1.0, isset($combo['multiplier']) ? floatval($combo['multiplier']) : 1.0);
-            if ($cm > $comboMultiplier) { $comboMultiplier = $cm; $matchedCombo = $combo; }
+            $cmRaw = isset($combo['multiplier']) ? floatval($combo['multiplier']) : 0.0;
+            if (!is_finite($cmRaw) || $cmRaw == 0.0) {
+                continue;
+            }
+            $factor = normalize_signed_price_multiplier_php($cmRaw);
+            if ($factor == 1.0) {
+                continue;
+            }
+            $comboMultiplier *= $factor;
+            $matchedCombos[] = $combo;
         }
     }
-    if ($matchedCombo !== null && $estimatedDoge !== null) {
+    if (count($matchedCombos) > 0 && $estimatedDoge !== null && $comboMultiplier != 1.0) {
+        $comboLabels = array();
+        foreach ($matchedCombos as $c) {
+            if (isset($c['label']) && trim(strval($c['label'])) !== '') {
+                $comboLabels[] = strval($c['label']);
+            }
+        }
+        $comboDisplayLabel = count($comboLabels) > 0 ? implode(' · ', $comboLabels) : 'Combo stack';
         $estimatedDoge = intval(round($estimatedDoge * $comboMultiplier));
         $specialMultiplierDetails[] = array(
             'type' => 'combo',
-            'label' => isset($matchedCombo['label']) ? $matchedCombo['label'] : '',
+            'label' => $comboDisplayLabel,
             'multiplier' => $comboMultiplier,
         );
     }
 
-    if ($matchedCombo !== null) {
-        $comboConds = isset($matchedCombo['conditions']) && is_array($matchedCombo['conditions']) ? $matchedCombo['conditions'] : array();
+    if (count($matchedCombos) > 0) {
+        $comboLabels = array();
+        foreach ($matchedCombos as $c) {
+            if (isset($c['label']) && trim(strval($c['label'])) !== '') {
+                $comboLabels[] = strval($c['label']);
+            }
+        }
+        $comboLabel = count($comboLabels) > 0 ? implode(' · ', $comboLabels) : 'Combo';
+        $comboId = count($matchedCombos) === 1 && isset($matchedCombos[0]['id']) ? strval($matchedCombos[0]['id']) : 'combo-stack';
         foreach ($traitBreakdown as &$tb) {
             if (!empty($tb['isSynthetic'])) {
                 continue;
             }
-            foreach ($comboConds as $cond) {
-                if (!is_array($cond) || !isset($cond['trait']) || $cond['trait'] !== $tb['trait']) {
-                    continue;
+            $hit = false;
+            foreach ($matchedCombos as $matchedCombo) {
+                $comboConds = isset($matchedCombo['conditions']) && is_array($matchedCombo['conditions']) ? $matchedCombo['conditions'] : array();
+                foreach ($comboConds as $cond) {
+                    if (!is_array($cond) || !isset($cond['trait']) || $cond['trait'] !== $tb['trait']) {
+                        continue;
+                    }
+                    $val = isset($traits[$tb['trait']]) ? $traits[$tb['trait']] : null;
+                    $present = ($val !== null && trim(strval($val)) !== '');
+                    $sv = $present ? strtolower(trim(strval($val))) : '';
+                    $cv = strtolower(trim(isset($cond['value']) ? strval($cond['value']) : ''));
+                    if ($cv === '') {
+                        continue;
+                    }
+                    if ($cv === 'any') {
+                        if ($present) {
+                            $hit = true;
+                            break 2;
+                        }
+                        continue;
+                    }
+                    if ($cv === 'none') {
+                        if (!$present) {
+                            $hit = true;
+                            break 2;
+                        }
+                        continue;
+                    }
+                    if (!$present) {
+                        continue;
+                    }
+                    $isContains = isset($cond['op']) && $cond['op'] === 'contains';
+                    if ($isContains ? (strpos($sv, $cv) !== false) : ($sv === $cv)) {
+                        $hit = true;
+                        break 2;
+                    }
                 }
-                $val = isset($traits[$tb['trait']]) ? $traits[$tb['trait']] : null;
-                if ($val === null) {
-                    continue;
-                }
-                $sv = strtolower(trim(strval($val)));
-                $cv = strtolower(trim(isset($cond['value']) ? strval($cond['value']) : ''));
-                if ($cv === '') {
-                    continue;
-                }
-                $isContains = isset($cond['op']) && $cond['op'] === 'contains';
-                if ($isContains ? (strpos($sv, $cv) !== false) : ($sv === $cv)) {
-                    $tb['comboPart'] = array(
-                        'id' => isset($matchedCombo['id']) ? strval($matchedCombo['id']) : '',
-                        'label' => isset($matchedCombo['label']) ? strval($matchedCombo['label']) : '',
-                    );
-                    break;
-                }
+            }
+            if ($hit) {
+                $tb['comboPart'] = array(
+                    'id' => $comboId,
+                    'label' => $comboLabel,
+                );
             }
         }
         unset($tb);
@@ -3545,17 +3989,17 @@ function evaluateDog($dogNumber) {
         }
     }
 
-    // Check for trend numbers (67, 69, 420)
+    // Exact-match vanity dog numbers from admin table (capped at ×1.2 in config)
     $trendNumConfig = isset($smAngel['trendNumbers']) && is_array($smAngel['trendNumbers']) ? $smAngel['trendNumbers'] : array();
-    $trendNumbers = array('67', '69', '420');
-    foreach ($trendNumbers as $trendNum) {
-        if ($dogNumStr === $trendNum) {
-            $config = isset($trendNumConfig[$trendNum]) && is_array($trendNumConfig[$trendNum]) ? $trendNumConfig[$trendNum] : array();
-            if (!isset($config['enabled']) || (bool)$config['enabled']) {
-                $m = max(1.0, isset($config['multiplier']) ? floatval($config['multiplier']) : 1.10);
-                if ($m > $angelMultiplier) { $angelMultiplier = $m; $angelType = 'trend_number'; $angelLabel = '🔢 ' . $trendNum; }
+    if (isset($trendNumConfig[$dogNumStr]) && is_array($trendNumConfig[$dogNumStr])) {
+        $tnConf = $trendNumConfig[$dogNumStr];
+        if (!isset($tnConf['enabled']) || (bool)$tnConf['enabled']) {
+            $m = max(1.0, min(1.2, isset($tnConf['multiplier']) ? floatval($tnConf['multiplier']) : 1.05));
+            if ($m > $angelMultiplier) {
+                $angelMultiplier = $m;
+                $angelType = 'trend_number';
+                $angelLabel = '🔢 ' . $dogNumStr;
             }
-            break; // Only one trend number can match
         }
     }
 
@@ -3634,8 +4078,19 @@ function evaluateDog($dogNumber) {
             'displayEstimatedUsdNote' => ($displayOverride && isset($displayOverride['estimation']['displayEstimatedUsdNote'])) ? $displayOverride['estimation']['displayEstimatedUsdNote'] : null,
             'valueMultiplier' => $valueMultiplier !== 1.0 ? $valueMultiplier : null,
             'basePriceDoge' => $basePriceDoge !== null ? intval(round($basePriceDoge)) : null,
+            'rarestTraitThinMarketBoost' => $rarestTraitThinMarketBoost,
             'traitBonus' => $traitBonus > 0 ? intval(round($traitBonus)) : 0,
             'rarestTrait' => $rarestTrait ? array('trait' => $rarestTrait['trait'], 'value' => $rarestTrait['value'], 'count' => $rarestTrait['traitCount']) : null,
+            'compoundAnchor' => (isset($compoundResult['compoundRows']) && count($compoundResult['compoundRows']) > 0) ? array(
+                'maxTraits' => isset($compoundResult['maxTraits']) ? intval($compoundResult['maxTraits']) : 3,
+                'maxSupply' => isset($compoundResult['maxSupply']) ? intval($compoundResult['maxSupply']) : 2500,
+                'traits' => $compoundResult['compoundRows'],
+                'winningTrait' => (isset($compoundResult['winningTrait']) && $compoundResult['winningTrait']) ? array(
+                    'trait' => $compoundResult['winningTrait']['trait'],
+                    'value' => $compoundResult['winningTrait']['value'],
+                    'count' => $compoundResult['winningTrait']['traitCount'],
+                ) : null,
+            ) : null,
             'trendingMultiplier' => $trendingMultiplier > 1 ? $trendingMultiplier : null,
             'trendingHits' => count($trendingHits) > 0 ? $trendingHits : null,
             'colorMatch' => $colorMatch,
@@ -3669,7 +4124,7 @@ function evaluateDog($dogNumber) {
             'specialMultiplier' => count($specialMultiplierDetails) > 0 ? array_reduce($specialMultiplierDetails, function($acc, $detail) { return $acc * $detail['multiplier']; }, 1.0) : null,
             'specialMultiplierDetails' => count($specialMultiplierDetails) > 0 ? $specialMultiplierDetails : null,
             'method' => implode(' + ', array_filter(array(
-                'rarest_trait_top_sale + trait_bonus + rarity_multiplier',
+                'compound_rarest_trait_anchor + trait_bonus + rarity_multiplier',
                 $valueMultiplier !== 1.0 ? 'one_of_one_multiplier' : null,
                 $colorMatch !== null ? 'color_match_multiplier' : null,
                 $isMinimalDog ? 'minimal_dog_multiplier' : null,
@@ -4173,6 +4628,10 @@ if ($action === 'admin-suggestions-review') {
 }
 
 if ($action === 'evaluate') {
+    $qm = isset($_GET['quotaMode']) ? strtolower(trim(strval($_GET['quotaMode']))) : 'inscription';
+    $rarityMode = ($qm === 'rarity');
+    $cap = $rarityMode ? dd_paywall_free_rarity_cap() : dd_paywall_free_inscriptions_cap();
+    dd_paywall_quota_try_consume($rarityMode ? 'rarity' : 'inscribe', $cap);
     try {
         $dogNumber = validateDogNumber(isset($_GET['dogNumber']) ? $_GET['dogNumber'] : null);
         $result = evaluateDog($dogNumber);
@@ -4183,13 +4642,10 @@ if ($action === 'evaluate') {
 }
 
 if ($action === 'wallet') {
-    try {
-        $address = validateWalletAddress(isset($_GET['address']) ? $_GET['address'] : null);
-        $result = getWalletHoldingsSummary($address);
-        sendJson($result, 200, 120);
-    } catch (Exception $e) {
-        sendError('Wallet evaluation failed: ' . $e->getMessage(), 502);
-    }
+    sendJson(array(
+        'code' => 'dd_wallet_plus_only',
+        'error' => 'Wallet portfolio valuations are exclusive to KushMetaX Doginal Dogs Plus subscribers.',
+    ), 403, 0);
 }
 
 sendError('Unknown action. Use evaluate, wallet, market-pulse, rank-lookup, snapshot_status, community-status, community-lore, community-suggestions, or admin routes.');

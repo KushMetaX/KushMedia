@@ -12,8 +12,8 @@
  *  5. To evaluate a single dog:
  *     - Look up its traits
  *     - For each trait → get the trait-value floor price from the snapshot
- *     - Estimated value = weighted average of per-trait floors,
- *       adjusted by rarity rank percentile.
+ *     - Estimated value blends listing + sale comps on the rarest trait (not max-heavy),
+ *       then trait bonus / rarity rank / multipliers as below.
  *     - If the dog is currently listed, compare asking price to estimate.
  */
 
@@ -37,6 +37,26 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** Default exact-match vanity / “angel” dog # multipliers (caps at 1.2× in normalizer). */
+function buildDefaultAngelTrendNumberMap() {
+  const pairs = [
+    [1, 1.20], [10, 1.06], [13, 1.05], [21, 1.05], [42, 1.10], [67, 1.12], [69, 1.20], [96, 1.07],
+    [100, 1.06], [111, 1.14], [123, 1.09], [222, 1.14], [234, 1.06], [321, 1.08], [333, 1.15],
+    [420, 1.20], [555, 1.10], [666, 1.19], [777, 1.14], [888, 1.14], [999, 1.14], [1000, 1.07],
+    [1111, 1.12], [1234, 1.16], [1337, 1.18], [2222, 1.12], [2345, 1.12], [2468, 1.08],
+    [3000, 1.06], [3333, 1.14], [3456, 1.17], [4321, 1.13], [4444, 1.11], [4567, 1.18],
+    [5432, 1.11], [5555, 1.10], [5678, 1.18], [6666, 1.12], [6789, 1.19], [7777, 1.13],
+    [8888, 1.13], [9876, 1.14], [9999, 1.15], [10000, 1.20],
+  ];
+  const o = {};
+  for (const [n, m] of pairs) {
+    o[String(n)] = Object.freeze({ enabled: true, multiplier: m });
+  }
+  return Object.freeze(o);
+}
+
+const DEFAULT_ANGEL_TREND_NUMBERS = buildDefaultAngelTrendNumberMap();
 
 const DEFAULT_TRENDING_CONFIG = Object.freeze({
   manualMultipliers: Object.freeze({
@@ -70,11 +90,7 @@ const DEFAULT_TRENDING_CONFIG = Object.freeze({
     angelNumbers: Object.freeze({
       quadRepeater: Object.freeze({ enabled: true, multiplier: 1.25 }),
       tripleRepeater: Object.freeze({ enabled: true, multiplier: 1.15 }),
-      trendNumbers: Object.freeze({
-        '67': Object.freeze({ enabled: true, multiplier: 1.10 }),
-        '69': Object.freeze({ enabled: true, multiplier: 1.10 }),
-        '420': Object.freeze({ enabled: true, multiplier: 1.10 }),
-      }),
+      trendNumbers: DEFAULT_ANGEL_TREND_NUMBERS,
     }),
   }),
   updatedAt: null,
@@ -265,6 +281,21 @@ function normalizeSpecialMultipliers(raw = {}) {
   }
 
   const angelRaw = raw?.angelNumbers && typeof raw.angelNumbers === 'object' ? raw.angelNumbers : {};
+  const trendRaw = angelRaw.trendNumbers != null && typeof angelRaw.trendNumbers === 'object'
+    ? angelRaw.trendNumbers
+    : null;
+  const trendSource = trendRaw != null ? trendRaw : DEFAULT_ANGEL_TREND_NUMBERS;
+  const trendNumbers = {};
+  for (const [key, entry] of Object.entries(trendSource)) {
+    const n = Number(String(key).trim());
+    if (!Number.isInteger(n) || n < 1 || n > 10000) continue;
+    if (!entry || typeof entry !== 'object') continue;
+    const mult = Math.max(1.0, Math.min(1.2, Number(entry.multiplier) || 1.05));
+    trendNumbers[String(n)] = {
+      enabled: entry.enabled !== false,
+      multiplier: mult,
+    };
+  }
   const angelNumbers = {
     quadRepeater: {
       enabled: angelRaw.quadRepeater?.enabled !== false,
@@ -274,20 +305,7 @@ function normalizeSpecialMultipliers(raw = {}) {
       enabled: angelRaw.tripleRepeater?.enabled !== false,
       multiplier: Math.max(1.0, Number(angelRaw.tripleRepeater?.multiplier) || 1.15),
     },
-    trendNumbers: {
-      '67': {
-        enabled: angelRaw.trendNumbers?.['67']?.enabled !== false,
-        multiplier: Math.max(1.0, Number(angelRaw.trendNumbers?.['67']?.multiplier) || 1.10),
-      },
-      '69': {
-        enabled: angelRaw.trendNumbers?.['69']?.enabled !== false,
-        multiplier: Math.max(1.0, Number(angelRaw.trendNumbers?.['69']?.multiplier) || 1.10),
-      },
-      '420': {
-        enabled: angelRaw.trendNumbers?.['420']?.enabled !== false,
-        multiplier: Math.max(1.0, Number(angelRaw.trendNumbers?.['420']?.multiplier) || 1.10),
-      },
-    },
+    trendNumbers,
   };
 
   return { colorMatch, minimalTiers, combos, angelNumbers };
@@ -462,6 +480,11 @@ async function readCommunityLoreForDog(dogNumber) {
   return null;
 }
 
+/** Trait slot has a real catalog value (not missing / blank). */
+function traitSlotIsPresent(val) {
+  return val != null && String(val).trim() !== '';
+}
+
 /** Mark trait breakdown rows that satisfied part of matched combo(s). */
 function annotateTraitBreakdownForCombo(traitBreakdown, traits, matchedCombos) {
   if (!matchedCombos || matchedCombos.length === 0 || !Array.isArray(traitBreakdown)) return;
@@ -475,11 +498,12 @@ function annotateTraitBreakdownForCombo(traitBreakdown, traits, matchedCombos) {
       return conditions.some(cond => {
         if (!cond || cond.trait !== tb.trait) return false;
         const val = traits[tb.trait];
-        if (val == null) return false;
-        const sv = String(val).toLowerCase().trim();
+        const sv = traitSlotIsPresent(val) ? String(val).toLowerCase().trim() : '';
         const cv = String(cond.value || '').toLowerCase().trim();
         if (!cv) return false;
-        if (cv === 'any') return true;
+        if (cv === 'any') return sv.length > 0;
+        if (cv === 'none') return sv.length === 0;
+        if (sv.length === 0) return false;
         return cond.op === 'contains' ? sv.includes(cv) : sv === cv;
       });
     });
@@ -1172,6 +1196,121 @@ function applyTraitDisplayOverrides(traitBreakdown, displayOverride) {
   }
 }
 
+/**
+ * Floor-first blended anchor on the rarest trait: mixes listing floor with sale comps
+ * (median when available), caps lift toward peak sale by trade depth — less max-heavy than
+ * max(floor, topSale). Caller still applies inscription own-sale floor afterward.
+ */
+function blendRarestTraitBasePrice(tb) {
+  if (!tb || tb.isSynthetic) return null;
+
+  const floor = tb.floor != null && Number.isFinite(Number(tb.floor)) ? Number(tb.floor) : null;
+  const saleMedian = tb.saleMedian != null && Number.isFinite(Number(tb.saleMedian)) ? Number(tb.saleMedian) : null;
+  const saleFloorStat = tb.saleFloor != null && Number.isFinite(Number(tb.saleFloor)) ? Number(tb.saleFloor) : null;
+  const topSale = tb.topSale != null && Number.isFinite(Number(tb.topSale)) ? Number(tb.topSale) : null;
+  const saleCount = Math.max(0, Math.floor(Number(tb.saleCount) || 0));
+  const listed = Math.max(0, Math.floor(Number(tb.listed) || 0));
+
+  let saleSignal = null;
+  if (saleCount >= 2 && saleMedian != null && saleMedian > 0) {
+    saleSignal = saleMedian;
+  } else if (saleMedian != null && saleMedian > 0) {
+    saleSignal = saleMedian;
+  } else if (saleFloorStat != null && saleFloorStat > 0) {
+    saleSignal = saleFloorStat;
+  } else if (topSale != null && topSale > 0) {
+    saleSignal = topSale;
+  }
+
+  const hasFloor = floor != null && floor > 0;
+  const hasSale = saleSignal != null && saleSignal > 0;
+
+  if (!hasFloor && !hasSale) {
+    return topSale != null && topSale > 0 ? topSale : null;
+  }
+  if (!hasFloor && hasSale) return saleSignal;
+  if (hasFloor && !hasSale) return floor;
+
+  let wFloor = 0.58 + Math.min(listed, 12) * 0.022 - Math.min(saleCount, 12) * 0.028;
+  wFloor = Math.max(0.28, Math.min(0.78, wFloor));
+
+  let blended = wFloor * floor + (1 - wFloor) * saleSignal;
+
+  if (topSale != null && topSale > floor) {
+    const excess = topSale - floor;
+    let capFrac = 0.42;
+    if (saleCount >= 10) capFrac = 0.72;
+    else if (saleCount >= 5) capFrac = 0.58;
+    else if (saleCount >= 2) capFrac = 0.48;
+    const ceiling = floor + excess * capFrac;
+    blended = Math.min(blended, ceiling);
+  }
+
+  if (!Number.isFinite(blended) || blended <= 0) {
+    const fb = Math.max(floor ?? 0, saleSignal ?? 0, topSale ?? 0);
+    return fb > 0 ? fb : null;
+  }
+  return blended;
+}
+
+/** Nudge base when the anchor trait is <100 supply but snapshot shows no listings/sales for it. */
+const RAREST_TRAIT_THIN_MARKET_BASE_BOOST = 1.08;
+
+function qualifiesRarestTraitThinMarketBaseBoost(tb) {
+  if (!tb || tb.isSynthetic) return false;
+  const tc = tb.traitCount;
+  if (tc == null || tc >= 100) return false;
+  const listed = Math.max(0, Math.floor(Number(tb.listed) || 0));
+  const saleCount = Math.max(0, Math.floor(Number(tb.saleCount) || 0));
+  return listed === 0 && saleCount === 0;
+}
+
+/** Top-N rarest layers (by supply ≤ maxSupply): base = max(blend each). Caps how many “kind of rare” rows compete. */
+const COMPOUND_ANCHOR_MAX_TRAITS = 3;
+const COMPOUND_ANCHOR_MAX_SUPPLY = 2500;
+
+function computeCompoundAnchorBase(traitBreakdown) {
+  const eligible = traitBreakdown.filter(tb => (
+    !tb.isSynthetic
+    && tb.traitCount != null
+    && tb.traitCount <= COMPOUND_ANCHOR_MAX_SUPPLY
+  ));
+  eligible.sort((a, b) => a.traitCount - b.traitCount || a.trait.localeCompare(b.trait) || String(a.value).localeCompare(String(b.value)));
+  const slice = eligible.slice(0, COMPOUND_ANCHOR_MAX_TRAITS);
+  const withBlends = slice.map(tb => ({ tb, blend: blendRarestTraitBasePrice(tb) }));
+
+  let basePriceDoge = null;
+  for (const { blend } of withBlends) {
+    if (blend != null && Number.isFinite(blend) && blend > 0 && (basePriceDoge == null || blend > basePriceDoge)) {
+      basePriceDoge = blend;
+    }
+  }
+
+  let winningTrait = null;
+  if (basePriceDoge != null) {
+    for (const { tb, blend } of withBlends) {
+      if (blend != null && Number.isFinite(blend) && Math.abs(blend - basePriceDoge) < 1e-9) {
+        winningTrait = tb;
+        break;
+      }
+    }
+  }
+
+  const compoundRows = withBlends.map(({ tb, blend }) => ({
+    trait: tb.trait,
+    value: tb.value,
+    count: tb.traitCount,
+    blendDoge: blend != null && Number.isFinite(blend) && blend > 0 ? Math.round(blend) : null,
+  }));
+
+  return {
+    basePriceDoge,
+    winningTrait,
+    compoundAnchorRefs: slice,
+    compoundRows,
+  };
+}
+
 function resolveValueMultiplier(traitBreakdown, displayOverride) {
   const explicitMultiplier = displayOverride?.estimation?.valueMultiplier;
   if (explicitMultiplier != null) {
@@ -1209,6 +1348,7 @@ function summarizeEvaluation(evaluation, dogeUsd) {
     askingPriceUsd: askingPriceDoge != null && dogeUsd ? +(askingPriceDoge * dogeUsd).toFixed(2) : null,
     valueMultiplier: estimation.valueMultiplier ?? null,
     rarestTrait: estimation.rarestTrait ?? null,
+    compoundAnchor: estimation.compoundAnchor ?? null,
     displayEstimatedUsdNote: estimation.displayEstimatedUsdNote ?? null,
   };
 }
@@ -1603,29 +1743,33 @@ async function evaluateDog(dogNumber) {
   }
 
   // --- Valuation logic ---
-  // Base = highest of: rarest trait's listing floor, rarest trait's top sale
-  let basePriceDoge = null;
-  if (rarestTrait) {
-    const rFloor = rarestTrait.floor;
-    const rSale  = rarestTrait.topSale;
-    if (rFloor != null && rSale != null) {
-      basePriceDoge = Math.max(rFloor, rSale);
-    } else if (rFloor != null) {
-      basePriceDoge = rFloor;
-    } else if (rSale != null) {
-      basePriceDoge = rSale;
+  // Compound anchor: max(blend) over the top-N rarest non-synthetic traits (supply ≤ cap).
+  const compound = computeCompoundAnchorBase(traitBreakdown);
+  let basePriceDoge = compound.basePriceDoge;
+
+  let rarestTraitThinMarketBoost = null;
+  if (compound.winningTrait && qualifiesRarestTraitThinMarketBaseBoost(compound.winningTrait)) {
+    if (basePriceDoge != null && basePriceDoge > 0) {
+      basePriceDoge *= RAREST_TRAIT_THIN_MARKET_BASE_BOOST;
+      rarestTraitThinMarketBoost = RAREST_TRAIT_THIN_MARKET_BASE_BOOST;
     }
   }
+  if (basePriceDoge == null && rarestTrait && qualifiesRarestTraitThinMarketBaseBoost(rarestTrait) && collectionStats.floor != null && collectionStats.floor > 0) {
+    basePriceDoge = collectionStats.floor * RAREST_TRAIT_THIN_MARKET_BASE_BOOST;
+    rarestTraitThinMarketBoost = RAREST_TRAIT_THIN_MARKET_BASE_BOOST;
+  }
 
-  // If this dog itself has sold, use the higher of own sale vs trait-based price
+  const compoundAnchorSkip = new Set(compound.compoundAnchorRefs);
+
+  // This inscription's own sale clears at least that price — anchors base (floors valuation)
   if (ownTopSale != null) {
     basePriceDoge = basePriceDoge != null ? Math.max(basePriceDoge, ownTopSale) : ownTopSale;
   }
 
-  // Other RARE traits can raise the value (skip common ones with count > 500)
+  // Other RARE traits can raise the value (skip common ones with count > 500; skip compound-anchor layers)
   let traitBonus = 0;
   for (const tb of traitBreakdown) {
-    if (tb === rarestTrait) continue;
+    if (compoundAnchorSkip.has(tb)) continue;
     if (tb.isSynthetic) continue;
     if (tb.traitCount == null || tb.traitCount > 500) continue;
     const tbPrice = tb.topSale ?? tb.floor ?? null;
@@ -1768,7 +1912,7 @@ async function evaluateDog(dogNumber) {
     });
   }
 
-  // --- Custom combo multipliers (product of all matching enabled combos; "Any" = wildcard) ---
+  // --- Custom combo multipliers (product of all matching enabled combos; Any = non-empty trait any value; None = empty slot) ---
   const smCombos = Array.isArray(smConfig.combos) ? smConfig.combos : [];
   let comboMultiplier = 1.0;
   const matchedCombos = [];
@@ -1778,11 +1922,12 @@ async function evaluateDog(dogNumber) {
     if (conditions.length === 0) continue;
     const allMatch = conditions.every(cond => {
       const val = traits[cond.trait];
-      if (val == null) return false;
-      const sv = String(val).toLowerCase().trim();
+      const sv = traitSlotIsPresent(val) ? String(val).toLowerCase().trim() : '';
       const cv = String(cond.value || '').toLowerCase().trim();
       if (!cv) return false;
-      if (cv === 'any') return true;
+      if (cv === 'any') return sv.length > 0;
+      if (cv === 'none') return sv.length === 0;
+      if (sv.length === 0) return false;
       return cond.op === 'contains' ? sv.includes(cv) : sv === cv;
     });
     if (allMatch) {
@@ -1838,17 +1983,13 @@ async function evaluateDog(dogNumber) {
     }
   }
 
-  // Check for trend numbers (67, 69, 420)
+  // Exact-match vanity / trend dog numbers (admin table; 1–10000, capped at ×1.2 in config)
   const trendNumConfig = smAngel.trendNumbers || {};
-  const trendNumbers = ['67', '69', '420'];
-  for (const trendNum of trendNumbers) {
-    if (dogNumStr === trendNum) {
-      const config = trendNumConfig[trendNum] || {};
-      if (config.enabled !== false) {
-        const m = Math.max(1.0, Number(config.multiplier) || 1.10);
-        if (m > angelMultiplier) { angelMultiplier = m; angelType = 'trend_number'; angelLabel = `🔢 ${trendNum}`; }
-      }
-      break; // Only one trend number can match
+  if (Object.prototype.hasOwnProperty.call(trendNumConfig, dogNumStr)) {
+    const tnConf = trendNumConfig[dogNumStr];
+    if (tnConf && tnConf.enabled !== false) {
+      const m = Math.max(1.0, Math.min(1.2, Number(tnConf.multiplier) || 1.05));
+      if (m > angelMultiplier) { angelMultiplier = m; angelType = 'trend_number'; angelLabel = `🔢 ${dogNumStr}`; }
     }
   }
 
@@ -1933,8 +2074,17 @@ async function evaluateDog(dogNumber) {
       displayEstimatedUsdNote: displayOverride?.estimation?.displayEstimatedUsdNote ?? null,
       valueMultiplier: valueMultiplier !== 1 ? valueMultiplier : null,
       basePriceDoge: basePriceDoge != null ? Math.round(basePriceDoge) : null,
+      rarestTraitThinMarketBoost: rarestTraitThinMarketBoost ?? null,
       traitBonus: traitBonus > 0 ? Math.round(traitBonus) : 0,
       rarestTrait: rarestTrait ? { trait: rarestTrait.trait, value: rarestTrait.value, count: rarestTrait.traitCount } : null,
+      compoundAnchor: compound.compoundRows.length > 0 ? {
+        maxTraits: COMPOUND_ANCHOR_MAX_TRAITS,
+        maxSupply: COMPOUND_ANCHOR_MAX_SUPPLY,
+        traits: compound.compoundRows,
+        winningTrait: compound.winningTrait
+          ? { trait: compound.winningTrait.trait, value: compound.winningTrait.value, count: compound.winningTrait.traitCount }
+          : null,
+      } : null,
       trendingMultiplier: trendingMultiplier > 1 ? trendingMultiplier : null,
       trendingHits: trendingHits.length > 0 ? trendingHits : null,
       colorMatch,
@@ -1969,7 +2119,7 @@ async function evaluateDog(dogNumber) {
       communityLore: communityLore || null,
       communityLoreMultiplier: communityLoreMultiplierFactor,
       method: [
-        'rarest_trait_top_sale + trait_bonus + rarity_multiplier',
+        'compound_rarest_trait_anchor + trait_bonus + rarity_multiplier',
         valueMultiplier !== 1 ? 'one_of_one_multiplier' : null,
         colorMatch ? 'color_match_multiplier' : null,
         isMinimalDog ? 'minimal_dog_multiplier' : null,

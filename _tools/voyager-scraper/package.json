@@ -1,0 +1,19 @@
+{
+  "name": "voyager-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "POI scraper for NovaScotiaVoyage — pulls open tourism data (OpenStreetMap Overpass API, Wikidata) and outputs Voyager-shaped JSON. Region-agnostic so the same pipeline scales beyond Nova Scotia.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "scrape": "node scrape.mjs --region nova-scotia",
+    "scrape:ns": "node scrape.mjs --region nova-scotia",
+    "scrape:all": "node scrape.mjs --all",
+    "scrape:dry": "node scrape.mjs --region nova-scotia --dry-run",
+    "scrape:fresh": "node scrape.mjs --region nova-scotia --no-cache",
+    "clean": "node clean-discovered.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

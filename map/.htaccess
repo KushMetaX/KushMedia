@@ -1,0 +1,51 @@
+# =============================================================================
+# /map/.htaccess — NovaScotiaVoyage password gate (Apache layer)
+#
+# WHY THIS EXISTS:
+#   The password lock is enforced server-side in public/server/index.js
+#   (HTTP Basic Auth via VOYAGER_PASSWORD). For that gate to RUN, every
+#   request under /map/* must reach the Passenger Node app — Apache must
+#   not serve any static file from this directory directly. Without this
+#   file, Apache's mod_dir + DirectoryIndex would cheerfully hand out
+#   /map/index.html, /map/app.js, /map/styles.css, /map/data.js, /map/pois.js
+#   to anyone, completely bypassing the password.
+# =============================================================================
+
+# 1. Disable directory listing + content negotiation + the default index lookup.
+Options -Indexes -MultiViews
+DirectoryIndex disabled
+
+# 2. Hide this folder from search engines (defence-in-depth on top of the
+#    `<meta name="robots" content="noindex,nofollow">` already in the HTML).
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, nosnippet, noarchive"
+  Header always set Cache-Control "no-store, private"
+</IfModule>
+
+# 3. Rewrite every request under /map/ to a virtual path that does NOT exist
+#    on disk. Apache then has no static file to serve and hands the request
+#    off to Phusion Passenger (Node), where the Express auth gate runs.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /map/
+
+  # Don't loop on the rewritten URL.
+  RewriteCond %{ENV:REDIRECT_NSV_GATED} !=1
+  # Internal rewrite: /map/foo.js -> /__nsv_gate/foo.js (handled in Express).
+  # Trailing-slash empty path resolves to /__nsv_gate/ which serves index.html.
+  RewriteRule ^(.*)$ /__nsv_gate/$1 [E=NSV_GATED:1,L]
+</IfModule>
+
+# 4. Belt-and-suspenders: if mod_rewrite is unavailable for any reason, deny
+#    direct file access so the static assets cannot leak unauthenticated.
+<IfModule !mod_rewrite.c>
+  <FilesMatch "\.(html?|js|mjs|css|map|json|geojson)$">
+    <IfModule mod_authz_core.c>
+      Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+      Order allow,deny
+      Deny from all
+    </IfModule>
+  </FilesMatch>
+</IfModule>

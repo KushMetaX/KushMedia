@@ -55,6 +55,8 @@ Options -Indexes -MultiViews
 </IfModule>
 
 # =============================================================================
+# DogiDex / Kush session APIs are Express (Passenger): use /kmx-auth/* — not under this PHP tree.
+#
 # Existing functional rewrites (DO NOT MODIFY in this wave - owned by
 # the PHP Hardening agent, Wave 2d).
 # =============================================================================

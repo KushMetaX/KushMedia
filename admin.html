@@ -119,6 +119,8 @@
     .dd-combo-ddm-field{display:flex;flex-direction:column;gap:.22rem}
     .dd-combo-ddm-field label{font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#777}
     .dd-combo-ddm-field select{width:100%;padding:.45rem .5rem;border-radius:.55rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff;font-size:.82rem}
+    .dd-settings-table.dd-angel-table{min-width:380px}
+    .dd-angel-num{font-variant-numeric:tabular-nums;font-weight:600;color:#e8e8e8}
     .dd-lore-mult{width:100%;max-width:6rem;padding:.55rem .65rem;border-radius:.75rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff}
   </style>
 </head>
@@ -144,7 +146,7 @@
       <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
       <li><a href="../services.html" class="nav-link">Services</a></li>
       <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
-      <li><a href="community-suggestions.html" class="nav-link">Community suggestions</a></li>
+      <li><a href="../voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="../contact.html" class="nav-link">Connect</a></li>
     </ul>
   </nav>
@@ -354,7 +356,7 @@
               <div class="dd-settings-subhead">
                 <div>
                   <h3 id="ddMultipliersTitle" class="dd-settings-subtitle">Special Multipliers</h3>
-                  <p class="dd-settings-copy">Fixed bonuses applied after rarity + trending scoring. Custom combos use one dropdown per trait (Any = wildcard). Positive combo multipliers boost; negative use (1+m). Click <strong>Save Special Multipliers</strong> to persist.</p>
+                  <p class="dd-settings-copy">Fixed bonuses applied after rarity + trending scoring. Each trait slot: <strong>Any (has trait)</strong> = that inscription must have a non-empty value in that slot (any listed variant). <strong>None (empty)</strong> = that slot must be empty or missing. Specific values match exactly. Combos with eight &ldquo;Any&rdquo; rows only match dogs that have all eight trait slots filled. Positive multipliers boost; negative use (1+m). Click <strong>Save Special Multipliers</strong> to persist.</p>
                 </div>
                 <button type="button" id="ddSaveSpecialMultipliers" class="dd-settings-save" style="align-self:flex-start" hidden>Save Special Multipliers</button>
               </div>
@@ -385,6 +387,35 @@
                   <button type="button" id="ddAddComboBtn" class="dd-mult-add-btn">+ Add Combo</button>
                 </div>
                 <div id="ddCombosContainer"></div>
+              </div>
+
+              <div class="dd-mult-section">
+                <div class="dd-mult-section-title">
+                  🔢 Angel &amp; vanity dog numbers
+                  <button type="button" id="ddAddAngelRowBtn" class="dd-mult-add-btn">+ Add #</button>
+                </div>
+                <p class="dd-settings-copy" style="margin:0 0 .65rem">Quad/triple repeaters use the toggles below; the table is for exact dog # matches (e.g. 1234, 420). Best single bonus wins. Table multipliers are capped at ×1.2.</p>
+                <div class="dd-mult-editable-row" style="margin-bottom:.5rem">
+                  <label class="dd-mult-toggle-wrap"><input type="checkbox" id="ddQuadRepeaterEnabled" checked> Quad (1111–9999)</label>
+                  <input type="number" id="ddQuadRepeaterMult" class="dd-mult-input" min="1" max="10" step="0.01" value="1.25" style="width:72px" title="Same digit ×4">
+                  <span class="dd-mult-x">&times;</span>
+                  <label class="dd-mult-toggle-wrap" style="margin-left:.85rem"><input type="checkbox" id="ddTripleRepeaterEnabled" checked> Triple (111–999)</label>
+                  <input type="number" id="ddTripleRepeaterMult" class="dd-mult-input" min="1" max="10" step="0.01" value="1.15" style="width:72px" title="Same digit ×3">
+                  <span class="dd-mult-x">&times;</span>
+                </div>
+                <div class="dd-settings-table-wrap" style="max-height:22rem">
+                  <table class="dd-settings-table dd-angel-table" id="ddAngelTable">
+                    <thead>
+                      <tr>
+                        <th>Dog #</th>
+                        <th>×</th>
+                        <th>On</th>
+                        <th class="dd-trait-action"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="ddAngelTbody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -642,6 +673,8 @@
     var ddMinimalTiersContainer = document.getElementById('ddMinimalTiersContainer');
     var ddCombosContainer = document.getElementById('ddCombosContainer');
     var ddAddComboBtn = document.getElementById('ddAddComboBtn');
+    var ddAddAngelRowBtn = document.getElementById('ddAddAngelRowBtn');
+    var ddAngelTbody = document.getElementById('ddAngelTbody');
     var ddDashboardData = null;
     var ddManualMultiplierDrafts = Object.create(null);
     var ddActivePanel = 'controls';
@@ -808,6 +841,15 @@
       { id: 'minimal_2',           label: '✨ Minimal — 2 extra traits', cond: 'Two non-base traits (e.g. eyes + clothes)', def: 1.01 },
     ];
     var DD_EVAL_TRAIT_KEYS = ['background','furColor','furPattern','eyes','clothes','accessory','mouth','head'];
+    var DD_ANGEL_NUMBER_DEFAULTS = [
+      [1, 1.20], [10, 1.06], [13, 1.05], [21, 1.05], [42, 1.10], [67, 1.12], [69, 1.20], [96, 1.07],
+      [100, 1.06], [111, 1.14], [123, 1.09], [222, 1.14], [234, 1.06], [321, 1.08], [333, 1.15],
+      [420, 1.20], [555, 1.10], [666, 1.19], [777, 1.14], [888, 1.14], [999, 1.14], [1000, 1.07],
+      [1111, 1.12], [1234, 1.16], [1337, 1.18], [2222, 1.12], [2345, 1.12], [2468, 1.08],
+      [3000, 1.06], [3333, 1.14], [3456, 1.17], [4321, 1.13], [4444, 1.11], [4567, 1.18],
+      [5432, 1.11], [5555, 1.10], [5678, 1.18], [6666, 1.12], [6789, 1.19], [7777, 1.13],
+      [8888, 1.13], [9876, 1.14], [9999, 1.15], [10000, 1.20],
+    ];
     var DD_SORT_LABELS = {
       trait: 'Trait',
       value: 'Value',
@@ -864,35 +906,113 @@
         combos.forEach(function(combo){ addDdComboRow(combo); });
       }
 
-      // Angel Numbers
-      var quadConfig = angelConfig.quadRepeater && typeof angelConfig.quadRepeater === 'object' ? angelConfig.quadRepeater : { enabled: true, multiplier: 1.25 };
-      var tripleConfig = angelConfig.tripleRepeater && typeof angelConfig.tripleRepeater === 'object' ? angelConfig.tripleRepeater : { enabled: true, multiplier: 1.15 };
-      var trendConfig = angelConfig.trendNumbers && typeof angelConfig.trendNumbers === 'object' ? angelConfig.trendNumbers : {};
+      // Angel / vanity numbers
+      renderAngelNumbersIntoPanel(angelConfig);
+    }
 
-      var quadEnabled = document.getElementById('ddQuadEnabled');
-      var quadMult = document.getElementById('ddQuadMultiplier');
-      if(quadEnabled) quadEnabled.checked = quadConfig.enabled !== false;
-      if(quadMult) quadMult.value = Number(quadConfig.multiplier) || 1.25;
-
-      var tripleEnabled = document.getElementById('ddTripleEnabled');
-      var tripleMult = document.getElementById('ddTripleMultiplier');
-      if(tripleEnabled) tripleEnabled.checked = tripleConfig.enabled !== false;
-      if(tripleMult) tripleMult.value = Number(tripleConfig.multiplier) || 1.15;
-
-      ['67', '69', '420'].forEach(function(num){
-        var config = trendConfig[num] && typeof trendConfig[num] === 'object' ? trendConfig[num] : { enabled: true, multiplier: 1.10 };
-        var enabledEl = document.getElementById('ddTrend' + num + 'Enabled');
-        var multEl = document.getElementById('ddTrend' + num + 'Multiplier');
-        if(enabledEl) enabledEl.checked = config.enabled !== false;
-        if(multEl) multEl.value = Number(config.multiplier) || 1.10;
+    function mergeAngelTrendMap(trendConfig){
+      var map = Object.create(null);
+      DD_ANGEL_NUMBER_DEFAULTS.forEach(function(pair){
+        map[String(pair[0])] = { mult: pair[1], enabled: true };
       });
+      if(trendConfig && typeof trendConfig === 'object'){
+        Object.keys(trendConfig).forEach(function(k){
+          var ent = trendConfig[k];
+          if(!ent || typeof ent !== 'object') return;
+          var n = parseInt(k, 10);
+          if(!Number.isFinite(n) || n < 1 || n > 10000) return;
+          var sk = String(n);
+          var prev = map[sk];
+          var mult = Number(ent.multiplier);
+          if(!Number.isFinite(mult)) mult = prev ? prev.mult : 1.05;
+          mult = Math.max(1, Math.min(1.2, mult));
+          map[sk] = { mult: mult, enabled: ent.enabled !== false };
+        });
+      }
+      return map;
+    }
+
+    function sortDdAngelTableRows(){
+      if(!ddAngelTbody) return;
+      var rows = Array.prototype.slice.call(ddAngelTbody.querySelectorAll('tr[data-angel-num]'), 0);
+      rows.sort(function(a, b){
+        return parseInt(a.getAttribute('data-angel-num'), 10) - parseInt(b.getAttribute('data-angel-num'), 10);
+      });
+      rows.forEach(function(r){ ddAngelTbody.appendChild(r); });
+    }
+
+    function renderAngelNumbersIntoPanel(angelConfig){
+      angelConfig = angelConfig && typeof angelConfig === 'object' ? angelConfig : {};
+      var quadConfig = angelConfig.quadRepeater && typeof angelConfig.quadRepeater === 'object' ? angelConfig.quadRepeater : {};
+      var tripleConfig = angelConfig.tripleRepeater && typeof angelConfig.tripleRepeater === 'object' ? angelConfig.tripleRepeater : {};
+      var trendConfig = angelConfig.trendNumbers && typeof angelConfig.trendNumbers === 'object' ? angelConfig.trendNumbers : {};
+      var qEn = document.getElementById('ddQuadRepeaterEnabled');
+      var qM = document.getElementById('ddQuadRepeaterMult');
+      var tEn = document.getElementById('ddTripleRepeaterEnabled');
+      var tM = document.getElementById('ddTripleRepeaterMult');
+      if(qEn) qEn.checked = quadConfig.enabled !== false;
+      if(qM) qM.value = Number(quadConfig.multiplier) || 1.25;
+      if(tEn) tEn.checked = tripleConfig.enabled !== false;
+      if(tM) tM.value = Number(tripleConfig.multiplier) || 1.15;
+      if(!ddAngelTbody) return;
+      ddAngelTbody.innerHTML = '';
+      var merged = mergeAngelTrendMap(trendConfig);
+      var nums = Object.keys(merged).map(function(k){ return parseInt(k, 10); });
+      nums.sort(function(a, b){ return a - b; });
+      nums.forEach(function(n){
+        var sk = String(n);
+        var m = merged[sk];
+        var row = document.createElement('tr');
+        row.setAttribute('data-angel-num', sk);
+        row.innerHTML =
+          '<td class="dd-angel-num">' + n + '</td>' +
+          '<td><input type="number" class="dd-angel-mult dd-mult-input" min="1" max="1.2" step="0.01" value="' + m.mult + '" style="width:72px"></td>' +
+          '<td><label class="dd-mult-toggle-wrap"><input type="checkbox" class="dd-angel-enabled"' + (m.enabled ? ' checked' : '') + '></label></td>' +
+          '<td class="dd-trait-action"><button type="button" class="btn-outline dd-angel-remove" style="padding:.25rem .45rem;font-size:.72rem">Remove</button></td>';
+        ddAngelTbody.appendChild(row);
+      });
+    }
+
+    function collectAngelNumbers(){
+      var qEn = document.getElementById('ddQuadRepeaterEnabled');
+      var qM = document.getElementById('ddQuadRepeaterMult');
+      var tEn = document.getElementById('ddTripleRepeaterEnabled');
+      var tM = document.getElementById('ddTripleRepeaterMult');
+      var trendNumbers = {};
+      if(ddAngelTbody){
+        var rows = ddAngelTbody.querySelectorAll('tr[data-angel-num]');
+        Array.prototype.forEach.call(rows, function(row){
+          var n = row.getAttribute('data-angel-num');
+          if(!n) return;
+          var en = row.querySelector('.dd-angel-enabled');
+          var mi = row.querySelector('.dd-angel-mult');
+          var mult = Number(mi && mi.value);
+          if(!Number.isFinite(mult)) mult = 1.05;
+          mult = Math.max(1, Math.min(1.2, mult));
+          trendNumbers[n] = { enabled: en ? en.checked : true, multiplier: mult };
+        });
+      }
+      return {
+        quadRepeater: {
+          enabled: qEn ? qEn.checked : true,
+          multiplier: Math.max(1, Number(qM && qM.value) || 1.25),
+        },
+        tripleRepeater: {
+          enabled: tEn ? tEn.checked : true,
+          multiplier: Math.max(1, Number(tM && tM.value) || 1.15),
+        },
+        trendNumbers: trendNumbers,
+      };
     }
 
     function ddComboTraitSelectHtml(traitKey, selectedVal){
       var list = ddTraitValueLists && ddTraitValueLists[traitKey] ? ddTraitValueLists[traitKey] : [];
       var sel = selectedVal != null ? String(selectedVal).trim() : 'Any';
-      if(sel.toLowerCase() === 'any') sel = 'Any';
-      var opts = '<option value="Any"' + (sel === 'Any' ? ' selected' : '') + '>Any</option>';
+      var selLow = sel.toLowerCase();
+      if(selLow === 'any') sel = 'Any';
+      else if(selLow === 'none') sel = 'None';
+      var opts = '<option value="Any"' + (sel === 'Any' ? ' selected' : '') + '>Any (has trait)</option>';
+      opts += '<option value="None"' + (sel === 'None' ? ' selected' : '') + '>None (empty)</option>';
       list.forEach(function(v){
         opts += '<option value="' + esc(v) + '"' + (v === sel ? ' selected' : '') + '>' + esc(v) + '</option>';
       });
@@ -967,7 +1087,10 @@
         DD_EVAL_TRAIT_KEYS.forEach(function(tk){
           var sel = row.querySelector('.dd-combo-trait-val[data-trait="' + tk + '"]');
           var value = sel ? String(sel.value || '').trim() : '';
-          if(!value || value.toLowerCase() === 'any'){
+          var low = value.toLowerCase();
+          if(low === 'none'){
+            conditions.push({ trait: tk, op: 'eq', value: 'None' });
+          } else if(!value || low === 'any'){
             conditions.push({ trait: tk, op: 'eq', value: 'Any' });
           } else {
             conditions.push({ trait: tk, op: 'eq', value: value });
@@ -984,7 +1107,7 @@
         });
       });
 
-      return { colorMatch: colorMatch, minimalTiers: minimalTiers, combos: combos };
+      return { colorMatch: colorMatch, minimalTiers: minimalTiers, combos: combos, angelNumbers: collectAngelNumbers() };
     }
 
     function saveSpecialMultipliers(){
@@ -2217,6 +2340,39 @@
     if(ddSaveBtn) ddSaveBtn.addEventListener('click', saveDdSettings);
     if(ddSaveSpecialMultipliersBtn) ddSaveSpecialMultipliersBtn.addEventListener('click', saveSpecialMultipliers);
     if(ddAddComboBtn) ddAddComboBtn.addEventListener('click', function(){ addDdComboRow(null); });
+    if(ddAddAngelRowBtn) ddAddAngelRowBtn.addEventListener('click', function(){
+      var raw = window.prompt('Dog number (1–10000) to add:', '');
+      if(raw == null) return;
+      var n = parseInt(String(raw).trim(), 10);
+      if(!Number.isFinite(n) || n < 1 || n > 10000){
+        showDdStatus('Enter a dog number from 1 to 10000.', 'error');
+        return;
+      }
+      var sk = String(n);
+      if(document.querySelector('#ddAngelTbody tr[data-angel-num="' + sk + '"]')){
+        showDdStatus('That number is already in the table.', 'error');
+        return;
+      }
+      if(!ddAngelTbody) return;
+      var row = document.createElement('tr');
+      row.setAttribute('data-angel-num', sk);
+      row.innerHTML =
+        '<td class="dd-angel-num">' + n + '</td>' +
+        '<td><input type="number" class="dd-angel-mult dd-mult-input" min="1" max="1.2" step="0.01" value="1.05" style="width:72px"></td>' +
+        '<td><label class="dd-mult-toggle-wrap"><input type="checkbox" class="dd-angel-enabled" checked></label></td>' +
+        '<td class="dd-trait-action"><button type="button" class="btn-outline dd-angel-remove" style="padding:.25rem .45rem;font-size:.72rem">Remove</button></td>';
+      ddAngelTbody.appendChild(row);
+      sortDdAngelTableRows();
+    });
+    if(ddAngelTbody){
+      ddAngelTbody.addEventListener('click', function(e){
+        var btn = e.target && e.target.closest ? e.target.closest('.dd-angel-remove') : null;
+        if(btn){
+          var tr = btn.closest('tr');
+          if(tr) tr.remove();
+        }
+      });
+    }
     if(ddCombosContainer){
       ddCombosContainer.addEventListener('click', function(e){
         var removeCombo = e.target && e.target.closest ? e.target.closest('.dd-combo-remove') : null;

@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#04060a">
+  <meta name="description" content="NovaScotiaVoyage — discover hidden gems, plan itineraries, and explore Nova Scotia's hot zones on an interactive map.">
+  <meta name="robots" content="noindex,nofollow">
+  <title>NovaScotiaVoyage — Discover · Plan · Explore</title>
+
+  <link rel="icon" href="/assets/LOGONOBG.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css">
+  <link rel="stylesheet" href="/map/styles.css">
+</head>
+<body>
+  <div id="nsv-app">
+
+    <!-- ===== TOP HEADER ===== -->
+    <header class="nsv-header">
+      <div class="nsv-header-inner glass-card">
+        <a href="#home" class="nsv-brand" aria-label="NovaScotiaVoyage home">
+          <span class="nsv-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+            </svg>
+          </span>
+          <span class="nsv-brand-text">
+            <span class="nsv-brand-name">NovaScotia<span class="accent">Voyage</span></span>
+            <span class="nsv-brand-sub">Discover · Plan · Explore</span>
+          </span>
+        </a>
+
+        <nav class="nsv-nav" aria-label="Primary">
+          <a class="nsv-tab" href="#home" data-view="home">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+            <span>Home</span>
+          </a>
+          <a class="nsv-tab" href="#map" data-view="map">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg>
+            <span>Map</span>
+          </a>
+          <a class="nsv-tab" href="#discover" data-view="discover">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <span>Discover</span>
+          </a>
+          <a class="nsv-tab" href="#planner" data-view="planner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>Planner</span>
+          </a>
+        </nav>
+
+        <div class="nsv-header-tools">
+          <button id="theme-toggle" class="nsv-icon-btn" type="button" aria-label="Toggle colour theme" title="Toggle theme">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.93 19.07 1.41-1.41"/><path d="m17.66 6.34 1.41-1.41"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="nsv-counter-strip" id="counter-strip" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="counter-text">Loading experiences…</span>
+      </div>
+    </header>
+
+    <main class="nsv-main">
+
+      <!-- ===== HOME VIEW ===== -->
+      <section class="nsv-view view-home" data-view="home">
+        <div class="container hero-wrap">
+          <span class="hero-eyebrow">
+            <span class="dot" aria-hidden="true"></span>
+            Intelligent Nova Scotia Tourism Platform
+          </span>
+          <h1 class="hero-title">What do you want to do in <span class="accent">Nova Scotia?</span></h1>
+          <p class="hero-lede" id="hero-lede">Discover hidden gem restaurants, live music, water activities, art galleries, bars, and mapped experiences across every region — then build your perfect itinerary.</p>
+
+          <form class="hero-search" id="home-search-form" autocomplete="off">
+            <span class="search-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            </span>
+            <input type="search" id="home-search" placeholder="Kayaking, whale watching, wine tours…" aria-label="Search experiences" />
+            <button type="submit" class="hero-cta">
+              <span>Explore</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+          </form>
+
+          <div class="hero-popular">
+            <span class="hero-popular-label">Popular:</span>
+            <div class="hero-popular-chips" id="popular-chips">
+              <button type="button" class="popular-chip" data-q="hidden gem restaurants">Hidden gem restaurants</button>
+              <button type="button" class="popular-chip" data-q="whale watching">Whale watching</button>
+              <button type="button" class="popular-chip" data-q="live music">Live music</button>
+              <button type="button" class="popular-chip" data-q="kayaking">Kayaking</button>
+            </div>
+          </div>
+
+          <div class="hero-stats" id="hero-stats">
+            <div class="stat-card">
+              <span class="stat-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+              </span>
+              <div class="stat-num" id="stat-experiences">—</div>
+              <div class="stat-label">Experiences</div>
+            </div>
+            <div class="stat-card">
+              <span class="stat-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-7 8-13a8 8 0 0 0-16 0c0 6 8 13 8 13z"/><circle cx="12" cy="9" r="2.5"/></svg>
+              </span>
+              <div class="stat-num" id="stat-regions">—</div>
+              <div class="stat-label">Regions</div>
+            </div>
+            <div class="stat-card">
+              <span class="stat-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M4.93 4.93l2.12 2.12"/><path d="M16.95 16.95l2.12 2.12"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.93 19.07l2.12-2.12"/><path d="M16.95 7.05l2.12-2.12"/></svg>
+              </span>
+              <div class="stat-num" id="stat-categories">—</div>
+              <div class="stat-label">Categories</div>
+            </div>
+            <div class="stat-card">
+              <span class="stat-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+              </span>
+              <div class="stat-num" id="stat-itineraries">48</div>
+              <div class="stat-label">Itinerary Templates</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="container hot-zones-wrap">
+          <div class="section-head">
+            <span class="section-eyebrow">Live Activity Map</span>
+            <h2>Explore Nova Scotia's Hot Zones</h2>
+            <p>Tap a region to fly the map there and reveal the standout experiences clustered nearby.</p>
+          </div>
+          <div class="hot-zones-grid" id="hot-zones-grid"></div>
+          <div class="section-cta-row">
+            <a class="ghost-btn" href="#map">
+              <span>Open the full map</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+            <a class="ghost-btn" href="#discover">
+              <span>Browse all experiences</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== MAP VIEW ===== -->
+      <section class="nsv-view view-map" data-view="map">
+        <div class="container">
+          <div class="view-head">
+            <h1>Interactive Map</h1>
+            <p>Click a marker to see details and book — or scroll for the full themed shortlist.</p>
+          </div>
+
+          <div class="map-grid">
+            <aside class="poi-detail-panel glass-card" id="map-poi-panel" aria-label="Selected location">
+              <div class="poi-empty" id="map-poi-empty">
+                <span class="poi-empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-7 8-13a8 8 0 0 0-16 0c0 6 8 13 8 13z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </span>
+                <h3>Pick a point of interest</h3>
+                <p>Click any marker on the map to see ratings, links, season, and accessibility info here.</p>
+                <div class="poi-empty-tip">
+                  <span class="kbd">Tip</span>
+                  Toggle layers from the panel inside the map.
+                </div>
+              </div>
+            </aside>
+
+            <div class="map-box-wrap">
+              <div class="map-box glass-card" data-map-slot="map">
+                <div class="layers-panel" aria-label="Map layers">
+                  <h3>Map Layers</h3>
+                  <div class="row" id="layer-heat-map" role="button" tabindex="0">
+                    <span class="label"><span class="swatch heat"></span>Activity Heat</span>
+                    <span class="toggle" data-on="true"></span>
+                  </div>
+                  <div class="row" id="layer-pois-map" role="button" tabindex="0">
+                    <span class="label"><span class="swatch poi"></span>POI Markers</span>
+                    <span class="toggle" data-on="true"></span>
+                  </div>
+                  <div class="row" id="layer-regions-map" role="button" tabindex="0">
+                    <span class="label"><span class="swatch region"></span>Regions</span>
+                    <span class="toggle" data-on="true"></span>
+                  </div>
+                </div>
+                <div class="map-hint">Click a marker to explore</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="theme-section">
+            <div class="theme-head">
+              <h2>Browse by theme</h2>
+              <div class="theme-bar" id="theme-bar" role="tablist" aria-label="POI categories"></div>
+            </div>
+            <div class="cards-grid" id="map-cards-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== DISCOVER VIEW ===== -->
+      <section class="nsv-view view-discover" data-view="discover">
+        <div class="container">
+          <div class="view-head">
+            <h1>Discovery Browser</h1>
+            <p>Search hidden gem restaurants, bars, water activities, live music, art galleries, and every tourism experience we've mapped across the province.</p>
+          </div>
+
+          <div class="discover-grid">
+            <aside class="discover-sidebar">
+              <div class="filter-card glass-card">
+                <label class="filter-search">
+                  <span class="search-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                  </span>
+                  <input type="search" id="discover-search" placeholder="Search experiences, tags, places…" aria-label="Search experiences" />
+                </label>
+              </div>
+
+              <div class="filter-card glass-card">
+                <h4 class="filter-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M11 18h2"/></svg>
+                  Filter by Activity
+                </h4>
+                <div class="chip-row" id="activity-chips"></div>
+              </div>
+
+              <div class="filter-card glass-card">
+                <h4 class="filter-title">Region</h4>
+                <div class="chip-row" id="region-chips"></div>
+              </div>
+
+              <div class="filter-card glass-card">
+                <label class="toggle-row">
+                  <span class="toggle-label">
+                    <span class="gem-dot" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 3h12l4 7-10 11L2 10l4-7z"/></svg>
+                    </span>
+                    Hidden gems only
+                  </span>
+                  <span class="switch" id="hidden-gem-switch" data-on="false">
+                    <input type="checkbox" id="hidden-gem-toggle" aria-label="Hidden gems only">
+                  </span>
+                </label>
+                <label class="toggle-row" style="margin-top:10px">
+                  <span class="toggle-label">
+                    <span class="gem-dot" aria-hidden="true" style="background:rgba(45,212,191,0.16);color:#2dd4bf">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                    </span>
+                    Verified links only
+                  </span>
+                  <span class="switch" id="verified-switch" data-on="false">
+                    <input type="checkbox" id="verified-toggle" aria-label="Verified links only">
+                  </span>
+                </label>
+              </div>
+
+              <div class="filter-card glass-card theme-list-card">
+                <h4 class="filter-title">Browse by theme</h4>
+                <ul class="theme-list" id="browse-theme-list"></ul>
+              </div>
+            </aside>
+
+            <div class="discover-results">
+              <div class="results-head">
+                <div class="results-count">Showing <span id="results-count">0</span> results</div>
+                <label class="map-switch">
+                  <span class="map-switch-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg>
+                    Map
+                  </span>
+                  <span class="switch" id="discover-map-switch" data-on="true">
+                    <input type="checkbox" id="discover-map-toggle" checked aria-label="Show map">
+                  </span>
+                </label>
+              </div>
+
+              <div class="map-box glass-card" id="discover-map-box" data-map-slot="discover">
+                <div class="layers-panel" aria-label="Map layers">
+                  <h3>Map Layers</h3>
+                  <div class="row" id="layer-heat-disc" role="button" tabindex="0">
+                    <span class="label"><span class="swatch heat"></span>Activity Heat</span>
+                    <span class="toggle" data-on="true"></span>
+                  </div>
+                  <div class="row" id="layer-pois-disc" role="button" tabindex="0">
+                    <span class="label"><span class="swatch poi"></span>POI Markers</span>
+                    <span class="toggle" data-on="true"></span>
+                  </div>
+                  <div class="row" id="layer-regions-disc" role="button" tabindex="0">
+                    <span class="label"><span class="swatch region"></span>Regions</span>
+                    <span class="toggle" data-on="true"></span>
+                  </div>
+                </div>
+                <div class="map-hint">Click a marker to explore</div>
+              </div>
+
+              <div class="cards-grid" id="discover-cards-grid"></div>
+              <div class="empty-state hidden" id="discover-empty">
+                <span class="empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                </span>
+                <h3>No experiences match those filters</h3>
+                <p>Try clearing a filter or searching for a tag like <em>kayak</em>, <em>vineyard</em>, or <em>ceilidh</em>.</p>
+                <button type="button" class="ghost-btn" id="reset-filters">Reset filters</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PLANNER VIEW (stub) ===== -->
+      <section class="nsv-view view-planner" data-view="planner">
+        <div class="container">
+          <div class="view-head">
+            <h1>Itinerary Planner</h1>
+            <p>Drag experiences from the map and discover browser into a multi-day plan with travel times, budgets, and accommodation suggestions.</p>
+          </div>
+          <div class="planner-soon glass-card">
+            <span class="soon-eyebrow">In development</span>
+            <h2>Coming soon</h2>
+            <p>The planner is being wired into the map. In the meantime, save experiences from <a href="#discover">Discover</a> and pin regions on the <a href="#map">Map</a>.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ===== SHARED MAP CONTAINER (moved between views) ===== -->
+    <div id="voyager-map" role="application" aria-label="Nova Scotia interactive map"></div>
+
+    <!-- ===== POI MODAL (Discover view click-throughs) ===== -->
+    <div class="poi-modal" id="poi-modal" aria-hidden="true">
+      <div class="poi-modal-backdrop" data-modal-close></div>
+      <div class="poi-modal-card glass-card" role="dialog" aria-modal="true" aria-labelledby="poi-modal-title">
+        <button class="poi-modal-close" id="poi-modal-close" type="button" aria-label="Close">✕</button>
+        <div id="poi-modal-body"></div>
+      </div>
+    </div>
+
+    <!-- ===== HOVER CARD ===== -->
+    <section id="hover-card" class="hover-card glass-card hidden" aria-hidden="true"></section>
+
+    <!-- ===== ERROR + BOOT ===== -->
+    <div id="voyager-error" class="error-card" role="alert" aria-live="polite">
+      <div class="panel glass-card">
+        <h2 id="voyager-error-title">Voyager could not start</h2>
+        <p id="voyager-error-msg"></p>
+        <p>If this persists, set <code>MAPBOX_ACCESS_TOKEN</code> in your server environment and restart the Node app.</p>
+      </div>
+    </div>
+
+    <div id="voyager-boot" class="boot-overlay" aria-hidden="true">
+      <div class="pulse"></div>
+      <div class="label">Charting Nova Scotia…</div>
+    </div>
+  </div>
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+  <script src="/map/data.js"></script>
+  <script src="/map/pois.js"></script>
+  <script src="/map/app.js"></script>
+</body>
+</html>

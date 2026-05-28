@@ -71,6 +71,11 @@ DirectoryIndex index.html index.htm
 # -----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # NovaScotiaVoyage map: do NOT short-circuit to map/index.html here.
+  # Every /map/* request is gated by the Express server (HTTP Basic Auth via
+  # VOYAGER_PASSWORD). The map/.htaccess inside that directory rewrites all
+  # requests to the virtual /__nsv_gate/* path so Passenger (Node) can apply
+  # the password gate before any file is served.
   # /server/* (Node app data + admin password file)
   RewriteRule ^server(/|$)                                - [F,L,NC]
   # /node_modules/* (full dependency disclosure if served)
@@ -104,7 +109,7 @@ DirectoryIndex index.html index.htm
   Header always set Cross-Origin-Resource-Policy "same-origin"
   Header always set Cross-Origin-Opener-Policy "same-origin"
   # Powerful-feature opt-out.
-  Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()"
+  Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
   # Reduce server fingerprint where the runtime allows it.
   Header always unset X-Powered-By
   Header unset X-Powered-By
@@ -118,7 +123,7 @@ DirectoryIndex index.html index.htm
   # The connect-src allowlist was computed by the Probe Agent from a grep
   # of every HTML/JS asset (see docs/security/deployment-facts.md).
   # ---------------------------------------------------------------------------
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-elem 'self' 'unsafe-inline'; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai https://therovers.xyz; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com; script-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai https://therovers.xyz https://assets.coingecko.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
   # ---------------------------------------------------------------------------
   # 6b. STRICT Content-Security-Policy (DISABLED - flip on after refactor)
   # ---------------------------------------------------------------------------
@@ -178,3 +183,7 @@ PassengerStartupFile server.js
 # "Environment Variables"), or use gitignored files under server/data/
 # (.dd-admin-password, .dd-admin-ui-password, .dd-community-password).
 # Never commit passwords in this file.
+#
+# DogiDex login bridge: Express serves the auth router at POST …/bridge-supabase-token under
+# /dd-evaluator/auth (best for APISIX), /kmx-auth, /kk-auth. HTML 503 + APISIX means the route
+# did not reach Node — fix the gateway upstream, not only LiteSpeed.

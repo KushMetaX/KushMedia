@@ -7,15 +7,34 @@
   <meta name="description" content="Trait-weighted Doginal Dogs price evaluation powered by live market data.">
   <link rel="icon" href="../assets/Kush.png" type="image/png">
   <link rel="apple-touch-icon" href="../assets/Kush.png">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Cormorant:ital,wght@0,500;0,600;0,700&family=Outfit:wght@400;500;600;700&family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant:ital,wght@0,500;0,600;0,700&family=Outfit:wght@400;500;600;700;800&family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css">
   <style>
+    /* Avoid smooth-scroll fighting touch momentum / focused-field scroll corrections */
+    html { scroll-behavior: auto; }
+
     :root{
       --eval-gold:#e8c547;
       --eval-gold-soft:rgba(232,197,71,.2);
-      --eval-surface:rgba(20,18,16,.82);
+      --eval-gold-dim:#c9a227;
+      --eval-surface:rgba(8,7,5,.94);
+      --eval-neon:rgba(140,210,255,.09);
+      --eval-neon-line:rgba(160,220,255,.14);
       --eval-grad-cta:linear-gradient(165deg, #f4e6a0 0%, #d4af37 42%, #9a7b18 100%);
-      --eval-vignette:radial-gradient(ellipse 100% 95% at 50% 36%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.38) 55%, rgba(0,0,0,0.9) 100%);
+      --eval-grad-cta-strong:linear-gradient(155deg, #fff8e0 0%, #f0d878 28%, #d4af37 52%, #7a6220 100%);
+      --eval-vignette:radial-gradient(ellipse 100% 95% at 50% 36%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.42) 55%, rgba(0,0,0,0.94) 100%);
+    }
+    .visually-hidden{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      clip-path:inset(50%);
+      white-space:nowrap;
+      border:0
     }
     /* ===== Sticky footer layout ===== */
     body{
@@ -25,7 +44,8 @@
       position:relative;
       isolation:isolate;
       color:#e8e4dc;
-      font-family:"Outfit",system-ui,-apple-system,sans-serif
+      font-family:"Outfit",system-ui,-apple-system,sans-serif;
+      overflow-anchor:none;
     }
     body::before{
       content:"";
@@ -34,7 +54,7 @@
       z-index:-1;
       pointer-events:none;
       background:url("../assets/DDBG.png") center center / cover no-repeat;
-      filter:saturate(0.88) brightness(0.46)
+      filter:saturate(0.88) brightness(0.4)
     }
     body::after{
       content:"";
@@ -60,16 +80,57 @@
     }
 
     .eval-shell{
-      max-width:680px;
+      max-width:760px;
       margin:0 auto;
       padding:0 1rem;
       display:flex;
       flex-direction:column;
-      gap:1.25rem
+      gap:1.65rem;
+    }
+    @media (min-width:768px){
+      .eval-shell{gap:1.85rem}
+    }
+    @keyframes evalSmokeDrift{
+      0%{opacity:.2;transform:translate3d(-8%,2%,0) scale(1.02)}
+      45%{opacity:.38;transform:translate3d(6%,0,0) scale(1.06)}
+      100%{opacity:.26;transform:translate3d(12%,-4%,0) scale(1.03)}
+    }
+    /* Subtle drifting “smoke” along top edge — keeps motion GPU-friendly */
+    .eval-kennel.eval-glass-panel{
+      position:relative;
+      overflow:hidden;
+      padding:1.35rem 1.25rem .55rem;
+      box-sizing:border-box;
+    }
+    @media (min-width:768px){
+      .eval-kennel.eval-glass-panel{padding:1.45rem 1.35rem .55rem}
+    }
+    .eval-kennel.eval-glass-panel::before{
+      content:"";
+      position:absolute;
+      inset:-35% -10% auto -10%;
+      height:72%;
+      z-index:0;
+      pointer-events:none;
+      background:
+        radial-gradient(ellipse 80% 60% at 25% 100%,rgba(212,175,55,.07) 0%,transparent 55%),
+        radial-gradient(ellipse 55% 45% at 62% 90%,rgba(180,155,115,.06) 0%,transparent 50%),
+        radial-gradient(ellipse 40% 35% at 88% 85%,rgba(232,197,71,.045) 0%,transparent 45%);
+      filter:blur(18px);
+      opacity:.65;
+      animation:evalSmokeDrift 14s ease-in-out infinite alternate;
+      mix-blend-mode:screen;
+    }
+    .eval-kennel > *{position:relative;z-index:1}
+    @media (prefers-reduced-motion: reduce){
+      .eval-kennel.eval-glass-panel::before{
+        animation:none;
+        opacity:.32;
+      }
     }
     /* Even vertical rhythm: shell gap only — no stacked margins on cards */
-    .eval-shell > .eval-tip-bar,
-    .eval-shell > .eval-title-card,
+    .eval-shell > .eval-hero,
+    .eval-shell > .eval-dex-spotlight,
     .eval-shell > .eval-market-pulse,
     .eval-shell > .eval-search-card,
     .eval-shell > .eval-status,
@@ -82,7 +143,10 @@
     .eval-block-card{
       width:100%;
       box-sizing:border-box;
-      padding:1.35rem 1.35rem 1.4rem
+      padding:1.55rem 1.5rem 1.6rem
+    }
+    @media (min-width:768px){
+      .eval-block-card{padding:1.65rem 1.65rem 1.7rem}
     }
     .eval-intro{
       text-align:center;
@@ -90,19 +154,33 @@
     }
     .eval-overline{
       font-family:"Cinzel",serif;
-      font-size:.68rem;
+      font-size:.78rem;
       text-transform:uppercase;
       letter-spacing:.26em;
       color:var(--eval-gold);
       margin-bottom:.55rem;
       font-weight:600
     }
+    /* Hero-only brand lockup */
+    .eval-hero-brand.eval-overline{
+      font-size:clamp(1rem,3.1vw,1.42rem);
+      letter-spacing:.34em;
+      font-weight:700;
+      margin-bottom:1.5rem;
+      margin-top:.15rem;
+      color:#f2e6b8;
+      text-shadow:
+        0 0 42px rgba(232,197,71,.38),
+        0 0 2px rgba(232,197,71,.55),
+        0 2px 18px rgba(0,0,0,.85);
+      border-bottom:none;
+    }
     .eval-title{
       font-family:"Cormorant",Georgia,serif;
-      font-size:clamp(1.65rem,4.5vw,2rem);
+      font-size:clamp(2.05rem,5.5vw,2.55rem);
       font-weight:700;
       color:#faf8f2;
-      line-height:1.2;
+      line-height:1.18;
       letter-spacing:.015em
     }
     .eval-subtitle{
@@ -116,11 +194,268 @@
       font-weight:400
     }
 
+    /* Hero: title + membership actions in one luxe panel */
+    .eval-hero.eval-block-card{
+      position:relative;
+      padding:2rem 1.5rem 1.85rem;
+      text-align:center;
+      animation:evalFadeUp .55s cubic-bezier(.22,1,.36,1) both;
+    }
+    @media (min-width:640px){
+      .eval-hero.eval-block-card{padding:2.15rem 1.75rem 1.95rem}
+    }
+    /* Tip — same centered column as DOGINAL DOGS / title (lives inside .eval-intro) */
+    .eval-hero-tip{
+      width:100%;
+      max-width:100%;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      margin:0 auto .75rem;
+      padding:0;
+      box-sizing:border-box;
+      text-align:center;
+    }
+    .eval-hero-tip-chip{
+      appearance:none;
+      font:inherit;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin:0 auto;
+      gap:.35rem .55rem;
+      row-gap:.25rem;
+      padding:.38rem .72rem .42rem;
+      margin:0;
+      border-radius:999px;
+      border:1px solid rgba(212,175,55,.22);
+      background:linear-gradient(165deg, rgba(12,10,8,.92) 0%, rgba(4,3,2,.78) 100%);
+      box-shadow:
+        0 6px 22px rgba(0,0,0,.4),
+        inset 0 1px 0 rgba(255,245,210,.06),
+        0 0 24px var(--eval-neon);
+      color:#b8b3a8;
+      font-size:.68rem;
+      font-weight:500;
+      letter-spacing:.04em;
+      line-height:1.35;
+      transition:border-color .22s ease,box-shadow .28s ease,background .22s ease,color .2s ease;
+      text-align:center;
+      max-width:min(17.5rem,100%);
+    }
+    .eval-hero-tip-chip:hover{
+      border-color:rgba(232,197,71,.38);
+      color:#ddd8cf;
+      box-shadow:
+        0 8px 28px rgba(0,0,0,.48),
+        inset 0 1px 0 rgba(255,245,210,.09),
+        0 0 28px rgba(232,197,71,.12);
+    }
+    .eval-hero-tip-chip:focus-visible{
+      outline:2px solid rgba(232,197,71,.55);
+      outline-offset:2px
+    }
+    .eval-hero-tip-chip-muted{
+      opacity:.88;
+      font-weight:500
+    }
+    .eval-hero-tip-chip-sep{
+      width:3px;
+      height:3px;
+      border-radius:50%;
+      background:rgba(232,197,71,.35);
+      flex-shrink:0;
+      opacity:.85
+    }
+    .eval-hero-tip-chip-cta{
+      color:var(--eval-gold-dim);
+      font-weight:700;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      font-size:.62rem;
+    }
+    .eval-hero-tip-chip:hover .eval-hero-tip-chip-cta{color:#fff4cc}
+    @media (min-width:640px){
+      .eval-hero-tip{margin-bottom:.85rem}
+      .eval-hero-tip-chip{font-size:.72rem;padding:.42rem .85rem .46rem}
+      .eval-hero-tip-chip-cta{font-size:.66rem}
+    }
+    @media (max-width:639px){
+      .eval-hero-tip{margin-bottom:1.05rem}
+    }
+    .eval-hero .eval-intro{margin-bottom:1.35rem}
+    .eval-hero .eval-title{
+      font-family:"Outfit",system-ui,sans-serif;
+      font-size:clamp(2.35rem,6.8vw,3.05rem);
+      font-weight:800;
+      letter-spacing:-.03em;
+      line-height:1.06;
+      color:#faf8f2;
+      text-shadow:
+        0 2px 28px rgba(0,0,0,.75),
+        0 0 48px rgba(232,197,71,.08),
+        0 0 1px rgba(255,255,255,.12);
+    }
+    .eval-hero .eval-subtitle{
+      margin-top:.95rem;
+      font-size:.875rem;
+      color:#8f8a82;
+      letter-spacing:.02em;
+      max-width:26rem;
+      line-height:1.6;
+    }
+    .eval-hero-divider{
+      width:min(18rem,86%);
+      height:1px;
+      margin:0 auto 1.35rem;
+      background:linear-gradient(90deg,
+        transparent,
+        rgba(212,175,55,.08),
+        rgba(232,197,71,.38),
+        rgba(160,215,255,.12),
+        rgba(232,197,71,.38),
+        rgba(212,175,55,.08),
+        transparent);
+      opacity:.95;
+      box-shadow:0 0 14px rgba(232,197,71,.12);
+    }
+    .eval-hero .eval-auth-bar{
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      gap:1.05rem;
+      padding:0;
+      border:none;
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
+    }
+    .eval-hero .eval-auth-bar-msg{
+      font-size:.8125rem;
+      color:#a9a49a;
+      letter-spacing:.025em;
+      line-height:1.65;
+      font-weight:500;
+      max-width:32rem;
+    }
+    .eval-hero .eval-auth-bar-actions{
+      gap:.85rem 1.15rem;
+    }
+    .eval-hero #evalAuthGuestRow,
+    .eval-hero #evalAuthUserRow{
+      gap:.65rem .95rem;
+      align-items:center;
+      justify-content:center;
+    }
+
+    /* DogiDex spotlight — companion card */
+    .eval-dex-spotlight.eval-block-card{
+      animation:evalFadeUp .55s cubic-bezier(.22,1,.36,1) .06s both;
+    }
+    .eval-dex-spotlight-inner{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      text-align:center;
+      gap:1.15rem;
+    }
+    .eval-dex-spotlight-copy{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      text-align:center;
+      max-width:32rem;
+      margin:0 auto;
+    }
+    .eval-dex-spotlight-cta{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:center;
+      gap:.75rem 1rem;
+      width:100%;
+    }
+    .eval-dex-spotlight .eval-overline{
+      margin-bottom:.45rem;
+    }
+    .eval-dex-spotlight-cta .eval-dex-spotlight-logo{
+      width:auto;
+      max-width:min(168px,46vw);
+      height:auto;
+      max-height:40px;
+      object-fit:contain;
+      display:block;
+      margin:0;
+      filter:drop-shadow(0 2px 10px rgba(212,175,55,.12));
+    }
+    .eval-dex-spotlight-desc{
+      margin:0;
+      font-size:.84rem;
+      line-height:1.55;
+      color:#9a958c;
+    }
+    .eval-dex-spotlight-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:.4rem;
+      padding:.75rem 1.42rem;
+      min-height:2.95rem;
+      border-radius:.65rem;
+      border:1px solid rgba(212,175,55,.38);
+      background:linear-gradient(180deg,rgba(22,18,14,.96) 0%,rgba(8,7,5,.92) 100%);
+      color:var(--eval-gold);
+      font:inherit;
+      font-weight:700;
+      font-size:.86rem;
+      letter-spacing:.04em;
+      cursor:pointer;
+      box-shadow:
+        inset 0 1px 0 rgba(255,230,180,.06),
+        0 8px 28px rgba(0,0,0,.42),
+        0 0 36px rgba(120,200,255,.05);
+      transition:transform .2s ease,border-color .2s ease,box-shadow .25s ease,filter .2s ease,color .2s ease;
+    }
+    .eval-dex-spotlight-btn:hover{
+      border-color:rgba(232,197,71,.58);
+      color:#fff4cc;
+      filter:brightness(1.06);
+      box-shadow:
+        inset 0 1px 0 rgba(255,240,200,.1),
+        0 10px 34px rgba(0,0,0,.48),
+        0 0 44px rgba(232,197,71,.12);
+    }
+    .eval-dex-spotlight-btn:active{transform:scale(.98)}
+    @media (prefers-reduced-motion: reduce){
+      .eval-hero.eval-block-card,.eval-dex-spotlight.eval-block-card{animation:evalFadeUp .35s ease-out both}
+      .eval-dex-spotlight-btn{transition:color .15s,border-color .15s}
+      .eval-dex-spotlight-btn:active{transform:none}
+    }
+    .eval-glass-panel.eval-lift-hover,
+    .eval-disclaimer.eval-lift-hover{
+      transition:border-color .35s ease,box-shadow .45s ease,transform .45s cubic-bezier(.22,1,.36,1);
+    }
+    .eval-glass-panel.eval-lift-hover:hover,
+    .eval-disclaimer.eval-lift-hover:hover{
+      border-color:rgba(212,175,55,.28);
+      box-shadow:
+        0 18px 52px rgba(0,0,0,.52),
+        inset 0 1px 0 rgba(255,230,180,.08),
+        0 0 72px rgba(120,200,255,.045);
+      transform:translateY(-2px);
+    }
+    @media (prefers-reduced-motion: reduce){
+      .eval-glass-panel.eval-lift-hover:hover,
+      .eval-disclaimer.eval-lift-hover:hover{transform:none}
+    }
+
     /* Search stack: mode + hint + form in one card */
     .eval-search-card.eval-block-card{
       display:flex;
       flex-direction:column;
-      gap:1.05rem
+      gap:1.2rem
     }
 
     /* Search mode toggle — equal width segments, inactive = solid dark like cards */
@@ -232,14 +567,17 @@
 
     /* Result card */
     .eval-card{
-      backdrop-filter:blur(18px);
-      -webkit-backdrop-filter:blur(18px);
-      background:linear-gradient(165deg, rgba(28,26,22,.88) 0%, rgba(10,8,6,.82) 100%);
-      border:1px solid rgba(212,175,55,.18);
-      border-radius:1.1rem;
+      backdrop-filter:blur(20px);
+      -webkit-backdrop-filter:blur(20px);
+      background:linear-gradient(158deg, rgba(14,12,10,.94) 0%, rgba(5,4,3,.88) 100%);
+      border:1px solid rgba(212,175,55,.14);
+      border-radius:1.15rem;
       overflow:hidden;
       margin-top:0;
-      box-shadow:0 12px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
+      box-shadow:
+        0 14px 52px rgba(0,0,0,.52),
+        inset 0 1px 0 rgba(255,230,180,.065),
+        0 0 88px rgba(120,200,255,.035);
       animation:evalFadeUp .35s ease-out both
     }
     @keyframes evalFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
@@ -248,14 +586,14 @@
       display:flex;
       align-items:center;
       gap:1.5rem;
-      padding:1.5rem;
-      border-bottom:1px solid rgba(200,170,80,.12);
+      padding:1.55rem 1.45rem;
+      border-bottom:1px solid rgba(212,175,55,.1);
       flex-wrap:wrap;
-      backdrop-filter:blur(18px);
-      -webkit-backdrop-filter:blur(18px);
-      background:linear-gradient(180deg, rgba(32,28,22,.75) 0%, rgba(14,12,10,.65) 100%);
-      border-radius:1.1rem 1.1rem 0 0;
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.04)
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      background:linear-gradient(180deg, rgba(14,12,10,.82) 0%, rgba(6,5,4,.72) 100%);
+      border-radius:1.15rem 1.15rem 0 0;
+      box-shadow:inset 0 1px 0 rgba(255,230,180,.05)
     }
     .eval-dog-img{width:100px;height:100px;border-radius:.75rem;border:2px solid rgba(212,175,55,.35);object-fit:cover;background:#0d0d0d;animation:evalGlow 2s ease-in-out infinite}
     @keyframes evalGlow{0%,100%{box-shadow:0 0 8px rgba(212,175,55,.2)}50%{box-shadow:0 0 20px rgba(212,175,55,.4)}}
@@ -364,33 +702,39 @@
     /* Timestamp */
     .eval-timestamp{padding:0 1.5rem 1rem;text-align:right;font-size:.65rem;color:#444}
 
-    /* Disclaimer / methodology */
+    /* Disclaimer / methodology — matches shell cards */
     .eval-disclaimer{
       margin-top:0;
-      border:1px solid rgba(212,175,55,.2);
-      border-radius:1rem;
-      background:linear-gradient(180deg, rgba(18,16,14,.9) 0%, rgba(8,6,4,.75) 100%);
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
+      border:1px solid rgba(212,175,55,.14);
+      border-radius:1.1rem;
+      background:linear-gradient(155deg, rgba(12,10,8,.94) 0%, rgba(4,3,2,.84) 100%);
       overflow:hidden;
-      box-shadow:0 8px 32px rgba(0,0,0,.25)
+      box-shadow:
+        0 14px 44px rgba(0,0,0,.48),
+        inset 0 1px 0 rgba(255,230,180,.06),
+        0 0 80px rgba(120,200,255,.035)
     }
     .eval-disclaimer summary{
-      padding:.85rem 1.25rem;
-      font-size:.8rem;
+      padding:1.05rem 1.45rem;
+      font-size:.78rem;
       font-weight:600;
-      color:#9a968c;
+      color:#a39e94;
       cursor:pointer;
       list-style:none;
       display:flex;
       align-items:center;
-      gap:.5rem;
+      gap:.55rem;
       user-select:none;
-      letter-spacing:.02em
+      letter-spacing:.06em;
+      text-transform:uppercase;
     }
     .eval-disclaimer summary::-webkit-details-marker{display:none}
-    .eval-disclaimer summary::before{content:'\25B6';font-size:.55rem;color:#555;transition:transform .2s}
+    .eval-disclaimer summary::before{content:'\25B6';font-size:.55rem;color:rgba(212,175,55,.45);transition:transform .2s}
     .eval-disclaimer[open] summary::before{transform:rotate(90deg)}
-    .eval-disclaimer summary:hover{color:#bbb}
-    .eval-disclaimer-body{padding:0 1.25rem 1.25rem;font-size:.78rem;line-height:1.6;color:#777}
+    .eval-disclaimer summary:hover{color:#d8d3c8}
+    .eval-disclaimer-body{padding:0 1.45rem 1.45rem;font-size:.78rem;line-height:1.62;color:#8a857c}
     .eval-disclaimer-body h4{color:#999;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;margin:1rem 0 .4rem}
     .eval-disclaimer-body h4:first-child{margin-top:0}
     .eval-disclaimer-body p{margin:0 0 .6rem}
@@ -428,58 +772,16 @@
     }
 
     .eval-glass-panel{
-      backdrop-filter:blur(18px);
-      -webkit-backdrop-filter:blur(18px);
-      background:linear-gradient(155deg, rgba(28,24,18,.88) 0%, rgba(12,10,8,.77) 100%);
-      border:1px solid rgba(212,175,55,.2);
-      border-radius:1.1rem;
-      box-shadow:0 10px 40px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,230,180,.05)
+      backdrop-filter:blur(20px);
+      -webkit-backdrop-filter:blur(20px);
+      background:linear-gradient(155deg, rgba(14,12,10,.94) 0%, rgba(5,4,3,.88) 100%);
+      border:1px solid rgba(212,175,55,.14);
+      border-radius:1.15rem;
+      box-shadow:
+        0 14px 48px rgba(0,0,0,.52),
+        inset 0 1px 0 rgba(255,230,180,.065),
+        0 0 88px rgba(120,200,255,.04)
     }
-
-    .eval-tip-bar{
-      display:flex;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:center;
-      gap:.65rem 1rem;
-      padding:.65rem 1rem;
-      margin:0
-    }
-    .eval-tip-heart{
-      color:#c94b6e;
-      display:inline-flex;
-      line-height:0
-    }
-    .eval-tip-heart svg{width:18px;height:18px;fill:currentColor}
-    .eval-tip-text{color:#b0aaa0;font-size:.88rem;letter-spacing:.03em;font-weight:500}
-    .eval-tip-cta{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      padding:.45rem 1.15rem;
-      border:1px solid rgba(212,175,55,.5);
-      color:var(--eval-gold);
-      font-size:.8rem;
-      font-weight:700;
-      text-decoration:none;
-      border-radius:999px;
-      background:linear-gradient(180deg, rgba(40,32,20,.5) 0%, rgba(12,8,4,.4) 100%);
-      box-shadow:0 2px 12px rgba(0,0,0,.2);
-      transition:background .2s,border-color .2s,transform .1s,box-shadow .2s
-    }
-    button.eval-tip-cta{
-      font-family:inherit;
-      -webkit-appearance:none;
-      appearance:none;
-      margin:0;
-      cursor:pointer
-    }
-    .eval-tip-cta:hover{
-      background:linear-gradient(180deg, rgba(60,50,30,.6) 0%, rgba(20,16,10,.5) 100%);
-      box-shadow:0 4px 16px rgba(200,160,50,.12);
-      border-color:rgba(232,200,100,.5)
-    }
-    .eval-tip-cta:active{transform:scale(.98)}
 
     .eval-tip-modal[hidden]{
       display:none !important
@@ -550,6 +852,131 @@
       line-height:1.5;
       margin:0 0 1.05rem
     }
+    .eval-tip-x-wrap{
+      margin:0 0 1rem;
+      padding:.75rem .65rem;
+      background:#1a1917;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:10px
+    }
+    .eval-tip-x-legend{
+      font-size:.78rem;
+      color:#b8b3aa;
+      margin:0 0 .55rem;
+      line-height:1.45;
+      font-weight:500
+    }
+    .eval-tip-x-fieldset{
+      border:none;
+      margin:0 0 .6rem;
+      padding:0
+    }
+    .eval-tip-x-radio-label{
+      display:flex;
+      gap:.5rem;
+      align-items:flex-start;
+      font-size:.74rem;
+      color:#b0aba2;
+      line-height:1.45;
+      margin:0 0 .45rem;
+      cursor:pointer
+    }
+    .eval-tip-x-radio-label:last-of-type{margin-bottom:0}
+    .eval-tip-x-radio-label input{
+      margin:.2rem 0 0;
+      flex-shrink:0;
+      accent-color:var(--eval-gold-dim)
+    }
+    .eval-tip-x-fields[hidden],
+    .eval-tip-x-anon-note[hidden]{display:none !important}
+    .eval-tip-x-anon-note{
+      font-size:.74rem;
+      color:#8f8a80;
+      line-height:1.45;
+      margin:0 0 .35rem
+    }
+    .eval-tip-x-label{
+      display:block;
+      font-size:.78rem;
+      color:#b8b3aa;
+      margin:0 0 .5rem;
+      line-height:1.45;
+      font-weight:500
+    }
+    .eval-tip-x-hint{
+      display:block;
+      font-size:.72rem;
+      font-weight:400;
+      opacity:.88;
+      margin-top:.2rem;
+      color:#8f8a80
+    }
+    .eval-tip-x-legend-tag{
+      display:inline;
+      font-size:.72rem;
+      margin:0;
+      margin-left:.2rem
+    }
+    .eval-tip-x-row{
+      display:flex;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:.4rem
+    }
+    .eval-tip-x-at{
+      font-size:.9rem;
+      color:var(--eval-gold);
+      font-weight:700;
+      flex-shrink:0;
+      line-height:1
+    }
+    .eval-tip-x-input{
+      flex:1;
+      min-width:7rem;
+      font-size:.85rem;
+      padding:.5rem .55rem;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,.12);
+      background:#121110;
+      color:#e8e4dc;
+      font-family:"Roboto Mono",ui-monospace,Consolas,monospace;
+      box-sizing:border-box
+    }
+    .eval-tip-x-input:focus{
+      outline:none;
+      border-color:rgba(212,175,55,.45);
+      box-shadow:0 0 0 2px rgba(212,175,55,.12)
+    }
+    .eval-tip-x-save{
+      font-size:.72rem;
+      font-weight:700;
+      padding:.5rem .75rem;
+      border-radius:8px;
+      border:none;
+      background:var(--eval-grad-cta);
+      color:#0c0a06;
+      cursor:pointer;
+      font-family:"Outfit",system-ui,sans-serif;
+      white-space:nowrap;
+      box-shadow:0 2px 10px rgba(180,150,50,.25);
+      transition:filter .12s,transform .1s
+    }
+    .eval-tip-x-save:hover{filter:brightness(1.06)}
+    .eval-tip-x-save:active{transform:scale(.98)}
+    .eval-tip-x-save:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+      transform:none
+    }
+    .eval-tip-x-msg{
+      font-size:.74rem;
+      margin:.55rem 0 0;
+      line-height:1.4
+    }
+    .eval-tip-x-msg[hidden]{display:none !important}
+    .eval-tip-x-msg.eval-tip-x-ok{color:#6ecf8f}
+    .eval-tip-x-msg.eval-tip-x-err{color:#e08080}
+    .eval-tip-x-msg.eval-tip-x-info{color:#a8a298}
     .eval-tip-addr-list{
       list-style:none;
       margin:0;
@@ -616,8 +1043,13 @@
     }
 
     .eval-market-pulse{
-      padding:1.15rem 1.25rem 1.3rem;
-      margin:0
+      padding:1.55rem 1.5rem 1.6rem;
+      margin:0;
+      text-align:center;
+      box-sizing:border-box;
+    }
+    @media (min-width:768px){
+      .eval-market-pulse{padding:1.65rem 1.65rem 1.7rem}
     }
     .eval-mp-kicker{
       font-size:.65rem;
@@ -625,7 +1057,7 @@
       letter-spacing:.24em;
       color:var(--eval-gold);
       font-weight:600;
-      margin:0 0 .4rem;
+      margin:0 auto .45rem;
       font-family:"Cinzel",serif
     }
     .eval-mp-title{
@@ -633,21 +1065,28 @@
       font-size:clamp(1.15rem,3.6vw,1.3rem);
       font-weight:700;
       color:#f5f0e6;
-      line-height:1.3;
-      margin:0;
-      letter-spacing:.02em
+      line-height:1.35;
+      margin:0 auto;
+      max-width:26rem;
+      letter-spacing:.02em;
+      text-wrap:balance
     }
     .eval-mp-sub{
-      color:#7a756c;
-      font-size:.82rem;
-      margin:.5rem 0 1rem;
-      line-height:1.45
+      color:#827d73;
+      font-size:.83rem;
+      margin:.55rem auto .95rem;
+      line-height:1.5;
+      max-width:22rem;
+      padding:0 .25rem;
+      text-wrap:pretty;
+      letter-spacing:.015em;
     }
     .eval-mp-actions{
       display:flex;
       flex-wrap:wrap;
-      gap:.5rem;
-      margin-bottom:.75rem
+      gap:.55rem;
+      margin-bottom:.2rem;
+      justify-content:center
     }
     .eval-mp-btn{
       padding:.5rem 1.05rem;
@@ -670,7 +1109,7 @@
       color:#fff0c0;
       border-color:rgba(232,200,100,.5)
     }
-    .eval-mp-body{margin-top:.75rem}
+    .eval-mp-body{margin-top:.85rem;text-align:left}
     .eval-mp-body[hidden]{display:none !important}
     .eval-mp-stale{
       color:#8a8a8a;
@@ -743,9 +1182,6 @@
     .eval-mp-skel{min-height:5rem;border-radius:.6rem;background:rgba(255,255,255,.04);animation:evalPulse 1.2s ease-in-out infinite}
     @keyframes evalPulse{0%,100%{opacity:.45}50%{opacity:.85}}
 
-    .eval-kennel{
-      margin:0
-    }
     .eval-kennel-inner{
       position:relative;
       padding:0;
@@ -805,8 +1241,9 @@
     .eval-kennel-dots{
       display:flex;
       justify-content:center;
-      gap:.45rem;
-      padding:.4rem 0 0
+      gap:.5rem;
+      padding:1rem 0 1rem;
+      margin-bottom:.15rem;
     }
     .eval-kennel-dot{
       width:6px;
@@ -823,11 +1260,506 @@
     @media(max-width:480px){
       .eval-tip-addr-row{grid-template-columns:1fr;gap:.5rem}
       .eval-tip-copy{justify-self:start}
-      .eval-tip-bar{flex-direction:column;align-items:stretch}
-      .eval-tip-text{text-align:center}
-      .eval-tip-cta{justify-content:center}
       .eval-kennel-slide{grid-template-columns:1fr;justify-items:center;text-align:center;min-height:12rem}
       .eval-kennel-thumb{max-width:100px}
+    }
+
+    /* Account + DogiDex */
+    .eval-auth-bar{
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      gap:.9rem;
+      padding:1.05rem 1.15rem 1.1rem;
+      border-radius:.85rem;
+      border:1px solid rgba(212,175,55,.22);
+      background:rgba(12,10,8,.65)
+    }
+    .eval-auth-bar-actions{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:center;
+      gap:.55rem;
+      width:100%;
+    }
+    #evalAuthGuestRow,
+    #evalAuthUserRow{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:center;
+      gap:.55rem;
+    }
+    /* Intro line — full width, wraps (never share .eval-auth-email truncation rules) */
+    .eval-auth-bar-msg{
+      flex:0 0 auto;
+      margin:0 auto;
+      min-width:0;
+      max-width:min(34rem,100%);
+      font-size:.85rem;
+      font-weight:500;
+      line-height:1.55;
+      letter-spacing:.015em;
+      color:#d8d3c8;
+      text-align:center;
+    }
+    #evalAuthLabel{
+      text-wrap:pretty;
+    }
+    .eval-auth-email{
+      font-size:.78rem;
+      color:#b8b3aa;
+      max-width:14rem;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      letter-spacing:.02em;
+    }
+    .eval-auth-btn{
+      font:inherit;
+      font-weight:600;
+      font-size:.78rem;
+      padding:.48rem .85rem;
+      border-radius:.55rem;
+      cursor:pointer;
+      border:1px solid rgba(212,175,55,.26);
+      background:linear-gradient(180deg, rgba(14,12,10,.96) 0%, rgba(6,5,4,.9) 100%);
+      color:#ece8df;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 4px 18px rgba(0,0,0,.28);
+      transition:background .2s,border-color .2s,color .2s,box-shadow .2s;
+    }
+    .eval-auth-btn:hover{
+      border-color:rgba(232,197,71,.45);
+      background:linear-gradient(180deg, rgba(22,19,15,.96) 0%, rgba(10,9,7,.93) 100%);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 6px 22px rgba(0,0,0,.32), 0 0 24px rgba(212,175,55,.06);
+      color:#fff;
+    }
+    .eval-auth-btn-primary{
+      border-color:rgba(212,175,55,.45);
+      background:var(--eval-grad-cta);color:#0d0a04;border:none;
+      box-shadow:0 2px 10px rgba(201,162,60,.22)
+    }
+    .eval-auth-btn-primary:hover{filter:brightness(1.05)}
+    .eval-unlock-btn{
+      font:inherit;
+      font-weight:800;
+      font-size:.8rem;
+      text-transform:none;
+      letter-spacing:.04em;
+      padding:.56rem 1.05rem;
+      border-radius:.65rem;
+      cursor:pointer;
+      border:1px solid rgba(255,236,180,.42);
+      background:var(--eval-grad-cta-strong);
+      color:#0a0704;
+      box-shadow:
+        0 0 0 1px rgba(212,175,55,.15),
+        0 4px 22px rgba(212,175,55,.42),
+        0 0 42px rgba(232,197,71,.22),
+        inset 0 1px 0 rgba(255,255,255,.42);
+      transition:filter .22s ease,transform .2s ease,box-shadow .28s ease,border-color .22s ease;
+    }
+    .eval-unlock-btn:hover{
+      filter:brightness(1.07);
+      transform:translateY(-2px);
+      border-color:rgba(255,245,210,.55);
+      box-shadow:
+        0 0 0 1px rgba(232,197,71,.28),
+        0 8px 32px rgba(212,175,55,.48),
+        0 0 56px rgba(232,197,71,.28),
+        inset 0 1px 0 rgba(255,255,255,.48);
+    }
+    .eval-unlock-btn:active{transform:translateY(0) scale(.98)}
+    @media (prefers-reduced-motion: reduce){
+      .eval-unlock-btn:hover,
+      .eval-unlock-btn:active{transform:none}
+    }
+    .eval-sub-badge{
+      font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;
+      padding:.28rem .5rem;border-radius:999px;background:rgba(80,220,140,.14);color:#9be7b9;border:1px solid rgba(80,220,140,.35)
+    }
+    .eval-modal{
+      max-width:92vw;width:400px;border:none;border-radius:.75rem;padding:0;
+      background:linear-gradient(180deg,#141210 0%,#0a0908 100%);
+      border:1px solid rgba(212,175,55,.28);
+      color:#e8e4dc;
+      box-shadow:0 24px 60px rgba(0,0,0,.55)
+    }
+    .eval-modal::backdrop{background:rgba(0,0,0,.72)}
+    .eval-modal-inner{padding:1.25rem 1.35rem 1.4rem;position:relative}
+    .eval-modal-close{
+      position:absolute;top:.55rem;right:.55rem;width:2rem;height:2rem;border:none;border-radius:.35rem;
+      background:transparent;color:#a39e94;font-size:1.35rem;line-height:1;cursor:pointer
+    }
+    .eval-modal-close:hover{color:var(--eval-gold)}
+    .eval-modal-title{
+      font-family:"Cormorant",Georgia,serif;font-size:1.35rem;margin:0 0 1rem;color:#faf8f2
+    }
+    .eval-modal-fields{display:flex;flex-direction:column;gap:.75rem}
+    .eval-modal-fields label{display:flex;flex-direction:column;gap:.28rem;font-size:.72rem;color:#9a958c;text-transform:uppercase;letter-spacing:.06em}
+    .eval-modal-fields input{
+      font:inherit;font-size:.92rem;padding:.55rem .65rem;border-radius:.45rem;
+      border:1px solid rgba(212,175,55,.28);background:#0a0908;color:#f2efe8
+    }
+    .eval-modal-auth-hint{font-size:.74rem;color:#8a857c;margin:0;line-height:1.45}
+    .eval-modal-submit{margin-top:.25rem;width:100%}
+    .eval-modal-links{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:.85rem;font-size:.82rem}
+    .eval-modal-links button{
+      background:none;border:none;padding:0;color:var(--eval-gold);cursor:pointer;text-decoration:underline;font:inherit
+    }
+    .eval-auth-msg{font-size:.82rem;margin:.65rem 0 0;min-height:1.2em;color:#e8a598}
+    .eval-auth-msg.ok{color:#98d4a4}
+    .eval-modal-panel[hidden]{display:none!important}
+
+    /* DogiDex — matches evaluator gold / dark luxe */
+    .eval-dex-modal.eval-modal{
+      width:min(960px,96vw);
+      max-height:92vh;
+      padding:0;
+      max-width:none;
+      overflow:hidden;
+      border-radius:12px;
+      background:linear-gradient(180deg,#151210 0%,#0a0908 100%);
+      border:1px solid rgba(212,175,55,.38);
+      box-shadow:0 24px 72px rgba(0,0,0,.55),0 0 0 1px rgba(0,0,0,.4) inset;
+      color:#e8e4dc
+    }
+    .eval-dex-modal.eval-modal::backdrop{background:rgba(5,4,2,.78);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    .eval-dex-inner.eval-modal-inner{padding:0 0 .75rem}
+    .eval-dex-close{color:#9a958c}
+    .eval-dex-close:hover{color:var(--eval-gold)}
+    .eval-dex-topbar{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+      align-items:center;
+      gap:.65rem;
+      padding:.85rem 3rem .75rem 1.1rem;
+      background:linear-gradient(180deg,rgba(32,28,22,.9) 0%,rgba(14,12,10,.75) 100%);
+      border-bottom:1px solid rgba(212,175,55,.12);
+    }
+    .eval-dex-all-dogs{
+      font-family:"Cinzel",serif;
+      font-size:.68rem;
+      font-weight:700;
+      letter-spacing:.2em;
+      text-transform:uppercase;
+      color:var(--eval-gold)
+    }
+    .eval-dex-brand{
+      display:flex;
+      align-items:center;
+      gap:.6rem;
+      justify-content:center;
+      text-align:center;
+    }
+    .eval-dex-brand-logo{
+      width:min(400px,84vw);
+      height:auto;
+      max-height:112px;
+      object-fit:contain;
+      display:block;
+      filter:drop-shadow(0 2px 14px rgba(212,175,55,.15));
+    }
+    .eval-dex-reg-meta{
+      justify-self:end;
+      text-align:right;
+      font-size:.72rem;
+      color:#9a958c;
+      line-height:1.45;
+      max-width:min(12rem,36vw);
+      word-wrap:break-word;
+      overflow-wrap:anywhere;
+      hyphens:auto;
+      -webkit-hyphens:auto;
+    }
+    .eval-dex-reg-meta strong{display:block;font-family:"Outfit",sans-serif;font-size:.78rem;color:#e8e4dc;font-weight:700}
+    .eval-dex-reg-meta span{display:block;margin-top:.2rem;font-size:.7rem;line-height:1.4}
+    .eval-dex-subbar{
+      margin:0;
+      padding:.52rem 1rem .55rem;
+      font-size:.74rem;
+      color:#a39e94;
+      line-height:1.45;
+      background:rgba(8,6,4,.45);
+      border-bottom:1px solid rgba(212,175,55,.1);
+    }
+    .eval-dex-toolbar{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap:.65rem;
+      padding:.5rem 1rem .6rem;
+      background:rgba(10,8,6,.5);
+      border-bottom:1px solid rgba(212,175,55,.08);
+    }
+    .eval-dex-sort-label{
+      font-family:"Outfit",sans-serif;
+      font-size:.74rem;
+      color:#b8b3aa;
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:.45rem;
+    }
+    .eval-dex-sort-select{
+      font:inherit;
+      font-size:.78rem;
+      padding:.38rem .55rem;
+      border-radius:8px;
+      border:1px solid rgba(212,175,55,.32);
+      background:linear-gradient(180deg,#141210 0%,#0c0a08 100%);
+      color:#f2efe8;
+      max-width:min(240px,92vw);
+    }
+    .eval-dex-grid-loading{padding:2rem 1rem;text-align:center;font-size:.82rem;color:#9a968c}
+    .eval-dex-progress-wrap{
+      height:8px;
+      border-radius:999px;
+      background:rgba(0,0,0,.35);
+      overflow:hidden;
+      margin:0 1rem .65rem;
+      border:1px solid rgba(212,175,55,.12);
+    }
+    .eval-dex-progress-bar{
+      height:100%;
+      border-radius:999px;
+      background:linear-gradient(90deg,#6a5216 0%,var(--eval-gold) 50%,#f4e6a0 100%);
+      width:0%;
+      transition:width .35s ease;
+    }
+    .eval-dex-body{
+      display:grid;
+      grid-template-columns:1fr minmax(260px,340px);
+      gap:.85rem;
+      padding:0 1rem .5rem;
+      min-height:min(52vh,460px);
+      align-items:stretch;
+    }
+    .eval-dex-grid-wrap{
+      background:rgba(8,7,5,.55);
+      border-radius:10px;
+      border:1px solid rgba(212,175,55,.15);
+      padding:.5rem;
+      max-height:min(54vh,440px);
+      overflow:hidden;
+    }
+    .eval-dex-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(88px,1fr));
+      gap:.52rem;
+      max-height:min(52vh,440px);
+      overflow-y:auto;
+      overflow-x:hidden;
+      padding:.2rem .15rem;
+      align-items:start;
+      scrollbar-width:thin;
+      scrollbar-color:rgba(212,175,55,.35) transparent;
+    }
+    .eval-dex-grid::-webkit-scrollbar{width:6px}
+    .eval-dex-grid::-webkit-scrollbar-thumb{background:rgba(212,175,55,.28);border-radius:99px}
+    .eval-dex-cell{
+      display:block;
+      width:100%;
+      min-width:0;
+      box-sizing:border-box;
+      aspect-ratio:1 / 1;
+      border-radius:.38rem;
+      overflow:hidden;
+      border:2px solid rgba(212,175,55,.28);
+      background:linear-gradient(145deg,#1a1714,#0e0c09);
+      padding:0;
+      cursor:pointer;
+      position:relative;
+      transition:border-color .15s ease,box-shadow .15s ease;
+      font:inherit;
+      color:inherit;
+      -webkit-appearance:none;
+      appearance:none;
+      touch-action:manipulation;
+    }
+    .eval-dex-cell:hover{border-color:rgba(212,175,55,.42)}
+    .eval-dex-cell[data-selected="true"]{
+      border-color:var(--eval-gold);
+      box-shadow:0 0 0 2px rgba(232,197,71,.35);
+    }
+    .eval-dex-cell--empty{
+      cursor:default;
+      pointer-events:none;
+      background:repeating-linear-gradient(
+        135deg,
+        rgba(212,175,55,.06),
+        rgba(212,175,55,.06) 5px,
+        rgba(255,255,255,.03) 5px,
+        rgba(255,255,255,.03) 10px);
+      opacity:.85;
+    }
+    .eval-dex-cell img{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      pointer-events:none;
+    }
+    .eval-dex-cell-badge{
+      position:absolute;top:2px;left:2px;font-size:.55rem;font-weight:800;line-height:1;
+      padding:.1rem .22rem;border-radius:4px;background:rgba(8,6,4,.88);color:var(--eval-gold);
+      pointer-events:none;z-index:1;
+      font-family:"Outfit",sans-serif;
+      letter-spacing:.02em;
+    }
+    .eval-dex-cell-slot-num{
+      position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:.55rem;font-weight:700;
+      color:rgba(200,195,175,.72);pointer-events:none;
+      font-variant-numeric:tabular-nums;
+    }
+    .eval-dex-detail{
+      background:rgba(18,15,11,.92);
+      border-radius:10px;
+      border:1px solid rgba(212,175,55,.18);
+      padding:.82rem .75rem;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
+    .eval-dex-detail-body{flex:1;display:flex;flex-direction:column;gap:.55rem;min-height:200px}
+    .eval-dex-detail-img-wrap{
+      flex:0 0 auto;
+      min-height:120px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(180deg,#141008,#1a1712);
+      border-radius:8px;
+      padding:.45rem;
+    }
+    .eval-dex-detail-img{max-width:100%;max-height:min(36vh,240px);object-fit:contain}
+    .eval-dex-detail-num{
+      margin:0;
+      padding:.45rem .6rem;
+      background:var(--eval-grad-cta);
+      color:#0d0a04;
+      font-family:"Outfit",sans-serif;
+      font-weight:800;
+      font-size:.82rem;
+      border-radius:6px;
+      text-align:center;
+      letter-spacing:.02em;
+    }
+    .eval-dex-detail-name{
+      margin:0;
+      padding:.45rem .6rem;
+      background:rgba(0,0,0,.4);
+      border:1px solid rgba(212,175,55,.22);
+      border-radius:6px;
+      font-family:"Cormorant",Georgia,serif;
+      font-weight:700;
+      font-size:clamp(.86rem,2.6vw,.95rem);
+      color:#faf8f2;
+      text-align:center;
+      word-break:break-word;
+    }
+    .eval-dex-detail-insc{
+      margin:0;
+      font-size:.66rem;
+      color:#a39e94;
+      text-align:center;
+      word-break:break-all;
+    }
+    .eval-dex-detail-traits{
+      font-size:.73rem;line-height:1.5;color:#c9c4ba;max-height:140px;
+      overflow-y:auto;text-align:left;
+    }
+    .eval-dex-detail-trait-row{padding:.22rem 0;border-bottom:1px solid rgba(212,175,55,.1)}
+    .eval-dex-detail-trait-row:last-child{border-bottom:none}
+    .eval-dex-detail-lore{
+      font-size:.74rem;line-height:1.5;color:#bfb8aa;padding:.52rem .48rem;
+      background:rgba(212,175,55,.06);border-radius:6px;border:1px solid rgba(212,175,55,.1);
+      max-height:110px;overflow-y:auto;text-align:left;
+    }
+    .eval-dex-detail-ph{
+      text-align:center;
+      color:#8a8580;
+      font-size:clamp(.78rem,2.4vw,.84rem);
+      padding:1.15rem .4rem;line-height:1.5;
+    }
+    .eval-dex-modal .eval-dex-load{
+      margin:.65rem 1rem 0;
+      width:calc(100% - 2rem);
+      border:1px solid rgba(212,175,55,.45);
+      background:linear-gradient(180deg,rgba(40,34,22,.95) 0%,rgba(12,10,8,.92) 100%);
+      color:var(--eval-gold);
+      font-family:"Outfit",sans-serif;
+      font-weight:700;
+      padding:.55rem .75rem;border-radius:.55rem;
+    }
+    .eval-dex-modal .eval-dex-load:hover{
+      filter:brightness(1.08);
+      border-color:rgba(232,197,71,.58);
+      color:#fff4cc;
+    }
+    .eval-dex-err-msg{color:#f0a898;margin-left:1rem;margin-right:1rem}
+    #result{
+      overflow-anchor:none;
+    }
+    @media(max-width:760px){
+      .eval-dex-body{
+        grid-template-columns:1fr;
+        min-height:auto;
+      }
+      .eval-dex-topbar{
+        grid-template-columns:1fr;
+        justify-items:center;
+        text-align:center;
+        gap:.85rem;
+        padding:.75rem .85rem 1rem .85rem;
+      }
+      .eval-dex-all-dogs{justify-self:center}
+      .eval-dex-brand{
+        flex-wrap:wrap;
+        justify-content:center;
+        gap:.65rem .85rem;
+        max-width:100%;
+      }
+      .eval-dex-brand-logo{width:min(320px,90vw);max-height:88px}
+      .eval-dex-reg-meta{
+        justify-self:center;
+        text-align:center;
+        max-width:100%;
+        font-size:.7rem;
+        padding:0 .5rem;
+      }
+      .eval-dex-sort-label{justify-content:center}
+      .eval-dex-sort-select{width:100%;max-width:100%}
+      .eval-dex-toolbar{flex-direction:column;align-items:stretch;padding:.65rem .85rem}
+      .eval-dex-modal.eval-modal{
+        width:min(960px,calc(100vw - 16px));
+        max-height:min(92vh,100dvh - 12px);
+      }
+      .eval-dex-inner.eval-modal-inner{padding-bottom:.85rem}
+      .eval-dex-body{padding:0 .65rem .75rem;gap:1rem}
+      .eval-dex-grid-wrap{
+        padding:.75rem .8rem;
+        max-height:min(56vh,520px);
+      }
+      .eval-dex-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.78rem;
+        padding:.45rem .35rem .55rem;
+        max-height:min(54vh,500px);
+      }
+      .eval-dex-cell{border-radius:.52rem;border-width:2px}
+      .eval-dex-cell-badge{font-size:.72rem;padding:.14rem .32rem;top:4px;left:4px}
+      .eval-dex-cell-slot-num{font-size:.7rem;bottom:5px;font-weight:800}
+    }
+    @media(max-width:760px) and (min-width:540px){
+      .eval-dex-grid{
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:.72rem;
+      }
     }
   </style>
 </head>
@@ -852,7 +1784,7 @@
       <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
       <li><a href="../services.html" class="nav-link">Services</a></li>
       <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
-      <li><a href="../community-suggestions.html" class="nav-link">Community suggestions</a></li>
+      <li><a href="../voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="../contact.html" class="nav-link">Connect</a></li>
     </ul>
   </nav>
@@ -861,23 +1793,52 @@
     <section class="section dd-eval-page">
       <div class="eval-shell">
 
-        <div class="eval-tip-bar eval-glass-panel" role="region" aria-label="Support the evaluator">
-          <span class="eval-tip-heart" aria-hidden="true">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-          </span>
-          <span class="eval-tip-text">Enjoyed the evaluator?</span>
-          <button type="button" class="eval-tip-cta" id="evalTipCta" aria-haspopup="dialog" aria-controls="evalTipModal">Leave a Tip →</button>
-        </div>
-
-        <div class="eval-title-card eval-glass-panel eval-block-card" role="group" aria-labelledby="evalMainTitle">
+        <div class="eval-hero eval-glass-panel eval-block-card eval-lift-hover" id="evalHero">
           <div class="eval-intro">
-            <p class="eval-overline">Doginal Dogs</p>
+            <div class="eval-hero-tip">
+              <button type="button" class="eval-hero-tip-chip" id="evalHeroTipCta" aria-haspopup="dialog" aria-controls="evalTipModal">
+                <span class="eval-hero-tip-chip-muted">Enjoyed the evaluator?</span>
+                <span class="eval-hero-tip-chip-sep" aria-hidden="true"></span>
+                <span class="eval-hero-tip-chip-cta">Leave a Tip →</span>
+              </button>
+            </div>
+            <p class="eval-overline eval-hero-brand">DOGINAL DOGS</p>
             <h1 class="eval-title" id="evalMainTitle">Price Evaluator</h1>
             <p class="eval-subtitle">Trait-weighted valuation powered by live market data</p>
           </div>
+          <div class="eval-hero-divider" aria-hidden="true"></div>
+          <div class="eval-auth-bar" id="evalAuthBar">
+            <p class="eval-auth-bar-msg" id="evalAuthLabel">Log in (free) to sync your DogiDex. Upgrade to Plus for unlimited valuations and wallet estimates.</p>
+            <div class="eval-auth-bar-actions">
+              <span id="evalAuthGuestRow">
+                <button type="button" class="eval-auth-btn" id="evalAuthLoginBtn">Member log in</button>
+                <button type="button" class="eval-unlock-btn" id="evalUnlockPlusBtn">Unlock Plus — unlimited &amp; wallet</button>
+              </span>
+              <span id="evalAuthUserRow" hidden>
+                <span class="eval-auth-email" id="evalAuthEmail" title=""></span>
+                <span id="evalSubBadge" class="eval-sub-badge" hidden aria-label="Subscription status">Plus active</span>
+                <button type="button" class="eval-unlock-btn" id="evalUnlockPlusLoggedBtn" hidden>Upgrade to Plus</button>
+                <button type="button" class="eval-auth-btn" id="evalManageBillingBtn" hidden>Renew Plus</button>
+                <button type="button" class="eval-auth-btn" id="evalAuthLogoutBtn">Log out</button>
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div class="eval-market-pulse eval-glass-panel" id="marketPulse">
+        <div class="eval-dex-spotlight eval-glass-panel eval-block-card eval-lift-hover">
+          <div class="eval-dex-spotlight-inner">
+            <div class="eval-dex-spotlight-copy">
+              <p class="eval-overline">Included with every account</p>
+              <p class="eval-dex-spotlight-desc">Your personal shelf of evaluated dogs &mdash; sorted by recency or rarity. Free when you sign in; evaluations you run here are saved automatically.</p>
+            </div>
+            <div class="eval-dex-spotlight-cta">
+              <img src="../assets/DogiDexLogo.png" alt="DogiDex" class="eval-dex-spotlight-logo" width="400" height="120" decoding="async" onerror="this.onerror=null;this.src='../assets/Kush.png'" />
+              <button type="button" class="eval-dex-spotlight-btn" id="evalDexSpotlightBtn" aria-haspopup="dialog" aria-controls="evalDexDialog">Open DogiDex</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="eval-market-pulse eval-glass-panel eval-lift-hover" id="marketPulse">
           <p class="eval-mp-kicker">Market pulse</p>
           <h2 class="eval-mp-title">Market Pulse &mdash; Current Floor Listings + Top Sales</h2>
           <p class="eval-mp-sub">Tap any dog to inspect it in the evaluator.</p>
@@ -893,13 +1854,14 @@
           </div>
         </div>
 
-        <div class="eval-search-card eval-glass-panel eval-block-card" role="search" aria-label="Inscription, rank, or wallet lookup">
+        <div class="eval-search-card eval-glass-panel eval-block-card eval-lift-hover" role="search" aria-label="Inscription, rank, or wallet lookup">
         <div class="eval-mode-toggle" role="tablist" aria-label="Search mode">
           <button type="button" class="eval-mode-btn active" data-mode="inscription" role="tab" aria-selected="true">Inscription #</button>
           <button type="button" class="eval-mode-btn" data-mode="rank" role="tab" aria-selected="false">Rarity Rank</button>
           <button type="button" class="eval-mode-btn" data-mode="wallet" role="tab" aria-selected="false">Wallet Address</button>
         </div>
-        <div id="modeHint" class="eval-mode-hint" style="display:none">Rank search uses your local scraped index to map rank to dog number.</div>
+        <p class="eval-mode-hint" id="evalFreeTierHint" style="display:block;margin:0">Free guests: 2 inscription valuations and 1 rarity valuation per UTC day at your IP. Wallet estimates require Plus.</p>
+        <div id="modeHint" class="eval-mode-hint" style="display:none"></div>
 
         <form id="searchForm" class="eval-form">
           <div class="eval-input-wrap">
@@ -911,7 +1873,7 @@
         </form>
         </div>
 
-        <div class="eval-kennel eval-glass-panel" id="kennelRoot" role="region" aria-roledescription="carousel" aria-label="KennelDAO" aria-live="polite">
+        <div class="eval-kennel eval-glass-panel eval-lift-hover" id="kennelRoot" role="region" aria-roledescription="carousel" aria-label="KennelDAO" aria-live="polite">
           <div class="eval-kennel-inner" id="kennelViewport">
             <div class="eval-kennel-track" id="kennelTrack" style="display:flex;transition:transform .35s ease;will-change:transform"></div>
           </div>
@@ -921,32 +1883,69 @@
         <div id="status" class="eval-status"></div>
         <div id="result"></div>
 
-        <details class="eval-disclaimer">
+        <details class="eval-disclaimer eval-lift-hover">
           <summary>How This Works &mdash; Methodology &amp; Disclaimer</summary>
           <div class="eval-disclaimer-body">
-            <h4>How the estimate is calculated</h4>
+            <h4>Data source</h4>
+            <p>Estimates use a <strong>market snapshot</strong> from Doginal Dogs listings and recent sales (refreshed on a timer, typically every ~12 hours). Live prints can move between refreshes, so numbers are a model output on that snapshot, not a live order book.</p>
+
+            <h4>Step 1 &mdash; Per-trait blend (used inside the anchor)</h4>
+            <p>For each trait value we combine <strong>listing floor</strong> and <strong>sale comps</strong> into one <strong>blended</strong> anchor price: mostly floor-weighted when both exist, with sale depth nudging the weight; top sales can only lift the blend so far unless there is enough trade history. It is <strong>not</strong> simply &ldquo;max of floor and last sale.&rdquo;</p>
+
+            <h4>Step 2 &mdash; Compound base (max of the rarest layers)</h4>
             <ul>
-              <li><strong>Rarest trait drives the base price.</strong> We identify the trait with the lowest count out of 10,000 dogs. Its listing floor or top sale price (whichever is higher) becomes the starting point.</li>
-              <li><strong>Other rare traits add a bonus.</strong> If a secondary trait (count &le; 500) has a higher sale or floor than the base, 20% of the difference is added as a trait bonus.</li>
-              <li><strong>Rarity rank multiplier.</strong> The dog&rsquo;s overall rarity rank applies a multiplier: top 1% &rarr; 1.5&times;, top 5% &rarr; 1.25&times;, top 15% &rarr; 1.1&times;, top 25% &rarr; 1.05&times;.</li>
-              <li><strong>Trending multiplier.</strong> Traits seeing high current demand (like Wizard, Beret, Suit) get an additional boost.</li>
-              <li><strong>Own sale history.</strong> If this specific dog has sold recently, its sale price acts as a floor&mdash;the estimate won&rsquo;t go below it.</li>
-              <li><strong>Collection floor guarantee.</strong> No dog is ever estimated below the collection floor price.</li>
-              <li><strong>Refused community offers.</strong> When a minimum refused offer is recorded for a dog (in USD, converted live to DOGE), the estimate won&rsquo;t go below that amount. The evaluator shows it as Refused Community Offer Floor.</li>
+              <li>We take non-synthetic traits with a known count of <strong>&le; 2,500</strong> out of 10,000, sort from <strong>rarest upward</strong>, and keep the <strong>top three</strong>.</li>
+              <li>We compute the blended price above for <strong>each</strong> of those layers.</li>
+              <li><strong>Base price</strong> = the <strong>maximum</strong> of those blends, so a strong market on one layer (e.g. Shiba) is not ignored just because another layer is numerically rarer (e.g. Poncho).</li>
+              <li><strong>Thin-market nudge:</strong> If the layer that <strong>wins</strong> that max has <strong>&lt; 100</strong> supply and the snapshot shows <strong>no listings and no sales</strong> for that value, base is multiplied by <strong>1.08</strong>. If there is still no numeric base, we may seed from the <strong>collection floor</strong> &times; 1.08 when the overall rarest layer qualifies the same way.</li>
             </ul>
 
-            <h4>Sale price attribution</h4>
-            <p>When a dog sells, the sale is attributed to its traits. To prevent common traits from being inflated by a rare dog&rsquo;s sale, we apply tiered caps:</p>
+            <h4>Step 3 &mdash; This dog&rsquo;s own sale</h4>
+            <p>If this dog appears in <strong>recent sales</strong> in the snapshot, that sale price is merged into base with <strong>max(blend base, own sale)</strong> before bonuses, so realized demand for <em>this</em> inscription lifts the anchor.</p>
+
+            <h4>Step 4 &mdash; Trait bonus (stacking beyond the anchor)</h4>
+            <p>Traits that are <strong>not</strong> in the three-layer compound anchor, have count <strong>&le; 500</strong>, and show a <strong>top sale or floor</strong> above the current base add <strong>20%</strong> of the difference, each. (So the anchor layers are not double-counted here.)</p>
+
+            <h4>Step 5 &mdash; Core estimate</h4>
+            <p><strong>(Base + trait bonus) &times; rarity rank multiplier &times; trending multiplier.</strong> Rarity uses overall rank bands: top 1% &rarr; 1.5&times;, top 5% &rarr; 1.25&times;, top 15% &rarr; 1.1&times;, top 25% &rarr; 1.05&times;. Trending uses the strongest <strong>admin-configured</strong> trait demand multiplier that applies to this dog.</p>
+            <p>If there is no usable base at all, we fall back to the <strong>average of available per-trait listing floors</strong>, then apply rarity and trending the same way.</p>
+
+            <h4>Step 6 &mdash; Floors and scarcity bump</h4>
             <ul>
-              <li><strong>Ultra-rare traits</strong> (count &le; 100, plus Diamond &amp; Shiny): full sale price attributed.</li>
-              <li><strong>Moderately rare traits</strong> (count 101&ndash;500): capped at 2&times; the median sale or the listing floor.</li>
-              <li><strong>Common traits</strong> (count &gt; 500): capped at the median sale price.</li>
+              <li><strong>Collection floor:</strong> the estimate is not left <strong>below</strong> the collection listing floor.</li>
+              <li><strong>Many thin trait books:</strong> if <strong>three or more</strong> trait values have <strong>zero listings and zero sales</strong> in the snapshot, the estimate is multiplied by <strong>1.15</strong> (illiquidity / thin-tape adjustment).</li>
             </ul>
 
-            <h4>What this can&rsquo;t measure</h4>
-            <p>Market sentiment, hype cycles, community attachment, and &ldquo;grail&rdquo; status are real factors that move prices&mdash;but they&rsquo;re extremely difficult to quantify in code. A dog might sell for multiples of its estimated value because a collector simply <em>wants</em> it, or sit unsold below estimate because the market is quiet.</p>
+            <h4>Step 7 &mdash; Optional multipliers (when they apply)</h4>
+            <ul>
+              <li><strong>True 1/1 traits</strong> (or configured display overrides): <strong>3&times;</strong> on the running estimate.</li>
+              <li><strong>Color harmony:</strong> when the same color theme shows across <strong>two or more</strong> layers, an admin-set multiplier applies (Black Classic dogs skip double-counting with a black color match).</li>
+              <li><strong>Minimal / aesthetic tiers:</strong> e.g. ultra-clean, minimal, visor-minimal, black classic (configurable in admin).</li>
+              <li><strong>Custom combos:</strong> admin-defined trait combinations can multiply the result (multiple matches multiply together).</li>
+              <li><strong>Angel / vanity dog numbers:</strong> quad or triple repeaters and listed trend numbers (configurable caps).</li>
+            </ul>
 
-            <p class="accent"><strong>&#9888; This tool provides a data-driven estimate, not financial advice.</strong> Actual sale prices depend on buyer demand, timing, and market conditions that no algorithm can fully capture. Always do your own research before buying or selling.</p>
+            <h4>Step 8 &mdash; Community floors and lore</h4>
+            <ul>
+              <li><strong>Refused community offer floor:</strong> when a minimum refused offer is recorded (USD converted live to DOGE), the <strong>final</strong> estimate is not left below that floor.</li>
+              <li><strong>Community lore:</strong> when a lore entry carries a signed price multiplier, it adjusts the estimate after the steps above.</li>
+            </ul>
+
+            <h4>Listing vs estimate</h4>
+            <p>If the dog is listed, we may show ask vs estimate (undervalued / fair / overpriced). That verdict is <strong>for display</strong>; it does not change the model estimate.</p>
+
+            <h4>Sale price attribution (per trait, for comps)</h4>
+            <p>When building each trait&rsquo;s comp stats, attributed top sales are <strong>capped</strong> so one grail sale does not paint an entire common trait:</p>
+            <ul>
+              <li><strong>Ultra-rare</strong> (count &le; 100, plus Diamond &amp; Shiny): full attributed sale.</li>
+              <li><strong>Moderately rare</strong> (101&ndash;500): capped at about <strong>2&times;</strong> the trait&rsquo;s median sale or the listing floor, whichever helps more.</li>
+              <li><strong>Common</strong> (&gt; 500): capped toward the trait&rsquo;s <strong>median</strong> sale.</li>
+            </ul>
+
+            <h4>What this still can&rsquo;t measure</h4>
+            <p>Sentiment, hype, personal taste, and &ldquo;grail&rdquo; narratives move prices in ways no snapshot model fully captures. Use this as one structured view of the tape, not a price guarantee.</p>
+
+            <p class="accent"><strong>&#9888; This tool provides a data-driven estimate, not financial advice.</strong> Actual sales depend on buyers, timing, and conditions the model does not see. Do your own research before buying or selling.</p>
           </div>
         </details>
 
@@ -960,6 +1959,10 @@
         <div class="footer-links">
           <a href="https://doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Doginal Dogs</a>
           <a href="https://market.doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Marketplace</a>
+          <a href="../pricing.html" class="footer-link">Pricing</a>
+          <a href="../legal/terms-of-service.html" class="footer-link">Terms</a>
+          <a href="../legal/privacy-policy.html" class="footer-link">Privacy</a>
+          <a href="../legal/refund-policy.html" class="footer-link">Refunds</a>
         </div>
         <p class="footer-copy">&copy; 2026 KushMetaX. All rights reserved.</p>
       </div>
@@ -998,13 +2001,250 @@
           <button type="button" class="eval-tip-copy" data-copy="D7G5HNDjvbSjxo5tGa9KA4GNtAXfBpipvi">Copy</button>
         </li>
       </ul>
+      <div class="eval-tip-x-wrap">
+        <p class="eval-tip-x-legend">After you tip <span class="eval-tip-x-hint eval-tip-x-legend-tag">(optional)</span></p>
+        <fieldset class="eval-tip-x-fieldset">
+          <legend class="visually-hidden">Giveaway and privacy</legend>
+          <label class="eval-tip-x-radio-label">
+            <input type="radio" name="eval-tip-privacy" value="share" id="evalTipPrivacyShare" checked>
+            <span>Share my X @ for giveaways &amp; shout-outs</span>
+          </label>
+          <label class="eval-tip-x-radio-label">
+            <input type="radio" name="eval-tip-privacy" value="anon" id="evalTipPrivacyAnon">
+            <span>Stay anonymous — don’t save my handle</span>
+          </label>
+        </fieldset>
+        <div class="eval-tip-x-fields" id="evalTipXFields">
+          <label class="eval-tip-x-label" for="evalTipXHandle">
+            Your X handle
+            <span class="eval-tip-x-hint">We only store this if you submit it below.</span>
+          </label>
+          <div class="eval-tip-x-row">
+            <span class="eval-tip-x-at" aria-hidden="true">@</span>
+            <input type="text" id="evalTipXHandle" class="eval-tip-x-input" name="x-handle" autocomplete="username"
+              maxlength="15" placeholder="yourhandle" spellcheck="false" inputmode="text" aria-describedby="evalTipXMsg">
+            <button type="button" class="eval-tip-x-save" id="evalTipXSave">Submit handle</button>
+          </div>
+        </div>
+        <p class="eval-tip-x-anon-note" id="evalTipXAnonNote" hidden>Thanks — we won’t store an X handle. Your on-chain tip already stays between you and your wallet.</p>
+        <p class="eval-tip-x-msg" id="evalTipXMsg" hidden role="status" aria-live="polite"></p>
+      </div>
       <p class="eval-tip-modal-footer">Seriously, thank you. 🐳</p>
     </div>
   </div>
 
+  <dialog class="eval-modal" id="evalSubscribeDialog" aria-labelledby="evalSubscribeTitle">
+    <div class="eval-modal-inner">
+      <button type="button" class="eval-modal-close" id="evalSubscribeDialogClose" aria-label="Close">&times;</button>
+      <h2 class="eval-modal-title" id="evalSubscribeTitle">DD Evaluator Plus</h2>
+      <p class="eval-modal-meta" style="font-size:.86rem;line-height:1.5;color:#b8b3aa;margin:0 0 .75rem">
+        Unlimited inscription &amp; rarity valuations and wallet portfolio estimates on your KushMedia account.
+        DogiDex stays free &mdash; sign in to sync your collection. Pay with cryptocurrency (BTC, ETH, SOL, DOGE via our payment processor); access extends for the prepaid period after the payment is confirmed.
+      </p>
+      <div id="evalSubscribeGuestEmailWrap" class="eval-modal-fields" style="margin:.35rem 0 .6rem;display:none">
+        <label style="display:block;margin:0;font-size:.84rem;line-height:1.35;color:#c9c4bc">Your email <span style="opacity:.72">(must match your KushMetaX account)</span>
+          <input type="email" id="evalSubscribeGuestEmail" autocomplete="email" placeholder="you@domain.com"
+            style="width:100%;margin-top:.35rem;padding:.45rem .55rem;border-radius:8px;border:1px solid #3a3935;background:#171614;color:#eee;font-size:.95rem" />
+        </label>
+      </div>
+      <div id="evalSubscribePlanStep">
+        <label style="display:block;margin:.25rem 0 .5rem;font-size:.84rem;line-height:1.35;color:#c9c4bc">Pay with
+          <select id="evalPayCurrencySelect" style="width:100%;margin-top:.35rem;padding:.45rem .55rem;border-radius:8px;border:1px solid #3a3935;background:#171614;color:#eee;font-size:.95rem">
+            <option value="btc">BTC</option>
+            <option value="eth">ETH</option>
+            <option value="sol">SOL</option>
+            <option value="doge">DOGE</option>
+          </select>
+        </label>
+        <div style="display:flex;flex-direction:column;gap:.55rem;margin-top:.5rem">
+          <button type="button" class="eval-btn eval-modal-submit" id="evalCheckoutMonthBtn">Prepay 1 month (USD price)</button>
+          <button type="button" class="eval-auth-btn" style="width:100%" id="evalCheckoutYearBtn">Prepay 1 year — best value</button>
+        </div>
+      </div>
+      <div id="evalSubscribePayStep" style="display:none;margin-top:.65rem">
+        <p class="eval-modal-meta" style="margin:0 0 .55rem;font-size:.85rem;line-height:1.45;color:#c9c4bc">
+          Send exactly <strong id="evalCryptoAmountStrong" translate="no">—</strong> <span id="evalCryptoCurrencyLabel"></span> to:
+        </p>
+        <div style="display:flex;gap:.4rem;align-items:flex-start;flex-wrap:wrap">
+          <code id="evalCryptoPayAddress" translate="no" style="flex:1;min-width:12rem;word-break:break-all;font-size:.82rem;padding:.45rem;border-radius:8px;background:#0f0e0c;border:1px solid #3a3935;color:#e8e4dc"></code>
+          <button type="button" class="eval-auth-btn" id="evalCryptoCopyAddrBtn" style="flex-shrink:0">Copy address</button>
+        </div>
+        <p class="eval-modal-meta" style="margin:.55rem 0 0;font-size:.78rem;color:#8a857c">Payment ID: <code id="evalCryptoPaymentIdEl" translate="no">—</code></p>
+        <div style="display:flex;flex-direction:column;gap:.45rem;margin-top:.75rem">
+          <button type="button" class="eval-btn eval-modal-submit" id="evalCryptoRefreshBtn">I paid — refresh status</button>
+          <button type="button" class="eval-auth-btn" style="width:100%" id="evalSubscribeBackBtn">Back to plans</button>
+        </div>
+      </div>
+      <p class="eval-modal-auth-hint" style="margin-top:.9rem"><strong>Same email as your KushMedia account</strong> — if you pay before registering, create your account with this email so Plus unlocks.</p>
+      <p class="eval-auth-msg" id="evalSubscribeErr" aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <dialog class="eval-modal" id="evalAuthDialog" aria-labelledby="evalAuthDialogTitle">
+    <div class="eval-modal-inner">
+      <button type="button" class="eval-modal-close" id="evalAuthDialogClose" aria-label="Close">&times;</button>
+      <h2 class="eval-modal-title" id="evalAuthDialogTitle">Log in</h2>
+      <div class="eval-modal-panel" id="evalAuthPanelLogin">
+        <form class="eval-modal-fields" id="evalLoginForm" autocomplete="on">
+          <label>Email<input type="email" name="email" required autocomplete="username"></label>
+          <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+          <button type="submit" class="eval-btn eval-modal-submit">Log in</button>
+        </form>
+        <div class="eval-modal-links">
+          <button type="button" id="evalShowRegister">Create account</button>
+          <button type="button" id="evalShowForgot">Forgot password?</button>
+        </div>
+        <p class="eval-auth-msg" id="evalAuthMsgLogin" aria-live="polite"></p>
+      </div>
+      <div class="eval-modal-panel" id="evalAuthPanelRegister" hidden>
+        <form class="eval-modal-fields" id="evalRegisterForm" autocomplete="on">
+          <label>Email<input type="email" name="email" required autocomplete="username"></label>
+          <label>Password<input type="password" name="password" required autocomplete="new-password" minlength="8"></label>
+          <p class="eval-modal-auth-hint">Choose a secure password &mdash; <strong>KushMedia SQLite accounts</strong> use Argon2id hashing.</p>
+          <button type="submit" class="eval-btn eval-modal-submit">Create account</button>
+        </form>
+        <div class="eval-modal-links"><button type="button" id="evalShowLoginFromRegister">Already have an account?</button></div>
+        <p class="eval-auth-msg" id="evalAuthMsgRegister" aria-live="polite"></p>
+      </div>
+      <div class="eval-modal-panel" id="evalAuthPanelForgot" hidden>
+        <p class="eval-modal-meta" style="font-size:.82rem;color:#9a958c;margin:0 0 .85rem">We will email a reset code if this address is registered.</p>
+        <form class="eval-modal-fields" id="evalForgotForm">
+          <label>Email<input type="email" name="email" required autocomplete="username"></label>
+          <button type="submit" class="eval-btn eval-modal-submit">Send code</button>
+        </form>
+        <div class="eval-modal-links"><button type="button" id="evalShowResetFromForgot">I have a code</button></div>
+        <p class="eval-auth-msg" id="evalAuthMsgForgot" aria-live="polite"></p>
+      </div>
+      <div class="eval-modal-panel" id="evalAuthPanelReset" hidden>
+        <form class="eval-modal-fields" id="evalResetForm" autocomplete="on">
+          <label>Email<input type="email" name="email" required autocomplete="username"></label>
+          <label>Reset code<input type="text" name="code" required autocomplete="one-time-code"></label>
+          <label>New password<input type="password" name="password" required autocomplete="new-password" minlength="8"></label>
+          <button type="submit" class="eval-btn eval-modal-submit">Update password</button>
+        </form>
+        <div class="eval-modal-links"><button type="button" id="evalShowLoginFromReset">Back to log in</button></div>
+        <p class="eval-auth-msg" id="evalAuthMsgReset" aria-live="polite"></p>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="eval-modal eval-dex-modal" id="evalDexDialog" aria-labelledby="evalDexDialogTitle">
+    <div class="eval-modal-inner eval-dex-inner">
+      <button type="button" class="eval-modal-close eval-dex-close" id="evalDexDialogClose" aria-label="Close">&times;</button>
+      <header class="eval-dex-topbar">
+        <span class="eval-dex-all-dogs">ALL DOGS</span>
+        <div class="eval-dex-brand">
+          <img src="../assets/DogiDexLogo.png" alt="DogiDex" class="eval-dex-brand-logo" id="evalDexDialogTitle" width="400" height="120" decoding="async" onerror="this.onerror=null;this.src='../assets/Kush.png'" />
+        </div>
+        <div class="eval-dex-reg-meta" id="evalDexRegMeta"></div>
+      </header>
+      <p class="eval-dex-subbar" id="evalDexSortLine">Loading…</p>
+      <div class="eval-dex-progress-wrap" aria-hidden="true"><div class="eval-dex-progress-bar" id="evalDexProgressBar"></div></div>
+      <div class="eval-dex-toolbar" id="evalDexToolbar">
+        <label class="eval-dex-sort-label" for="evalDexSortMode">Order
+          <select id="evalDexSortMode" class="eval-dex-sort-select">
+            <option value="collection">Collection number (inscription slot)</option>
+            <option value="recent">Recently searched</option>
+            <option value="rarity">Rarity rank (1 = rarest)</option>
+          </select>
+        </label>
+      </div>
+      <div class="eval-dex-body">
+        <div class="eval-dex-grid-wrap">
+          <div class="eval-dex-grid" id="evalDexGrid"></div>
+        </div>
+        <aside class="eval-dex-detail" aria-label="Selected dog traits and lore">
+          <div class="eval-dex-detail-body" id="evalDexDetailBody">
+            <div class="eval-dex-detail-ph" id="evalDexDetailPlaceholder">Select an inscription on the left to view traits and community lore.</div>
+          </div>
+        </aside>
+      </div>
+      <p class="eval-auth-msg eval-dex-err-msg" id="evalDexErr" aria-live="polite"></p>
+    </div>
+  </dialog>
+
   <script src="../brand.js"></script>
+  <!-- emailRedirectUrl: public base URL for auth emails (magic link, confirm, recover). Must match Supabase Redirect URLs. Without it, localhost dev leaks into those links. -->
+  <script>
+    window.__DOGIDEX_SUPABASE__ = Object.assign(
+      {
+        url: 'https://tblktaifczarnesqucwz.supabase.co',
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRibGt0YWlmY3phcm5lc3F1Y3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NzQzNjcsImV4cCI6MjA5MzA1MDM2N30.Y0dXaaTo-k-i77IVMUQGOHfRpG77mHYdVm7mQiR7Zy8',
+        emailRedirectUrl: 'https://kushmedia.xyz/dd-evaluator'
+      },
+      window.__DOGIDEX_SUPABASE__ || {}
+    );
+  </script>
+  <script src="dogidex-supabase.js"></script>
+  <script>
+    (function () {
+      try {
+        if (window.DogidexSupabase && typeof window.DogidexSupabase.consumeAuthRedirectFromUrl === 'function') {
+          window.DogidexSupabase.consumeAuthRedirectFromUrl();
+        }
+      } catch (_e) {}
+    })();
+  </script>
   <script>
     const API_BASE = window.location.origin;
+    /** Try `/dd-evaluator/auth` first on APISIX + LiteSpeed stacks that 503 `/kmx-auth` POST; see server `app.use('/dd-evaluator/auth', ...)`. */
+    var KMX_AUTH_PREFIX_STORAGE_KEY = 'dogidex_kmx_auth_prefix_v1';
+    var kmxAuthActivePrefix = '/dd-evaluator/auth';
+    (function hydrateKmxAuthPrefix() {
+      try {
+        var s = sessionStorage.getItem(KMX_AUTH_PREFIX_STORAGE_KEY);
+        if (s && typeof s === 'string') {
+          var t = s.trim().replace(/\/+$/, '');
+          if (t) kmxAuthActivePrefix = t;
+        }
+      } catch (_h) {}
+    })();
+
+    function rememberWorkingKmxAuthPrefix(prefix) {
+      var p = String(prefix || '').trim().replace(/\/+$/, '');
+      if (!p) return;
+      kmxAuthActivePrefix = p;
+      try {
+        sessionStorage.setItem(KMX_AUTH_PREFIX_STORAGE_KEY, p);
+      } catch (_s) {}
+    }
+
+    function kmxAuthPrefixCandidateList() {
+      var cfg =
+        typeof window.__KMX_AUTH_BASE__ === 'string'
+          ? window.__KMX_AUTH_BASE__.trim().replace(/\/+$/, '')
+          : '';
+      var defaults = ['/dd-evaluator/auth', '/kmx-auth', '/kk-auth'];
+      var ordered = [kmxAuthActivePrefix, cfg].concat(defaults);
+      var seen = {};
+      return ordered.filter(function(x) {
+        if (!x || seen[x]) return false;
+        seen[x] = true;
+        return true;
+      });
+    }
+
+    function authApi(suffix) {
+      return API_BASE + kmxAuthActivePrefix + suffix;
+    }
+
+    function parseAuthJsonResponse(res, txt) {
+      try {
+        var data = txt && txt.trim() ? JSON.parse(txt) : null;
+        return { ok: res.ok, status: res.status, data: data, nonJson: false };
+      } catch (_parse) {
+        return {
+          ok: res.ok,
+          status: res.status,
+          data: { error: 'bad_json', raw: String(txt || '').slice(0, 200) },
+          nonJson: true,
+        };
+      }
+    }
+
+    function dogidexUseSupabase() {
+      return window.DogidexSupabase && typeof window.DogidexSupabase.configured === 'function' && window.DogidexSupabase.configured();
+    }
 
     const form     = document.getElementById('searchForm');
     const input    = document.getElementById('dogInput');
@@ -1058,11 +2298,1329 @@
         applySearchMode();
         syncModeTabs();
         input.value = '';
-        input.focus();
+        try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
       });
     });
     applySearchMode();
     syncModeTabs();
+
+    /* ---------- KushMetaX account + DogiDex ---------- */
+    var authSession = null;
+
+    var evalAuthGuestRow = document.getElementById('evalAuthGuestRow');
+    var evalAuthUserRow = document.getElementById('evalAuthUserRow');
+    var evalAuthEmail = document.getElementById('evalAuthEmail');
+    var evalAuthLoginBtn = document.getElementById('evalAuthLoginBtn');
+    var evalUnlockPlusBtn = document.getElementById('evalUnlockPlusBtn');
+    var evalUnlockPlusLoggedBtn = document.getElementById('evalUnlockPlusLoggedBtn');
+    var evalSubBadge = document.getElementById('evalSubBadge');
+    var evalManageBillingBtn = document.getElementById('evalManageBillingBtn');
+    var evalFreeTierHint = document.getElementById('evalFreeTierHint');
+    var evalAuthLogoutBtn = document.getElementById('evalAuthLogoutBtn');
+    var evalDexSpotlightBtn = document.getElementById('evalDexSpotlightBtn');
+    var evalAuthDialog = document.getElementById('evalAuthDialog');
+    var evalAuthDialogClose = document.getElementById('evalAuthDialogClose');
+    var evalAuthPanelLogin = document.getElementById('evalAuthPanelLogin');
+    var evalAuthPanelRegister = document.getElementById('evalAuthPanelRegister');
+    var evalAuthPanelForgot = document.getElementById('evalAuthPanelForgot');
+    var evalAuthPanelReset = document.getElementById('evalAuthPanelReset');
+    var evalLoginForm = document.getElementById('evalLoginForm');
+    var evalRegisterForm = document.getElementById('evalRegisterForm');
+    var evalForgotForm = document.getElementById('evalForgotForm');
+    var evalResetForm = document.getElementById('evalResetForm');
+    var evalShowRegister = document.getElementById('evalShowRegister');
+    var evalShowForgot = document.getElementById('evalShowForgot');
+    var evalShowLoginFromRegister = document.getElementById('evalShowLoginFromRegister');
+    var evalShowResetFromForgot = document.getElementById('evalShowResetFromForgot');
+    var evalShowLoginFromReset = document.getElementById('evalShowLoginFromReset');
+    var evalDexDialog = document.getElementById('evalDexDialog');
+    var evalDexDialogClose = document.getElementById('evalDexDialogClose');
+    var evalDexGrid = document.getElementById('evalDexGrid');
+    var evalDexRegMeta = document.getElementById('evalDexRegMeta');
+    var evalDexSortLine = document.getElementById('evalDexSortLine');
+    var evalDexDetailBody = document.getElementById('evalDexDetailBody');
+    var evalDexProgressBar = document.getElementById('evalDexProgressBar');
+    var evalDexErr = document.getElementById('evalDexErr');
+    var evalDexSortMode = document.getElementById('evalDexSortMode');
+    var evalSubscribeDialog = document.getElementById('evalSubscribeDialog');
+    var evalSubscribeDialogClose = document.getElementById('evalSubscribeDialogClose');
+    var evalCheckoutMonthBtn = document.getElementById('evalCheckoutMonthBtn');
+    var evalCheckoutYearBtn = document.getElementById('evalCheckoutYearBtn');
+    var evalSubscribeErr = document.getElementById('evalSubscribeErr');
+    var evalSubscribePlanStep = document.getElementById('evalSubscribePlanStep');
+    var evalSubscribePayStep = document.getElementById('evalSubscribePayStep');
+    var evalPayCurrencySelect = document.getElementById('evalPayCurrencySelect');
+    var evalCryptoRefreshBtn = document.getElementById('evalCryptoRefreshBtn');
+    var evalSubscribeBackBtn = document.getElementById('evalSubscribeBackBtn');
+    var evalCryptoCopyAddrBtn = document.getElementById('evalCryptoCopyAddrBtn');
+    var cryptoCheckoutState = { paymentId: '', orderId: '' };
+
+    /** GET /kmx-auth/me JSON or null — does not touch UI (for Supabase + bridge merge). */
+    function fetchKushMePayload() {
+      return fetch(authApi('/me'), { credentials: 'include', headers: { accept: 'application/json' } })
+        .then(function(res) {
+          if (!res.ok) return null;
+          return res.json().then(function(body) {
+            if (body && body.user) return body;
+            return null;
+          });
+        })
+        .catch(function() {
+          return null;
+        });
+    }
+
+    /** Try KushMetaX cookie session without wiping a Supabase-only session UI on 401. */
+    function tryFetchKushSession() {
+      return fetchKushMePayload().then(function(body) {
+        if (body && body.user) {
+          setAuthUiFromSession(body);
+          return body;
+        }
+        return null;
+      });
+    }
+
+    function shortEmail(em) {
+      var s = String(em || '');
+      if (s.length <= 22) return s;
+      var at = s.indexOf('@');
+      if (at < 0) return s.slice(0, 18) + '…';
+      return s.slice(0, 6) + '…' + s.slice(at);
+    }
+
+    function ddPlusActive(sess) {
+      var sub = sess && sess.subscription;
+      if (!sub) return false;
+      if (sub.active === true) return true;
+      if (sub.complimentary === true) return true;
+      return !!sub.active;
+    }
+
+    /** Keeps Supabase user (UUID) for DogiDex Postgres; attaches SQLite subscription + paywall state from /me when bridged. */
+    function mergeSupabaseWithKush(sb, kush) {
+      if (!sb || !sb.user) return sb;
+      if (kush && kush.subscription) {
+        sb.subscription = kush.subscription;
+      }
+      if (kush && kush.dex) {
+        sb.dex = kush.dex;
+      }
+      return sb;
+    }
+
+    /** Supabase OAuth bridge: resolves to { ok, status, data } (always). Retries alternate URL prefixes when the edge returns HTML (503). */
+    function bridgeKushFromSupabaseAccessToken() {
+      if (!dogidexUseSupabase() || !window.DogidexSupabase || typeof window.DogidexSupabase.getAccessToken !== 'function') {
+        return Promise.resolve({ ok: false, status: 0, data: { error: 'supabase_sdk' } });
+      }
+      var tok = DogidexSupabase.getAccessToken();
+      if (!tok) {
+        return Promise.resolve({ ok: false, status: 0, data: { error: 'no_access_token' } });
+      }
+      var prefixes = kmxAuthPrefixCandidateList();
+      function attempt(i) {
+        if (i >= prefixes.length) {
+          try {
+            sessionStorage.removeItem(KMX_AUTH_PREFIX_STORAGE_KEY);
+          } catch (_cl) {}
+          kmxAuthActivePrefix = '/dd-evaluator/auth';
+          return {
+            ok: false,
+            status: 503,
+            data: { error: 'bridge_non_json_all_paths', tried: prefixes },
+          };
+        }
+        var prefix = prefixes[i];
+        return fetch(API_BASE + prefix + '/bridge-supabase-token', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ accessToken: tok }),
+        })
+          .then(function(res) {
+            return res.text().then(function(txt) {
+              return parseAuthJsonResponse(res, txt);
+            });
+          })
+          .then(function(parsed) {
+            if (parsed.nonJson) {
+              return attempt(i + 1);
+            }
+            rememberWorkingKmxAuthPrefix(prefix);
+            parsed.bridgePrefix = prefix;
+            return parsed;
+          });
+      }
+      return Promise.resolve()
+        .then(function() {
+          return attempt(0);
+        })
+        .catch(function() {
+          return { ok: false, status: 0, data: { error: 'network' } };
+        });
+    }
+
+    function dogidexLogBridgeIssue(br, note) {
+      if (br && br.ok) return;
+      try {
+        var d = (br && br.data) || {};
+        var parts = ['[DogiDex Kush bridge]'];
+        if (note) parts.push(note + ':');
+        parts.push(String(br && br.status != null ? br.status : '?'));
+        if (d.message) parts.push(String(d.message));
+        else if (d.error) parts.push(String(d.error));
+        if (d.raw) {
+          parts.push('body:' + String(d.raw).replace(/\s+/g, ' ').trim().slice(0, 160));
+        }
+        if (br && br.status === 503 && d.error === 'bad_json') {
+          parts.push(
+            'HTML response (APISIX/LiteSpeed): upstream Node returned 503 or auth paths are not proxied. Ensure routes hit Passenger for /dd-evaluator/auth/*, /kmx-auth/*, /kk-auth/* — see Network tab.'
+          );
+        } else if (d.error === 'bridge_non_json_all_paths') {
+          parts.push(
+            'All bridge paths returned HTML. APISIX must route POST to Node (check x-apisix-upstream-status). Stored auth prefix was cleared; reload after fixing routes.'
+          );
+        } else if (br && br.status === 503) {
+          parts.push('If error above mentions Supabase env: set DOGIDEX_SUPABASE_URL + DOGIDEX_SUPABASE_ANON_KEY for the Passenger app and restart.');
+        }
+        console.warn(parts.join(' '));
+      } catch (_eW) {}
+    }
+
+    /** Merges Plus/subscription onto Supabase-shaped session using bridge JSON or /me fallback. */
+    function attachKushPlusAfterBridge(sb, br) {
+      if (!sb || !sb.user) return Promise.resolve(sb);
+      if (br && br.ok && br.data && br.data.subscription) {
+        sb.subscription = br.data.subscription;
+        if (br.data.dex) sb.dex = sb.dex || br.data.dex;
+        setAuthUiFromSession(sb);
+        return Promise.resolve(sb);
+      }
+      dogidexLogBridgeIssue(br);
+      return fetchKushMePayload().then(function(inner) {
+        mergeSupabaseWithKush(sb, inner);
+        setAuthUiFromSession(sb);
+        return sb;
+      });
+    }
+
+    function dogidexAuthRedirectBonus(sb) {
+      if (!sb) return sb;
+      try {
+        if (sessionStorage.getItem('dogidex_just_redirect_auth') === '1') {
+          sessionStorage.removeItem('dogidex_just_redirect_auth');
+          if (sb.user) {
+            setTimeout(function() {
+              openDexModal();
+            }, 0);
+          }
+        }
+      } catch (_eSb) {}
+      return sb;
+    }
+
+    function setAuthUiFromSession(session) {
+      authSession = session;
+      var loggedIn = !!(session && session.user);
+      evalAuthGuestRow.hidden = loggedIn;
+      evalAuthUserRow.hidden = !loggedIn;
+      if (evalUnlockPlusBtn) evalUnlockPlusBtn.hidden = loggedIn;
+
+      var plus = ddPlusActive(session);
+
+      if (evalSubBadge) evalSubBadge.hidden = !loggedIn || !plus;
+      if (evalUnlockPlusLoggedBtn) evalUnlockPlusLoggedBtn.hidden = !loggedIn || plus;
+
+      var authLabelEl = document.getElementById('evalAuthLabel');
+      if (authLabelEl) {
+        if (!loggedIn) {
+          authLabelEl.textContent =
+            'Log in (free) to sync your DogiDex. Unlock Plus for unlimited valuations and wallet estimates — same email at checkout.';
+        } else if (plus) {
+          authLabelEl.textContent = 'Plus active — unlimited valuations and wallet estimates. DogiDex remains free on this account.';
+        } else {
+          authLabelEl.textContent =
+            'DogiDex is free while signed in. Upgrade to Plus for unlimited valuations and wallet portfolio estimates.';
+        }
+      }
+      if (evalManageBillingBtn) {
+        var canRenew = !!(session && session.subscription && session.subscription.canRenew === true);
+        var comp = !!(session && session.subscription && session.subscription.complimentary === true);
+        var plusOn = ddPlusActive(session);
+        evalManageBillingBtn.hidden = !loggedIn || !plusOn || !canRenew || comp;
+      }
+
+      var subGuestWrap = document.getElementById('evalSubscribeGuestEmailWrap');
+      if (subGuestWrap) subGuestWrap.style.display = loggedIn ? 'none' : 'block';
+
+      if (evalFreeTierHint) {
+        var showTier = !(loggedIn && plus);
+        evalFreeTierHint.style.display = showTier ? 'block' : 'none';
+      }
+
+      if (loggedIn && session.user) {
+        evalAuthEmail.textContent = shortEmail(session.user.email);
+        evalAuthEmail.title = session.user.email || '';
+      }
+    }
+
+    function authShowPanel(panelId) {
+      [evalAuthPanelLogin, evalAuthPanelRegister, evalAuthPanelForgot, evalAuthPanelReset].forEach(function(el) {
+        el.hidden = el.id !== panelId;
+      });
+      document.getElementById('evalAuthDialogTitle').textContent =
+        panelId === 'evalAuthPanelRegister' ? 'Sign up' :
+        panelId === 'evalAuthPanelForgot' ? 'Reset password' :
+        panelId === 'evalAuthPanelReset' ? 'Set new password' : 'Log in';
+    }
+
+    function authClearMsgs() {
+      ['evalAuthMsgLogin','evalAuthMsgRegister','evalAuthMsgForgot','evalAuthMsgReset'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = '';
+        if (el) el.classList.remove('ok');
+      });
+    }
+
+    function fetchAuthMeSession() {
+      return fetch(authApi('/me'), { credentials: 'include', headers: { accept: 'application/json' } })
+        .then(function(res) {
+          if (!res.ok) {
+            setAuthUiFromSession(null);
+            return null;
+          }
+          return res.json().then(function(body) {
+            if (body && body.user) {
+              setAuthUiFromSession(body);
+              return body;
+            }
+            setAuthUiFromSession(null);
+            return null;
+          });
+        });
+    }
+
+    function refreshAuthSession() {
+      if (dogidexUseSupabase()) {
+        /** Supabase-first: old km_sid-only shortcut hid Supabase login + bridge (complimentary Plus). */
+        return DogidexSupabase.refreshAuthSession()
+          .then(function(sb) {
+            if (sb && sb.user) {
+              return bridgeKushFromSupabaseAccessToken()
+                .then(function(br) {
+                  return attachKushPlusAfterBridge(sb, br).then(dogidexAuthRedirectBonus);
+                })
+                .catch(function() {
+                  setAuthUiFromSession(sb);
+                  return dogidexAuthRedirectBonus(sb);
+                });
+            }
+            return tryFetchKushSession().then(function(km) {
+              if (km && km.user) return dogidexAuthRedirectBonus(km);
+              setAuthUiFromSession(null);
+              return null;
+            });
+          })
+          .catch(function() {
+            return tryFetchKushSession().then(function(km) {
+              if (km && km.user) return dogidexAuthRedirectBonus(km);
+              setAuthUiFromSession(null);
+              return null;
+            }).catch(function() {
+              setAuthUiFromSession(null);
+              return null;
+            });
+          });
+      }
+      return fetch(authApi('/status'), { headers: { accept: 'application/json' } })
+        .then(function(statusRes) {
+          if (statusRes.status === 404) {
+            return fetchAuthMeSession();
+          }
+          if (!statusRes.ok) {
+            setAuthUiFromSession(null);
+            return null;
+          }
+          return statusRes.json().then(function(st) {
+            if (!st || !st.sessionConfigured || !st.dbOk) {
+              setAuthUiFromSession(null);
+              return null;
+            }
+            return fetchAuthMeSession();
+          });
+        })
+        .catch(function() {
+          setAuthUiFromSession(null);
+          return null;
+        });
+    }
+
+    function dogidexNotifyIndexedDog(dogNum) {
+      var num = Math.floor(Number(dogNum));
+      if (!Number.isFinite(num) || num < 1 || num > 10000) return;
+      dogidexIndexedMap.set(num, Date.now());
+      try {
+        if (dogidexReady && evalDexDialog && evalDexDialog.open) {
+          dexSetProgressFromDex(authSession && authSession.dex ? authSession.dex : { uniqueCount: dogidexIndexedMap.size });
+          dogidexRenderGrid();
+        }
+      } catch (_e) {}
+    }
+
+    function postDexIndex(dogNum) {
+      var n = Math.floor(Number(dogNum));
+      if (!Number.isFinite(n) || n < 1 || n > 10000) return;
+      if (dogidexUseSupabase()) {
+        DogidexSupabase.postDexIndex(n).then(function(body) {
+          if (body && body.user && authSession) {
+            authSession.dex = body.dex;
+            authSession.user = authSession.user || body.user;
+          }
+          dogidexNotifyIndexedDog(n);
+        }).catch(function() {});
+        return;
+      }
+      fetch(authApi('/dex/index'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ dogNumber: n })
+      })
+        .then(function(res) {
+          if (res.status === 401) return null;
+          if (!res.ok) return null;
+          return res.json();
+        })
+        .then(function(body) {
+          if (body && body.uniqueCount != null && authSession && authSession.user) {
+            authSession.dex = {
+              uniqueCount: body.uniqueCount,
+              tier: body.tier,
+              rankTitle: body.rankTitle
+            };
+          }
+          dogidexNotifyIndexedDog(n);
+        })
+        .catch(function() {});
+    }
+
+    var DOGIDEX_SCROLL_BATCH = 96;
+    var dogidexIndexedMap = new Map();
+    var dogidexDogsByRarity = null;
+    var dogidexRankLoadFailed = false;
+    var dogidexRarityOrderSource = '';
+    var dogidexReady = false;
+    var dogidexRenderedCount = 0;
+    var dogidexDrainGen = 0;
+    var dogidexScrollBound = false;
+    var dogidexScrollRaf = null;
+
+    function dogidexGetRecentSortedList() {
+      var arr = [];
+      dogidexIndexedMap.forEach(function(t, dog) {
+        arr.push({ dogNumber: dog, indexed_at: Number(t) || 0 });
+      });
+      arr.sort(function(a, b) {
+        return b.indexed_at - a.indexed_at;
+      });
+      return arr;
+    }
+
+    function dogidexTotalSlotsForMode() {
+      var mode = evalDexSortMode ? evalDexSortMode.value : 'collection';
+      if (mode === 'recent') return dogidexGetRecentSortedList().length;
+      if (mode === 'rarity') return dogidexDogsByRarity && dogidexDogsByRarity.length ? dogidexDogsByRarity.length : 0;
+      return 10000;
+    }
+
+    function dogidexEnsureRarityOrder() {
+      if (dogidexDogsByRarity && dogidexDogsByRarity.length) return Promise.resolve(true);
+      function applyRankMap(map) {
+        if (!map || typeof map !== 'object') return false;
+        var dogToRank = new Map();
+        Object.keys(map).forEach(function(rankStr) {
+          var rank = Number(rankStr);
+          var dog = Number(map[rankStr]);
+          if (Number.isFinite(rank) && Number.isFinite(dog)) dogToRank.set(dog, rank);
+        });
+        var dogs = [];
+        var d;
+        for (d = 1; d <= 10000; d++) dogs.push(d);
+        dogs.sort(function(a, b) {
+          var ra = dogToRank.has(a) ? dogToRank.get(a) : 999999;
+          var rb = dogToRank.has(b) ? dogToRank.get(b) : 999999;
+          return ra - rb || a - b;
+        });
+        dogidexDogsByRarity = dogs;
+        dogidexRankLoadFailed = false;
+        dogidexRarityOrderSource = 'rank-map';
+        return true;
+      }
+      function tryRankMap(i, urls) {
+        if (i >= urls.length) {
+          dogidexRankLoadFailed = true;
+          dogidexRarityOrderSource = '';
+          return Promise.resolve(false);
+        }
+        return fetch(urls[i], { headers: { accept: 'application/json' } })
+          .then(function(res) {
+            if (!res.ok) return tryRankMap(i + 1, urls);
+            return res.json().then(function(map) {
+              return applyRankMap(map) ? true : tryRankMap(i + 1, urls);
+            });
+          })
+          .catch(function() {
+            return tryRankMap(i + 1, urls);
+          });
+      }
+      var catalogUrls = [
+        API_BASE + '/api/dd-evaluator/dogidex/rarity-order',
+        '../api/dd-evaluator/dogidex/rarity-order'
+      ];
+      function tryCatalog(i) {
+        if (i >= catalogUrls.length) {
+          var rankUrls = [
+            API_BASE + '/api/data/rank-map.json',
+            '../api/data/rank-map.json'
+          ];
+          return tryRankMap(0, rankUrls);
+        }
+        return fetch(catalogUrls[i], { headers: { accept: 'application/json' } })
+          .then(function(res) {
+            if (!res.ok) return tryCatalog(i + 1);
+            return res.json().then(function(body) {
+              if (body && body.ok && Array.isArray(body.order) && body.order.length === 10000) {
+                dogidexDogsByRarity = body.order.map(Number).filter(function(n) {
+                  return Number.isFinite(n);
+                });
+                if (dogidexDogsByRarity.length !== 10000) return tryCatalog(i + 1);
+                dogidexRankLoadFailed = false;
+                dogidexRarityOrderSource = 'catalog';
+                return true;
+              }
+              return tryCatalog(i + 1);
+            });
+          })
+          .catch(function() {
+            return tryCatalog(i + 1);
+          });
+      }
+      return tryCatalog(0);
+    }
+    function dexLoadAllIndexed() {
+      dogidexIndexedMap = new Map();
+      if (dogidexUseSupabase()) {
+        return new Promise(function(resolve, reject) {
+          var limit = 500;
+          function loop(page) {
+            DogidexSupabase.dexFetchPage(page, limit).then(function(body) {
+              if (!body || !body.ok) {
+                reject(new Error('dex'));
+                return;
+              }
+              (body.entries || []).forEach(function(e) {
+                var n = e.dogNumber;
+                var t = e.indexed_at != null ? e.indexed_at : e.indexedAt;
+                if (Number.isFinite(n)) dogidexIndexedMap.set(n, t != null ? Number(t) : 0);
+              });
+              var tp = body.totalPages != null ? Number(body.totalPages) : 1;
+              var p = body.page != null ? Number(body.page) : page;
+              if (p < tp && (body.entries || []).length) loop(p + 1);
+              else resolve(dogidexIndexedMap);
+            }).catch(reject);
+          }
+          loop(1);
+        });
+      }
+      return fetch(authApi('/dex?limit=500&page=1'), {
+        credentials: 'include',
+        headers: { accept: 'application/json' }
+      })
+        .then(function(res) {
+          if (res.status === 401) throw Object.assign(new Error('401'), { status: 401 });
+          if (!res.ok) throw new Error('dex');
+          return res.json();
+        })
+        .then(function(body) {
+          if (!body || !body.ok) throw new Error('dex');
+          function ingest(entries) {
+            (entries || []).forEach(function(e) {
+              var n = e.dogNumber;
+              var t = e.indexedAt != null ? e.indexedAt : e.indexed_at;
+              if (Number.isFinite(n)) dogidexIndexedMap.set(n, t != null ? Number(t) : 0);
+            });
+          }
+          ingest(body.entries);
+          var tp = body.totalPages != null ? Number(body.totalPages) : 1;
+          if (tp <= 1) return dogidexIndexedMap;
+          var chain = Promise.resolve();
+          var p;
+          for (p = 2; p <= tp; p++) {
+            (function(pg) {
+              chain = chain.then(function() {
+                return fetch(authApi('/dex?limit=500&page=' + pg), {
+                  credentials: 'include',
+                  headers: { accept: 'application/json' }
+                }).then(function(r) {
+                  if (!r.ok) throw new Error('dex');
+                  return r.json();
+                }).then(function(b) {
+                  if (b && b.ok) ingest(b.entries);
+                });
+              });
+            })(p);
+          }
+          return chain.then(function() {
+            return dogidexIndexedMap;
+          });
+        });
+    }
+
+    function dogidexUpdateSortLine(dex) {
+      var u = dex && dex.uniqueCount != null ? Number(dex.uniqueCount) : dogidexIndexedMap.size;
+      var mode = evalDexSortMode ? evalDexSortMode.value : 'collection';
+      var parts = [];
+      parts.push(u.toLocaleString() + ' searched · full grid 10,000 slots');
+      var totalSlots = dogidexTotalSlotsForMode();
+      var shown = Math.min(dogidexRenderedCount, totalSlots);
+      if (mode === 'collection') {
+        parts.push(
+          shown < totalSlots
+            ? 'Loading grid… ' + fmt(shown) + ' / ' + fmt(totalSlots)
+            : 'All #' + fmt(1) + '–' + fmt(10000) + ' · scroll the grid'
+        );
+      } else if (mode === 'recent') {
+        if (!totalSlots) {
+          parts.push('No searches yet');
+        } else {
+          parts.push(
+            shown < totalSlots
+              ? 'Loading… ' + fmt(shown) + ' / ' + fmt(totalSlots)
+              : fmt(totalSlots) + ' dogs · newest first · scroll grid'
+          );
+        }
+      } else if (mode === 'rarity') {
+        if (!dogidexDogsByRarity || !dogidexDogsByRarity.length) {
+          parts.push(dogidexRankLoadFailed ? 'Rarity order unavailable' : 'Loading rarity order…');
+        } else {
+          var srcLabel =
+            dogidexRarityOrderSource === 'catalog'
+              ? 'DoginalDogsCatalog · '
+              : dogidexRarityOrderSource === 'rank-map'
+                ? 'rank map · '
+                : '';
+          parts.push(
+            srcLabel +
+              (shown < totalSlots
+                ? 'Loading… ' + fmt(shown) + ' / ' + fmt(totalSlots)
+                : fmt(totalSlots) + ' dogs · scroll grid')
+          );
+        }
+      }
+      if (evalDexSortLine) evalDexSortLine.textContent = parts.join(' · ');
+    }
+
+    function dogidexAppendCellForDog(dogNum, opts) {
+      opts = opts || {};
+      var indexed = dogidexIndexedMap.has(dogNum);
+      var cell;
+      if (indexed) {
+        cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'eval-dex-cell';
+        cell.setAttribute('data-dog', String(dogNum));
+        cell.setAttribute('aria-label', 'Dog inscription number ' + dogNum);
+        var img = document.createElement('img');
+        img.src = 'https://market.doginaldogs.com/dogs/' + encodeURIComponent(dogNum) + '.png';
+        img.alt = '';
+        img.loading = 'lazy';
+        cell.appendChild(img);
+        if (opts.badge || opts.forceBadge) {
+          var badge = document.createElement('span');
+          badge.className = 'eval-dex-cell-badge';
+          badge.textContent = '#' + dogNum;
+          cell.appendChild(badge);
+        }
+      } else {
+        cell = document.createElement('div');
+        cell.className = 'eval-dex-cell eval-dex-cell--empty';
+        cell.setAttribute('aria-hidden', 'true');
+        var lab = document.createElement('span');
+        lab.className = 'eval-dex-cell-slot-num';
+        lab.textContent = '#' + dogNum;
+        cell.appendChild(lab);
+      }
+      return cell;
+    }
+
+    function dogidexAppendBatch(opts) {
+      opts = opts || {};
+      if (!evalDexGrid) return;
+      var mode = evalDexSortMode ? evalDexSortMode.value : 'collection';
+      var total = dogidexTotalSlotsForMode();
+      if (dogidexRenderedCount >= total) return;
+      var len = Math.min(DOGIDEX_SCROLL_BATCH, total - dogidexRenderedCount);
+      var slice = [];
+      var i;
+      if (mode === 'recent') {
+        var recent = dogidexGetRecentSortedList();
+        for (i = 0; i < len; i++) {
+          var ent = recent[dogidexRenderedCount + i];
+          if (!ent) break;
+          slice.push(ent.dogNumber);
+        }
+      } else if (mode === 'rarity') {
+        for (i = 0; i < len; i++) {
+          var rn = dogidexDogsByRarity[dogidexRenderedCount + i];
+          if (rn == null) break;
+          slice.push(rn);
+        }
+      } else {
+        var startDog = dogidexRenderedCount + 1;
+        for (i = 0; i < len; i++) {
+          var d = startDog + i;
+          if (d > 10000) break;
+          slice.push(d);
+        }
+      }
+      if (!slice.length) return;
+      var frag = document.createDocumentFragment();
+      slice.forEach(function(dogNum) {
+        var badge = mode === 'rarity' || mode === 'recent';
+        frag.appendChild(dogidexAppendCellForDog(dogNum, { badge: badge }));
+      });
+      evalDexGrid.appendChild(frag);
+      dogidexRenderedCount += slice.length;
+      if (opts.sortLine !== false) {
+        dogidexUpdateSortLine(authSession && authSession.dex ? authSession.dex : {});
+      }
+      if (!opts.silent) dogidexOnGridScroll();
+    }
+
+    function dogidexResetGridShell() {
+      dogidexDrainGen++;
+      dogidexRenderedCount = 0;
+      if (!evalDexGrid) return;
+      evalDexGrid.innerHTML = '';
+    }
+
+    function dogidexDrainRemainingTiles() {
+      var gen = dogidexDrainGen;
+      var BATCHES_PER_FRAME = 14;
+      function tick() {
+        if (gen !== dogidexDrainGen || !evalDexGrid) return;
+        var k = 0;
+        while (k < BATCHES_PER_FRAME && dogidexRenderedCount < dogidexTotalSlotsForMode()) {
+          dogidexAppendBatch({ silent: true, sortLine: false });
+          k++;
+        }
+        dogidexUpdateSortLine(authSession && authSession.dex ? authSession.dex : {});
+        if (dogidexRenderedCount < dogidexTotalSlotsForMode() && gen === dogidexDrainGen) {
+          requestAnimationFrame(tick);
+        } else if (gen === dogidexDrainGen && evalDexGrid.querySelector('.eval-dex-cell')) {
+          evalDexGrid.scrollTop = 0;
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function dogidexOnGridScroll() {
+      if (!evalDexGrid) return;
+      var total = dogidexTotalSlotsForMode();
+      if (dogidexRenderedCount >= total) return;
+      if (
+        evalDexGrid.scrollTop + evalDexGrid.clientHeight >=
+        evalDexGrid.scrollHeight - 180
+      ) {
+        dogidexAppendBatch();
+      }
+    }
+
+    function dogidexOnGridScrollDebounced() {
+      if (dogidexScrollRaf != null) return;
+      dogidexScrollRaf = requestAnimationFrame(function() {
+        dogidexScrollRaf = null;
+        dogidexOnGridScroll();
+      });
+    }
+
+    function dogidexBindGridScrollOnce() {
+      if (dogidexScrollBound || !evalDexGrid) return;
+      dogidexScrollBound = true;
+      evalDexGrid.addEventListener('scroll', dogidexOnGridScrollDebounced, { passive: true });
+    }
+
+    function dogidexRenderGrid() {
+      if (!evalDexGrid) return;
+      var mode = evalDexSortMode ? evalDexSortMode.value : 'collection';
+
+      if (mode === 'recent') {
+        var recent = dogidexGetRecentSortedList();
+        if (!recent.length) {
+          dogidexResetGridShell();
+          var empty = document.createElement('div');
+          empty.className = 'eval-dex-grid-loading';
+          empty.textContent = 'Evaluate dogs to fill your DogiDex — then browse them here by search time.';
+          evalDexGrid.appendChild(empty);
+          dogidexUpdateSortLine(authSession && authSession.dex ? authSession.dex : {});
+          return;
+        }
+      }
+
+      if (mode === 'rarity' && (!dogidexDogsByRarity || !dogidexDogsByRarity.length)) {
+        dogidexResetGridShell();
+        var warn = document.createElement('div');
+        warn.className = 'eval-dex-grid-loading';
+        warn.textContent = dogidexRankLoadFailed
+          ? 'Could not load rarity ordering (DoginalDogsCatalog API or api/data/rank-map.json).'
+          : 'Loading rarity order…';
+        evalDexGrid.appendChild(warn);
+        dogidexUpdateSortLine(authSession && authSession.dex ? authSession.dex : {});
+        return;
+      }
+
+      dogidexResetGridShell();
+      dogidexBindGridScrollOnce();
+      dogidexDrainRemainingTiles();
+      dogidexUpdateSortLine(authSession && authSession.dex ? authSession.dex : {});
+    }
+
+    function dexSetProgressFromDex(dex) {
+      var u = dex && dex.uniqueCount != null ? Number(dex.uniqueCount) : 0;
+      var pct = Math.min(100, (u / 10000) * 100);
+      evalDexProgressBar.style.width = pct.toFixed(2) + '%';
+      if (evalDexRegMeta) {
+        var tier = dex && dex.rankTitle ? String(dex.rankTitle) : '';
+        evalDexRegMeta.innerHTML =
+          '<strong>' + u.toLocaleString() + ' registered</strong>' +
+          (tier ? '<span>' + esc(tier) + '</span>' : '');
+      }
+      dogidexUpdateSortLine(dex);
+    }
+
+    function openDexModal() {
+      if (!authSession || !authSession.user) return;
+      evalDexErr.textContent = '';
+      evalDexGrid.innerHTML = '<div class="eval-dex-grid-loading">Loading DogiDex…</div>';
+      renderDexDetailPlaceholder();
+      dogidexRenderedCount = 0;
+      dogidexReady = false;
+      if (evalDexSortMode) evalDexSortMode.value = 'collection';
+      var d = authSession.dex || {};
+      dexSetProgressFromDex(d);
+      evalDexDialog.showModal();
+
+      Promise.all([dexLoadAllIndexed(), dogidexEnsureRarityOrder()])
+        .then(function(results) {
+          if (results && results[0]) dogidexIndexedMap = results[0];
+          dogidexReady = true;
+          dexSetProgressFromDex(authSession.dex || {});
+          dogidexRenderGrid();
+        })
+        .catch(function(err) {
+          evalDexErr.textContent =
+            err && err.status === 401 ? 'Session expired. Log in again.' : 'Could not load DogiDex.';
+          evalDexGrid.innerHTML = '';
+        });
+    }
+
+    if (evalDexSortMode) {
+      evalDexSortMode.addEventListener('change', function() {
+        if (evalDexSortMode.value === 'rarity') {
+          dogidexEnsureRarityOrder().then(function() {
+            dogidexRenderGrid();
+            dogidexUpdateSortLine(authSession && authSession.dex ? authSession.dex : {});
+          });
+        } else {
+          dogidexRenderGrid();
+          dogidexUpdateSortLine(authSession && authSession.dex ? authSession.dex : {});
+        }
+      });
+    }
+
+    function populatePayCurrencyOptions() {
+      return fetch(authApi('/billing/pricing'), { credentials: 'include', headers: { accept: 'application/json' } })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(p) {
+          if (!evalPayCurrencySelect || !p || !p.payCurrencies || !p.payCurrencies.length) return;
+          var cur = evalPayCurrencySelect.value;
+          evalPayCurrencySelect.innerHTML = '';
+          p.payCurrencies.forEach(function(c) {
+            var o = document.createElement('option');
+            o.value = c;
+            o.textContent = String(c).toUpperCase();
+            evalPayCurrencySelect.appendChild(o);
+          });
+          if (cur && Array.prototype.some.call(evalPayCurrencySelect.options, function(o) { return o.value === cur; })) {
+            evalPayCurrencySelect.value = cur;
+          }
+        })
+        .catch(function() {});
+    }
+
+    function openSubscribePlusDialog() {
+      if (evalSubscribeErr) evalSubscribeErr.textContent = '';
+      cryptoCheckoutState = { paymentId: '', orderId: '' };
+      if (evalSubscribePlanStep) evalSubscribePlanStep.style.display = '';
+      if (evalSubscribePayStep) evalSubscribePayStep.style.display = 'none';
+      populatePayCurrencyOptions();
+      if (evalSubscribeDialog) evalSubscribeDialog.showModal();
+    }
+
+    function startDoginalPlusCheckout(plan) {
+      var isYear = plan === 'year';
+      if (evalSubscribeErr) {
+        evalSubscribeErr.textContent = '';
+        evalSubscribeErr.classList.remove('ok');
+      }
+      var payCurrency = evalPayCurrencySelect && evalPayCurrencySelect.value ? evalPayCurrencySelect.value : 'btc';
+      var checkoutPayload = { plan: isYear ? 'year' : 'month', payCurrency: payCurrency };
+      if (!(authSession && authSession.user)) {
+        var ge = document.getElementById('evalSubscribeGuestEmail');
+        var gum = ge && typeof ge.value === 'string' ? ge.value.trim() : '';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gum)) {
+          if (evalSubscribeErr) evalSubscribeErr.textContent = 'Enter the email tied to your KushMedia account.';
+          return;
+        }
+        checkoutPayload.email = gum;
+      }
+      fetch(authApi('/billing/create-checkout-session'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(checkoutPayload)
+      })
+        .then(function(res) {
+          return res.json().then(function(body) { return { ok: res.ok, body: body }; });
+        })
+        .then(function(r) {
+          if (r.ok && r.body && r.body.ok && r.body.payAddress) {
+            cryptoCheckoutState.paymentId = r.body.paymentId || '';
+            cryptoCheckoutState.orderId = r.body.orderId || '';
+            var amtEl = document.getElementById('evalCryptoAmountStrong');
+            var curEl = document.getElementById('evalCryptoCurrencyLabel');
+            var addrEl = document.getElementById('evalCryptoPayAddress');
+            var pidEl = document.getElementById('evalCryptoPaymentIdEl');
+            if (amtEl) amtEl.textContent = r.body.payAmount || '—';
+            if (curEl) curEl.textContent = (r.body.payCurrency || '').toUpperCase();
+            if (addrEl) addrEl.textContent = r.body.payAddress;
+            if (pidEl) pidEl.textContent = r.body.paymentId || '—';
+            if (evalSubscribePlanStep) evalSubscribePlanStep.style.display = 'none';
+            if (evalSubscribePayStep) evalSubscribePayStep.style.display = 'block';
+            if (evalSubscribeErr) {
+              evalSubscribeErr.textContent = 'Send the exact amount from your wallet. Confirmations may take a few minutes.';
+            }
+            return;
+          }
+          var err = (r.body && (r.body.error || r.body.message)) ? (r.body.error || r.body.message) : 'Checkout is not available yet.';
+          if (evalSubscribeErr) evalSubscribeErr.textContent = err;
+        })
+        .catch(function() {
+          if (evalSubscribeErr) evalSubscribeErr.textContent = 'Could not start checkout.';
+        });
+    }
+
+    function refreshCryptoPaymentStatus() {
+      var pid = cryptoCheckoutState.paymentId;
+      var oid = cryptoCheckoutState.orderId;
+      if (!pid && !oid) return;
+      fetch(authApi('/billing/refresh-crypto-payment'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(pid ? { paymentId: pid } : { orderId: oid })
+      })
+        .then(function(res) { return res.json().then(function(b) { return { ok: res.ok, b: b }; }); })
+        .then(function(r) {
+          if (evalSubscribeErr) {
+            evalSubscribeErr.classList.remove('ok');
+            if (r.b && r.b.finished) {
+              evalSubscribeErr.textContent = 'Payment confirmed. Refreshing your session…';
+              evalSubscribeErr.classList.add('ok');
+            } else {
+              evalSubscribeErr.textContent = (r.b && r.b.paymentStatus) ? ('Status: ' + r.b.paymentStatus) : 'Still waiting for confirmation.';
+            }
+          }
+          return refreshAuthSession();
+        })
+        .then(function() {
+          if (evalSubscribeDialog && evalSubscribeDialog.open && authSession && ddPlusActive(authSession)) {
+            evalSubscribeDialog.close();
+          }
+        })
+        .catch(function() {
+          if (evalSubscribeErr) evalSubscribeErr.textContent = 'Could not refresh status.';
+        });
+    }
+
+    /** After return from payment provider success_url (?orderId=). */
+    function maybeSyncCryptoReturnFromUrl() {
+      try {
+        var u = new URL(window.location.href);
+        var oid = String(u.searchParams.get('orderId') || '').trim();
+        if (!oid) return Promise.resolve();
+        return fetch(authApi('/billing/refresh-crypto-payment'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ orderId: oid })
+        })
+          .then(function() {
+            u.searchParams.delete('orderId');
+            window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+          })
+          .catch(function() {});
+      } catch (_eU) {
+        return Promise.resolve();
+      }
+    }
+
+    evalAuthLoginBtn.addEventListener('click', function() {
+      authClearMsgs();
+      authShowPanel('evalAuthPanelLogin');
+      evalAuthDialog.showModal();
+    });
+
+    if (evalUnlockPlusBtn) evalUnlockPlusBtn.addEventListener('click', function() {
+      openSubscribePlusDialog();
+    });
+    if (evalUnlockPlusLoggedBtn) evalUnlockPlusLoggedBtn.addEventListener('click', function() {
+      openSubscribePlusDialog();
+    });
+    if (evalCheckoutMonthBtn) evalCheckoutMonthBtn.addEventListener('click', function() {
+      startDoginalPlusCheckout('month');
+    });
+    if (evalCheckoutYearBtn) evalCheckoutYearBtn.addEventListener('click', function() {
+      startDoginalPlusCheckout('year');
+    });
+    if (evalSubscribeDialogClose && evalSubscribeDialog) {
+      evalSubscribeDialogClose.addEventListener('click', function() {
+        evalSubscribeDialog.close();
+      });
+      evalSubscribeDialog.addEventListener('cancel', function(e) {
+        e.preventDefault();
+        evalSubscribeDialog.close();
+      });
+    }
+    if (evalCryptoRefreshBtn) {
+      evalCryptoRefreshBtn.addEventListener('click', function() {
+        refreshCryptoPaymentStatus();
+      });
+    }
+    if (evalSubscribeBackBtn) {
+      evalSubscribeBackBtn.addEventListener('click', function() {
+        if (evalSubscribePlanStep) evalSubscribePlanStep.style.display = '';
+        if (evalSubscribePayStep) evalSubscribePayStep.style.display = 'none';
+        if (evalSubscribeErr) evalSubscribeErr.textContent = '';
+        cryptoCheckoutState = { paymentId: '', orderId: '' };
+      });
+    }
+    if (evalCryptoCopyAddrBtn) {
+      evalCryptoCopyAddrBtn.addEventListener('click', function() {
+        var addrEl = document.getElementById('evalCryptoPayAddress');
+        var t = addrEl && addrEl.textContent ? addrEl.textContent.trim() : '';
+        if (!t || !navigator.clipboard || !navigator.clipboard.writeText) return;
+        navigator.clipboard.writeText(t).then(function() {
+          if (evalSubscribeErr) {
+            evalSubscribeErr.textContent = 'Address copied.';
+            evalSubscribeErr.classList.add('ok');
+          }
+        }).catch(function() {});
+      });
+    }
+    evalAuthLogoutBtn.addEventListener('click', function() {
+      if (dogidexUseSupabase()) {
+        fetch(authApi('/logout'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { accept: 'application/json' }
+        })
+          .catch(function() {})
+          .finally(function() {
+            DogidexSupabase.logout()
+              .then(function() {
+                setAuthUiFromSession(null);
+              })
+              .catch(function() {
+                setAuthUiFromSession(null);
+              });
+          });
+        return;
+      }
+      fetch(authApi('/logout'), { method: 'POST', credentials: 'include', headers: { accept: 'application/json' } })
+        .then(function() {
+          setAuthUiFromSession(null);
+        });
+    });
+    if (evalDexSpotlightBtn) {
+      evalDexSpotlightBtn.addEventListener('click', function() {
+        if (!authSession || !authSession.user) {
+          authClearMsgs();
+          authShowPanel('evalAuthPanelLogin');
+          evalAuthDialog.showModal();
+          return;
+        }
+        openDexModal();
+      });
+    }
+    if (evalManageBillingBtn) {
+      evalManageBillingBtn.addEventListener('click', function() {
+        openSubscribePlusDialog();
+      });
+    }
+    evalAuthDialogClose.addEventListener('click', function() {
+      evalAuthDialog.close();
+    });
+    evalAuthDialog.addEventListener('cancel', function(e) {
+      e.preventDefault();
+      evalAuthDialog.close();
+    });
+    evalDexDialogClose.addEventListener('click', function() {
+      evalDexDialog.close();
+    });
+    evalDexDialog.addEventListener('cancel', function(e) {
+      e.preventDefault();
+      evalDexDialog.close();
+    });
+
+    evalShowRegister.addEventListener('click', function() {
+      authClearMsgs();
+      authShowPanel('evalAuthPanelRegister');
+    });
+    evalShowForgot.addEventListener('click', function() {
+      authClearMsgs();
+      authShowPanel('evalAuthPanelForgot');
+    });
+    evalShowLoginFromRegister.addEventListener('click', function() {
+      authClearMsgs();
+      authShowPanel('evalAuthPanelLogin');
+    });
+    evalShowResetFromForgot.addEventListener('click', function() {
+      authClearMsgs();
+      authShowPanel('evalAuthPanelReset');
+    });
+    evalShowLoginFromReset.addEventListener('click', function() {
+      authClearMsgs();
+      authShowPanel('evalAuthPanelLogin');
+    });
+
+    evalLoginForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var fd = new FormData(evalLoginForm);
+      var msg = document.getElementById('evalAuthMsgLogin');
+      msg.textContent = '';
+      msg.classList.remove('ok');
+      if (dogidexUseSupabase()) {
+        DogidexSupabase.login(fd.get('email'), fd.get('password'))
+          .then(function(r) {
+            if (r && r.user) {
+              return bridgeKushFromSupabaseAccessToken()
+                .then(function(br) {
+                  return attachKushPlusAfterBridge(r, br).then(function() {
+                    msg.textContent = 'Logged in.';
+                    msg.classList.add('ok');
+                    evalAuthDialog.close();
+                  });
+                })
+                .catch(function() {
+                  setAuthUiFromSession(r);
+                  msg.textContent = 'Logged in.';
+                  msg.classList.add('ok');
+                  evalAuthDialog.close();
+                });
+            }
+            msg.textContent = 'Login failed.';
+          })
+          .catch(function(err) {
+            msg.textContent = err && err.message ? err.message : 'Login failed.';
+          });
+        return;
+      }
+      fetch(authApi('/login'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') })
+      })
+        .then(function(res) {
+          return res.json().then(function(body) {
+            return { ok: res.ok, status: res.status, body: body };
+          });
+        })
+        .then(function(r) {
+          if (r.ok && r.body && r.body.user) {
+            setAuthUiFromSession(r.body);
+            msg.textContent = 'Logged in.';
+            msg.classList.add('ok');
+            evalAuthDialog.close();
+            return;
+          }
+          msg.textContent = (r.body && r.body.error)
+            ? r.body.error
+            : (r.status === 503 ? 'Authentication is not configured on the server (SESSION_SECRET).' : 'Login failed.');
+        })
+        .catch(function() {
+          msg.textContent = 'Login failed.';
+        });
+    });
+
+    evalRegisterForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var fd = new FormData(evalRegisterForm);
+      var msg = document.getElementById('evalAuthMsgRegister');
+      msg.textContent = '';
+      msg.classList.remove('ok');
+      if (dogidexUseSupabase()) {
+        DogidexSupabase.register(fd.get('email'), fd.get('password'))
+          .then(function(r) {
+            if (r && r.needsEmailConfirm) {
+              msg.textContent = r.message || 'Check your email to confirm.';
+              msg.classList.add('ok');
+              return;
+            }
+            if (r && r.user) {
+              return bridgeKushFromSupabaseAccessToken()
+                .then(function(br) {
+                  return attachKushPlusAfterBridge(r, br).then(function() {
+                    msg.textContent = 'Welcome!';
+                    msg.classList.add('ok');
+                    evalAuthDialog.close();
+                  });
+                })
+                .catch(function() {
+                  setAuthUiFromSession(r);
+                  msg.textContent = 'Welcome!';
+                  msg.classList.add('ok');
+                  evalAuthDialog.close();
+                });
+            }
+          })
+          .catch(function(err) {
+            msg.textContent = err && err.message ? err.message : 'Could not register.';
+          });
+        return;
+      }
+      fetch(authApi('/register'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') })
+      })
+        .then(function(res) {
+          return res.json().then(function(body) {
+            return { ok: res.ok, status: res.status, body: body };
+          });
+        })
+        .then(function(r) {
+          if (r.ok && r.body && r.body.user) {
+            setAuthUiFromSession(r.body);
+            msg.textContent = 'Welcome!';
+            msg.classList.add('ok');
+            evalAuthDialog.close();
+            return;
+          }
+          msg.textContent = (r.body && r.body.error)
+            ? r.body.error
+            : (r.status === 503 ? 'Authentication is not configured on the server (SESSION_SECRET).' : 'Could not register.');
+        })
+        .catch(function() {
+          msg.textContent = 'Could not register.';
+        });
+    });
+
+    evalForgotForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var fd = new FormData(evalForgotForm);
+      var msg = document.getElementById('evalAuthMsgForgot');
+      msg.textContent = '';
+      msg.classList.remove('ok');
+      if (dogidexUseSupabase()) {
+        DogidexSupabase.forgotPassword(fd.get('email'))
+          .then(function() {
+            msg.textContent = 'If that email exists, Supabase sent a reset link.';
+            msg.classList.add('ok');
+          })
+          .catch(function() {
+            msg.textContent = 'Request failed.';
+          });
+        return;
+      }
+      fetch(authApi('/forgot-password'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email: fd.get('email') })
+      })
+        .then(function(res) {
+          return res.json().then(function(body) {
+            return { ok: res.ok, status: res.status, body: body };
+          }).catch(function() {
+            return { ok: res.ok, status: res.status, body: null };
+          });
+        })
+        .then(function(r) {
+          if (r.ok && r.body && r.body.ok !== false) {
+            msg.textContent = 'If that email is registered, we sent a reset code.';
+            msg.classList.add('ok');
+            return;
+          }
+          msg.textContent = (r.body && r.body.error)
+            ? r.body.error
+            : (r.status === 503
+              ? 'Sign-in is not available on the server right now (SESSION_SECRET or database).'
+              : 'Request failed.');
+        })
+        .catch(function() {
+          msg.textContent = 'Request failed.';
+        });
+    });
+
+    evalResetForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var msg = document.getElementById('evalAuthMsgReset');
+      msg.textContent = '';
+      msg.classList.remove('ok');
+      if (dogidexUseSupabase()) {
+        msg.textContent =
+          'Supabase sends a magic link — use email to set a password, then log in here.';
+        msg.classList.add('ok');
+        authShowPanel('evalAuthPanelLogin');
+        return;
+      }
+      var fd = new FormData(evalResetForm);
+      fetch(authApi('/reset-password'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({
+          email: fd.get('email'),
+          code: fd.get('code'),
+          password: fd.get('password')
+        })
+      })
+        .then(function(res) {
+          return res.json().then(function(body) {
+            return { ok: res.ok, body: body };
+          });
+        })
+        .then(function(r) {
+          if (r.ok) {
+            msg.textContent = 'Password updated. Log in with your new password.';
+            msg.classList.add('ok');
+            authShowPanel('evalAuthPanelLogin');
+            return;
+          }
+          msg.textContent = (r.body && r.body.error) ? r.body.error : 'Reset failed.';
+        })
+        .catch(function() {
+          msg.textContent = 'Reset failed.';
+        });
+    });
+
+    maybeSyncCryptoReturnFromUrl().then(function() {
+      refreshAuthSession();
+    });
 
     /* ---------- helpers ---------- */
     function sanitizeNumber(raw) {
@@ -1081,6 +3639,81 @@
     function fmtDoge(n) { return n != null ? fmt(n) + ' DOGE' : '\u2014'; }
     function fmtUsd(n)  { return n != null ? '$' + fmt(n, 2) : ''; }
     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function padDogDexNum(n) {
+      var s = String(Math.floor(Number(n)) || 0);
+      while (s.length < 4) s = '0' + s;
+      return s;
+    }
+
+    function dexClearGridSelection() {
+      if (!evalDexGrid) return;
+      Array.prototype.forEach.call(evalDexGrid.querySelectorAll('.eval-dex-cell[data-dog]'), function(c) {
+        c.removeAttribute('data-selected');
+      });
+    }
+
+    function renderDexDetailPlaceholder() {
+      if (!evalDexDetailBody) return;
+      dexClearGridSelection();
+      evalDexDetailBody.innerHTML =
+        '<div class="eval-dex-detail-ph">Select an inscription on the left to view traits and community lore.</div>';
+    }
+
+    function renderDexDetailLoading(dogNum) {
+      if (!evalDexDetailBody) return;
+      evalDexDetailBody.innerHTML =
+        '<div class="eval-dex-detail-ph">Loading inscription #' + fmt(dogNum) + '…</div>';
+    }
+
+    function renderDexDetailError(msg) {
+      if (!evalDexDetailBody) return;
+      evalDexDetailBody.innerHTML = '<div class="eval-dex-detail-ph">' + esc(msg || 'Something went wrong.') + '</div>';
+    }
+
+    function renderDexDetailFromData(d) {
+      if (!evalDexDetailBody || !d) return;
+      var loreText = '';
+      try {
+        loreText = extractLoreFromPayload(d);
+      } catch (_e) {
+        loreText = '';
+      }
+      var traitsLines = (d.traitBreakdown || []).map(function(t) {
+        var traitValue = t.displayValue || t.value;
+        var traitCount = t.displayTraitCount != null ? t.displayTraitCount : t.traitCount;
+        var cnt = traitCount != null ? ' (' + traitCount + '/10k)' : '';
+        return '<div class="eval-dex-detail-trait-row"><strong>' + esc(t.trait) + cnt + '</strong> — ' + esc(traitValue) + '</div>';
+      }).join('');
+      var loreBlock = loreText
+        ? '<div class="eval-dex-detail-lore"><strong>Community lore</strong><br/>' + esc(loreText) + '</div>'
+        : '';
+      var dn = d.dogNumber != null ? Number(d.dogNumber) : NaN;
+      evalDexDetailBody.innerHTML =
+        '<div class="eval-dex-detail-img-wrap"><img class="eval-dex-detail-img" src="' + esc(d.imageUrl || '') + '" alt="" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" /></div>' +
+        '<p class="eval-dex-detail-num">No. ' + esc(padDogDexNum(dn)) + '</p>' +
+        '<p class="eval-dex-detail-name">' + esc(d.name || ('Dog #' + fmt(dn))) + '</p>' +
+        (d.inscriptionId ? '<p class="eval-dex-detail-insc">Inscription ' + esc(d.inscriptionId) + '</p>' : '') +
+        '<div class="eval-dex-detail-traits"><strong>Traits</strong>' +
+        (traitsLines ? traitsLines : '<p class="eval-dex-detail-ph" style="padding:.5rem 0;margin:0">No trait breakdown.</p>') +
+        '</div>' +
+        loreBlock;
+    }
+
+    evalDexGrid.addEventListener('click', function(ev) {
+      var btn = ev.target.closest('.eval-dex-cell[data-dog]');
+      if (!btn || !evalDexGrid.contains(btn)) return;
+      var dn = Number(btn.getAttribute('data-dog'));
+      if (!Number.isFinite(dn)) return;
+      dexClearGridSelection();
+      btn.setAttribute('data-selected', 'true');
+      renderDexDetailLoading(dn);
+      getEvaluation(dn, 'inscription').then(function(data) {
+        renderDexDetailFromData(data);
+      }).catch(function(err) {
+        renderDexDetailError(err && err.message ? err.message : 'Could not load this dog.');
+      });
+    });
     function shortAddress(address) {
       var text = String(address || '');
       if (text.length <= 12) return text;
@@ -1316,7 +3949,8 @@
             '<h3 class="eval-section-title">Trait Breakdown</h3>' +
             '<div class="eval-trait-grid">' + traitHtml + '</div>' +
             '<div class="eval-trait-meta">' +
-              (est.rarestTrait ? '<span>Rarest: ' + esc(est.rarestTrait.value) + ' ' + esc(est.rarestTrait.trait) + ' (' + est.rarestTrait.count + '/10k)</span>' : '') +
+              (est.rarestTrait ? '<span>Rarest layer: ' + esc(est.rarestTrait.value) + ' ' + esc(est.rarestTrait.trait) + ' (' + est.rarestTrait.count + '/10k)</span>' : '') +
+              (est.compoundAnchor && est.compoundAnchor.traits && est.compoundAnchor.traits.length ? '<span>Compound anchor: max blend over up to ' + esc(String(est.compoundAnchor.maxTraits)) + ' layers (each ≤' + esc(String(est.compoundAnchor.maxSupply)) + '/10k)' + (est.compoundAnchor.winningTrait ? ' · strongest: ' + esc(est.compoundAnchor.winningTrait.value) + ' ' + esc(est.compoundAnchor.winningTrait.trait) : '') + '</span>' : '') +
               (est.basePriceDoge ? '<span>Base price: ' + fmtDoge(est.basePriceDoge) + '</span>' : '') +
               (est.traitBonus > 0 ? '<span>Trait bonus: +' + fmtDoge(est.traitBonus) + '</span>' : '') +
               (est.valueMultiplier ? '<span>1/1 multiplier: ' + est.valueMultiplier + 'x</span>' : '') +
@@ -1420,7 +4054,7 @@
         while (cursor < dogNumbers.length) {
           var currentIndex = cursor;
           cursor += 1;
-          var evaluation = await getEvaluation(dogNumbers[currentIndex]);
+          var evaluation = await getEvaluation(dogNumbers[currentIndex], 'inscription');
           var estimate = effectiveEstimate(evaluation.estimation || {});
           breakdown[currentIndex] = {
             dogNumber: dogNumbers[currentIndex],
@@ -1477,22 +4111,23 @@
     }
 
     /* ---------- fetch ---------- */
-    function getEvaluationUrls(dogNumber) {
+    /**
+     * Node-only URLs: never fall back to dd-evaluator.php for evaluate/wallet.
+     * PHP endpoints historically had no guest quotas; the client used to retry PHP on any Node 5xx (e.g. snapshot 503),
+     * which bypassed dd-paywall.js entirely.
+     */
+    function getEvaluationUrls(dogNumber, quotaKind) {
       var encoded = encodeURIComponent(dogNumber);
+      var qm = quotaKind === 'rarity' ? 'rarity' : 'inscription';
+      var suf = '?quotaMode=' + encodeURIComponent(qm);
       return [
-        API_BASE + '/api/dd-evaluator/evaluate/' + encoded,
-        API_BASE + '/api/dd-evaluator.php?action=evaluate&dogNumber=' + encoded
+        API_BASE + '/api/dd-evaluator/evaluate/' + encoded + suf
       ];
     }
 
     function getWalletEvaluationUrls(address) {
       var encoded = encodeURIComponent(address);
-      var phpUrl = API_BASE + '/api/dd-evaluator.php?action=wallet&address=' + encoded;
-      var routeUrl = API_BASE + '/api/dd-evaluator/wallet/' + encoded;
-      if (/kushmedia\.xyz$/i.test(window.location.hostname)) {
-        return [phpUrl, routeUrl];
-      }
-      return [routeUrl, phpUrl];
+      return [API_BASE + '/api/dd-evaluator/wallet/' + encoded];
     }
 
     async function readApiError(res) {
@@ -1537,32 +4172,26 @@
       return '';
     }
 
-    async function getEvaluation(dogNumber) {
-      var urls = getEvaluationUrls(dogNumber);
+    async function getEvaluation(dogNumber, quotaKind) {
+      var urls = getEvaluationUrls(dogNumber, quotaKind);
       var lastError = null;
 
       for (var i = 0; i < urls.length; i += 1) {
         try {
           var res = await fetch(urls[i], {
+            credentials: 'include',
             headers: { accept: 'application/json' }
           });
 
           if (!res.ok) {
             var message = await readApiError(res);
             lastError = new Error(message);
-            if ((res.status === 404 || res.status >= 500) && i + 1 < urls.length) {
-              continue;
-            }
             throw lastError;
           }
 
           var data = await res.json().catch(function() { return null; });
           if (!data || typeof data !== 'object') {
-            lastError = new Error('DD evaluator backend returned an invalid response.');
-            if (i + 1 < urls.length) {
-              continue;
-            }
-            throw lastError;
+            throw new Error('DD evaluator backend returned an invalid response.');
           }
 
           if (data.error) {
@@ -1593,25 +4222,19 @@
       for (var i = 0; i < urls.length; i += 1) {
         try {
           var res = await fetch(urls[i], {
+            credentials: 'include',
             headers: { accept: 'application/json' }
           });
 
           if (!res.ok) {
             var message = await readApiError(res);
             lastError = new Error(message);
-            if ((res.status === 404 || res.status >= 500) && i + 1 < urls.length) {
-              continue;
-            }
             throw lastError;
           }
 
           var data = await res.json().catch(function() { return null; });
           if (!data || typeof data !== 'object') {
-            lastError = new Error('DD evaluator backend returned an invalid wallet response.');
-            if (i + 1 < urls.length) {
-              continue;
-            }
-            throw lastError;
+            throw new Error('DD evaluator backend returned an invalid wallet response.');
           }
 
           if (data.error) {
@@ -1691,8 +4314,12 @@
         if (searchMode === 'rank') {
           dogNumber = await lookupRank(num);
         }
-        var data = await getEvaluation(dogNumber);
+        var quotaKind = searchMode === 'rank' ? 'rarity' : 'inscription';
+        var data = await getEvaluation(dogNumber, quotaKind);
         renderResult(data);
+        if (searchMode === 'inscription' || searchMode === 'rank') {
+          postDexIndex(dogNumber);
+        }
       } catch (err) {
         showError(err.message || 'Something went wrong. Please try again.');
       }
@@ -1869,6 +4496,7 @@
     var kennelViewport = document.getElementById('kennelViewport');
     var kennelDots = document.getElementById('kennelDots');
     var KENNEL_AUTO_MS = 8000;
+    var kennelLastLayoutW = -1;
 
     function kennelBuild() {
       if (!kennelTrack) return;
@@ -1908,6 +4536,9 @@
       if (!kennelTrack || !kennelViewport) return;
       var w = kennelViewport.offsetWidth;
       if (!w) w = 320;
+      /* Skip relayout when width unchanged (mobile toolbar resize often fires without real width delta) */
+      if (kennelLastLayoutW >= 0 && Math.abs(w - kennelLastLayoutW) < 2) return;
+      kennelLastLayoutW = w;
       kennelTrack.querySelectorAll('.eval-kennel-slide').forEach(function(el) {
         el.style.flex = '0 0 ' + w + 'px';
         el.style.width = w + 'px';
@@ -1943,7 +4574,14 @@
     if (kennelTrack && kennelViewport) {
       kennelBuild();
       kennelStartAuto();
-      window.addEventListener('resize', function() { layoutKennel(); });
+      var kennelResizeRaf = null;
+      window.addEventListener('resize', function() {
+        if (kennelResizeRaf != null) cancelAnimationFrame(kennelResizeRaf);
+        kennelResizeRaf = requestAnimationFrame(function() {
+          kennelResizeRaf = null;
+          layoutKennel();
+        });
+      });
       var kennelRoot = document.getElementById('kennelRoot');
       if (kennelRoot) {
         kennelRoot.addEventListener('mouseenter', function() { if (kennelTimer) clearInterval(kennelTimer); });
@@ -1961,18 +4599,24 @@
     }
 
     (function() {
-      var cta = document.getElementById('evalTipCta');
+      var heroTipCta = document.getElementById('evalHeroTipCta');
       var modal = document.getElementById('evalTipModal');
       var closeBtn = document.getElementById('evalTipModalClose');
       var backdrop = document.getElementById('evalTipModalBackdrop');
-      if (!cta || !modal) return;
+      if (!modal || !heroTipCta) return;
       var prevFocus = null;
 
       function openTip() {
         prevFocus = document.activeElement;
         modal.removeAttribute('hidden');
         document.body.style.overflow = 'hidden';
-        (closeBtn || cta).focus();
+        var share = document.getElementById('evalTipPrivacyShare');
+        var anon = document.getElementById('evalTipPrivacyAnon');
+        if (share) share.checked = true;
+        if (anon) anon.checked = false;
+        syncTipPrivacyUi();
+        clearTipXMsg();
+        (closeBtn || heroTipCta).focus();
       }
       function closeTip() {
         modal.setAttribute('hidden', '');
@@ -1981,7 +4625,7 @@
         prevFocus = null;
       }
 
-      cta.addEventListener('click', function() { openTip(); });
+      heroTipCta.addEventListener('click', function() { openTip(); });
       if (closeBtn) closeBtn.addEventListener('click', closeTip);
       if (backdrop) backdrop.addEventListener('click', closeTip);
       document.addEventListener('keydown', function(e) {
@@ -2022,10 +4666,102 @@
           if (t) copyToClipboard(t, btn);
         });
       });
+
+      var tipXInput = document.getElementById('evalTipXHandle');
+      var tipXSave = document.getElementById('evalTipXSave');
+      var tipXMsg = document.getElementById('evalTipXMsg');
+      var tipXFields = document.getElementById('evalTipXFields');
+      var tipXAnonNote = document.getElementById('evalTipXAnonNote');
+      var tipPrivacyAnon = document.getElementById('evalTipPrivacyAnon');
+
+      function clearTipXMsg() {
+        if (!tipXMsg) return;
+        tipXMsg.setAttribute('hidden', '');
+        tipXMsg.textContent = '';
+        tipXMsg.classList.remove('eval-tip-x-ok', 'eval-tip-x-err', 'eval-tip-x-info');
+      }
+
+      function syncTipPrivacyUi() {
+        var hideHandle = tipPrivacyAnon && tipPrivacyAnon.checked;
+        if (hideHandle) {
+          if (tipXFields) tipXFields.setAttribute('hidden', '');
+          if (tipXAnonNote) tipXAnonNote.removeAttribute('hidden');
+          if (tipXInput) tipXInput.value = '';
+          clearTipXMsg();
+        } else {
+          if (tipXFields) tipXFields.removeAttribute('hidden');
+          if (tipXAnonNote) tipXAnonNote.setAttribute('hidden', '');
+        }
+      }
+
+      modal.querySelectorAll('input[name="eval-tip-privacy"]').forEach(function(r) {
+        r.addEventListener('change', syncTipPrivacyUi);
+      });
+
+      function showTipXMsg(text, kind) {
+        if (!tipXMsg) return;
+        tipXMsg.removeAttribute('hidden');
+        tipXMsg.textContent = text;
+        tipXMsg.classList.remove('eval-tip-x-ok', 'eval-tip-x-err', 'eval-tip-x-info');
+        if (kind === 'ok') tipXMsg.classList.add('eval-tip-x-ok');
+        else if (kind === 'err') tipXMsg.classList.add('eval-tip-x-err');
+        else tipXMsg.classList.add('eval-tip-x-info');
+      }
+      function submitTipXHandle() {
+        if (!tipXInput || !tipXSave) return;
+        if (tipPrivacyAnon && tipPrivacyAnon.checked) return;
+        var v = String(tipXInput.value || '').trim();
+        if (!v) {
+          showTipXMsg('Enter your X handle, or skip this step.', 'err');
+          return;
+        }
+        tipXSave.disabled = true;
+        showTipXMsg('Sending…', 'info');
+        fetch(API_BASE + '/api/dd-evaluator/tip-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ xHandle: v })
+        })
+          .then(function(r) { return r.json().then(function(j) { return { r: r, j: j }; }); })
+          .then(function(o) {
+            if (o.r.ok) {
+              showTipXMsg('Saved — thank you! We’ll use your @ for shout-outs or giveaways when we run them.', 'ok');
+              tipXInput.value = '';
+            } else {
+              var err = (o.j && o.j.error) ? o.j.error : 'Could not save. Try again in a moment.';
+              showTipXMsg(err, 'err');
+            }
+          })
+          .catch(function() {
+            showTipXMsg('Could not reach the server. Try again in a moment.', 'err');
+          })
+          .then(function() {
+            tipXSave.disabled = false;
+          });
+      }
+      if (tipXSave && tipXInput) {
+        tipXSave.addEventListener('click', submitTipXHandle);
+        tipXInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitTipXHandle();
+          }
+        });
+      }
     })();
 
     form.addEventListener('submit', function(e) { e.preventDefault(); evaluate(); });
-    input.focus();
+    /* Mobile: avoid autofocus — focused inputs trigger repeated scroll-into-view and fight swipe-up toward the hero */
+    function evalShouldAutofocusSearch() {
+      try {
+        if (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) return false;
+      } catch (_) {}
+      return true;
+    }
+    if (evalShouldAutofocusSearch()) {
+      try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
+    }
   </script>
 </body>
 </html>

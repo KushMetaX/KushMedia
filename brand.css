@@ -222,6 +222,9 @@ body.menu-open .nav-list li:nth-child(2) .nav-link { transition-delay: 140ms; }
 body.menu-open .nav-list li:nth-child(3) .nav-link { transition-delay: 200ms; }
 body.menu-open .nav-list li:nth-child(4) .nav-link { transition-delay: 260ms; }
 body.menu-open .nav-list li:nth-child(5) .nav-link { transition-delay: 320ms; }
+body.menu-open .nav-list li:nth-child(6) .nav-link { transition-delay: 380ms; }
+body.menu-open .nav-list li:nth-child(7) .nav-link { transition-delay: 440ms; }
+body.menu-open .nav-list li:nth-child(8) .nav-link { transition-delay: 500ms; }
 
 .nav-link:hover,
 .nav-link:focus-visible {
