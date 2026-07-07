@@ -395,6 +395,7 @@ function validateSuggestionPayload(kind, raw) {
   if (k === 'lore_only') {
     const dogNumber = Number(raw.dogNumber);
     const lore = String(raw.lore || '').trim();
+    const submittedBy = String(raw.submittedBy || '').trim().slice(0, 120);
     let loreMultiplier = raw.loreMultiplier != null ? Number(raw.loreMultiplier) : null;
     if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
       throw new Error('dogNumber must be 1–10000.');
@@ -405,13 +406,16 @@ function validateSuggestionPayload(kind, raw) {
     if (lore.length > 8000) {
       throw new Error('lore is too long.');
     }
+    if (!submittedBy) {
+      throw new Error('submittedBy is required.');
+    }
     if (loreMultiplier != null && !Number.isFinite(loreMultiplier)) {
       throw new Error('loreMultiplier must be a finite number.');
     }
     if (loreMultiplier != null && (loreMultiplier > 100 || loreMultiplier < -0.99)) {
       throw new Error('loreMultiplier must be between -0.99 and 100.');
     }
-    return { dogNumber, lore, loreMultiplier };
+    return { dogNumber, lore, loreMultiplier, submittedBy };
   }
   throw new Error('Unknown suggestion kind.');
 }
@@ -464,9 +468,13 @@ async function mergeApprovedSuggestion(item) {
   } else if (kind === 'lore_only') {
     const ns = readCommunityNotesStore();
     const dn = String(payload.dogNumber);
+    const submittedBy = payload.submittedBy ? String(payload.submittedBy).trim().slice(0, 120) : '';
     let stored = payload.lore;
-    if (payload.loreMultiplier != null && Number.isFinite(Number(payload.loreMultiplier))) {
-      stored = { lore: payload.lore, loreMultiplier: Number(payload.loreMultiplier) };
+    const hasMult = payload.loreMultiplier != null && Number.isFinite(Number(payload.loreMultiplier));
+    if (hasMult || submittedBy) {
+      stored = { lore: payload.lore };
+      if (hasMult) stored.loreMultiplier = Number(payload.loreMultiplier);
+      if (submittedBy) stored.submittedBy = submittedBy;
     }
     ns.notes = { ...(ns.notes || {}), [dn]: stored };
     writeCommunityNotesStore(ns);

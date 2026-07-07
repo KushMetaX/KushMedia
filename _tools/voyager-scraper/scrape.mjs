@@ -22,6 +22,7 @@ import { REGIONS, resolveRegionId } from "./config/regions.mjs";
 import { fetchOverpass } from "./sources/overpass.mjs";
 import { osmElementToPoi } from "./pipeline/normalize.mjs";
 import { dedupe } from "./pipeline/dedupe.mjs";
+import { loadCatalog, saveCatalog, isFresh, ageInDays, recordSubregion } from "./pipeline/catalog.mjs";
 
 const HERE = path.dirname(url.fileURLToPath(import.meta.url));
 process.chdir(HERE);
@@ -43,7 +44,27 @@ for (const r of targetRegions) {
 const log = (...m) => console.log(...m);
 log(`voyager-scraper ${pkgVersion()} — regions: ${targetRegions.join(", ")}`);
 
+// Catalog of what each subregion last produced. Subregions scraped within
+// --max-age days are skipped on this run (their POIs are reused from the
+// existing output) so we don't keep hammering Overpass and re-processing
+// everything. --force or --no-cache bypass the catalog and re-scrape.
+const forceRescrape = ARGS.force || ARGS.noCache;
+const catalog = await loadCatalog();
+const priorPois = forceRescrape ? [] : await loadDiscovered();
+const priorBySub = new Map();
+for (const p of priorPois) {
+  if (!priorBySub.has(p.regionId)) priorBySub.set(p.regionId, []);
+  priorBySub.get(p.regionId).push(p);
+}
+if (forceRescrape) {
+  log(`Force re-scrape: catalog freshness ignored.`);
+} else {
+  log(`Catalog: ${Object.keys(catalog.subregions).length} subregion(s) on record, reuse window ${ARGS.maxAge}d, ${priorPois.length} prior POI(s) available for reuse.`);
+}
+
 const allPois = [];
+let reusedSubregions = 0;
+let scrapedSubregions = 0;
 const stats = { byRegion: {}, byCategory: {}, totalRaw: 0, totalKept: 0, totalDropped: 0 };
 
 for (const macroRegionId of targetRegions) {
@@ -60,6 +81,26 @@ for (const macroRegionId of targetRegions) {
 
   for (const sub of subregions) {
     log(`  → ${sub.id} bbox=${sub.bbox.join(",")}`);
+
+    // Skip subregions that were scraped recently — reuse their POIs from the
+    // last run's output instead of re-querying Overpass + re-processing.
+    const reusable = priorBySub.get(sub.id);
+    if (!forceRescrape && isFresh(catalog, sub.id, ARGS.maxAge) && reusable && reusable.length) {
+      const entry = catalog.subregions[sub.id];
+      const rawCount = entry.rawElements || reusable.length;
+      for (const p of reusable) {
+        allPois.push(p);
+        stats.byCategory[p.category] = (stats.byCategory[p.category] || 0) + 1;
+      }
+      stats.totalRaw += rawCount;
+      stats.byRegion[macroRegionId].raw += rawCount;
+      stats.byRegion[macroRegionId].kept += reusable.length;
+      stats.byRegion[macroRegionId].subregions[sub.id] = { raw: rawCount, kept: reusable.length, dropped: 0, reused: true };
+      reusedSubregions++;
+      log(`    ↳ reused ${reusable.length} POIs from catalog (scraped ${ageInDays(entry.lastScrapedAt).toFixed(1)}d ago) — skipping Overpass`);
+      continue;
+    }
+
     let elements = [];
     try {
       elements = await fetchOverpass(sub.bbox, { noCache: ARGS.noCache, verbose: true });
@@ -67,6 +108,7 @@ for (const macroRegionId of targetRegions) {
       console.error(`    overpass failed for ${sub.id}: ${err.message}`);
       continue;
     }
+    scrapedSubregions++;
     stats.totalRaw += elements.length;
     stats.byRegion[macroRegionId].raw += elements.length;
 
@@ -88,9 +130,12 @@ for (const macroRegionId of targetRegions) {
     stats.byRegion[macroRegionId].kept += kept;
     stats.byRegion[macroRegionId].dropped += dropped;
     stats.byRegion[macroRegionId].subregions[sub.id] = { raw: elements.length, kept, dropped };
+    recordSubregion(catalog, sub, macroRegionId, { rawElements: elements.length, keptPois: kept });
     log(`    kept ${kept}, dropped ${dropped}`);
   }
 }
+
+log(`\nSubregions: ${scrapedSubregions} scraped, ${reusedSubregions} reused from catalog.`);
 
 // Filter against curated map/pois.js so the same record doesn't appear twice.
 let curatedNames = new Set();
@@ -128,10 +173,12 @@ for (const macroRegionId of targetRegions) {
 }
 await fs.writeFile(path.join(outDir, "stats.json"),
   JSON.stringify({ generatedAt: new Date().toISOString(), ...stats }, null, 2));
+const catalogPath = await saveCatalog(catalog);
 
 log(`\nWrote:
   ${path.relative(process.cwd(), path.join(outDir, "pois-discovered.json"))}  (${merged.length} POIs)
-  ${path.relative(process.cwd(), path.join(outDir, "stats.json"))}`);
+  ${path.relative(process.cwd(), path.join(outDir, "stats.json"))}
+  ${path.relative(process.cwd(), catalogPath)}  (scrape catalog)`);
 log("\nNext steps:");
 log("  • Restart the Node app — /api/voyager/pois will pick up the new file automatically.");
 log("  • Re-run with --no-cache after adding/removing OSM filter rules.");
@@ -140,7 +187,7 @@ log("  • Re-run with --no-cache after adding/removing OSM filter rules.");
  * Helpers
  * ============================================================================= */
 function parseArgs(argv) {
-  const out = { region: null, all: false, dryRun: false, noCache: false, includeCurated: false, help: false };
+  const out = { region: null, all: false, dryRun: false, noCache: false, includeCurated: false, force: false, maxAge: 14, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--region")           out.region = argv[++i];
@@ -148,6 +195,8 @@ function parseArgs(argv) {
     else if (a === "--dry-run")     out.dryRun = true;
     else if (a === "--no-cache")    out.noCache = true;
     else if (a === "--include-curated") out.includeCurated = true;
+    else if (a === "--force")       out.force = true;
+    else if (a === "--max-age")     out.maxAge = Math.max(0, Number(argv[++i]) || 0);
     else if (a === "--help" || a === "-h") out.help = true;
   }
   return out;
@@ -157,19 +206,38 @@ function printHelp() {
   console.log(`voyager-scraper
 
 Usage:
-  node scrape.mjs [--region <id>] [--all] [--dry-run] [--no-cache] [--include-curated]
+  node scrape.mjs [--region <id>] [--all] [--dry-run] [--no-cache] [--force] [--max-age <days>] [--include-curated]
 
 Flags:
   --region <id>        Scrape one macro-region (default: nova-scotia)
   --all                Scrape every region in config/regions.mjs
   --dry-run            Don't write files; print sample to stdout
-  --no-cache           Bypass on-disk cache and refetch from Overpass
+  --no-cache           Bypass on-disk cache and refetch from Overpass (implies --force)
+  --force              Ignore the catalog and re-scrape every subregion
+  --max-age <days>     Reuse subregions scraped within this many days (default: 14)
   --include-curated    Don't suppress POIs whose name matches map/pois.js
   --help, -h           Show this help
+
+The scrape catalog (data/out/catalog.json) records when each subregion was last
+scraped. Subregions still within --max-age are skipped and their POIs reused
+from data/out/pois-discovered.json, so re-runs don't re-query Overpass or
+re-process everything. Use --force (or --max-age 0) to rebuild from scratch.
 
 Add a new region: edit config/regions.mjs.
 Add a new tag mapping: edit config/categories.mjs.
 `);
+}
+
+async function loadDiscovered() {
+  // Previously-written canonical output, used to reuse POIs for subregions the
+  // catalog says are still fresh (so we can skip re-scraping them).
+  try {
+    const file = path.resolve("data", "out", "pois-discovered.json");
+    const arr = JSON.parse(await fs.readFile(file, "utf8"));
+    return Array.isArray(arr) ? arr : [];
+  } catch (_e) {
+    return [];
+  }
 }
 
 async function loadCuratedNames() {

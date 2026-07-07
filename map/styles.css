@@ -104,6 +104,7 @@ img { max-width: 100%; display: block; }
   top: 0;
   z-index: 60;
   padding: 16px 24px 0;
+  transition: padding 0.25s ease;
 }
 
 .nsv-header-inner {
@@ -114,6 +115,7 @@ img { max-width: 100%; display: block; }
   border-radius: 18px;
   max-width: 1240px;
   margin: 0 auto;
+  transition: padding 0.25s ease, border-radius 0.25s ease;
 }
 
 .nsv-brand {
@@ -240,6 +242,48 @@ img { max-width: 100%; display: block; }
   .nsv-tab span { display: none; }
   .nsv-tab { padding: 9px 12px; }
   .nsv-header > .nsv-counter-strip { margin-left: 24px; }
+}
+
+/* ---- Mobile: collapse header into a thin bar on scroll ---- */
+@media (max-width: 720px) {
+  .nsv-brand-mark,
+  .nsv-icon-btn {
+    transition: width 0.25s ease, height 0.25s ease;
+  }
+  .nsv-brand-name { transition: font-size 0.25s ease; }
+  .nsv-header > .nsv-counter-strip {
+    overflow: hidden;
+    transition: max-height 0.25s ease, margin 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
+    max-height: 40px;
+  }
+
+  .nsv-header.is-scrolled {
+    padding-top: 8px;
+  }
+  .nsv-header.is-scrolled .nsv-header-inner {
+    padding: 6px 12px;
+    border-radius: 12px;
+  }
+  .nsv-header.is-scrolled .nsv-brand-mark {
+    width: 30px;
+    height: 30px;
+  }
+  .nsv-header.is-scrolled .nsv-brand-mark svg { width: 17px; height: 17px; }
+  .nsv-header.is-scrolled .nsv-brand-name { font-size: 15px; }
+  .nsv-header.is-scrolled .nsv-icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+  .nsv-header.is-scrolled .nsv-tab { padding: 6px 10px; }
+  .nsv-header.is-scrolled .nsv-tab svg { width: 15px; height: 15px; }
+  .nsv-header.is-scrolled > .nsv-counter-strip {
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    border-width: 0;
+  }
 }
 
 /* =====================================================================

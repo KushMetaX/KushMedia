@@ -32,6 +32,12 @@ node scrape.mjs --all
 # Bypass the on-disk cache (force a fresh Overpass round-trip)
 node scrape.mjs --no-cache
 
+# Re-process every subregion even if the catalog says it's still fresh
+node scrape.mjs --force
+
+# Only reuse subregions scraped in the last 30 days (default is 14)
+node scrape.mjs --max-age 30
+
 # Preview first 5 normalised records without writing files
 node scrape.mjs --dry-run
 ```
@@ -43,7 +49,28 @@ Output:
 | `data/out/pois-discovered.json` | Canonical merged set — served by `/api/voyager/pois` |
 | `data/out/pois-discovered.<region>.json` | Per-region split (handy for diff review) |
 | `data/out/stats.json` | Counts per region/category, dupe count, fetch timestamp |
+| `data/out/catalog.json` | Scrape catalog — when each subregion was last scraped (drives reuse) |
 | `data/raw/overpass-<hash>.json` | Cached Overpass response per bbox (delete to refetch) |
+
+### Incremental re-runs (the catalog)
+
+Every run used to rebuild everything from scratch — query Overpass for all
+seven Nova Scotia subregions (or read their bbox cache), then re-normalise and
+re-dedupe the whole set. That's wasteful on the public Overpass servers and on
+your CPU when nothing has changed.
+
+The **scrape catalog** (`data/out/catalog.json`) records when each subregion was
+last scraped and how many POIs it produced. On the next run, any subregion still
+within `--max-age` days (default **14**) is **skipped entirely** — its POIs are
+reused from `data/out/pois-discovered.json` instead of being re-fetched and
+re-processed. The run log shows `reused N POIs … skipping Overpass` for those.
+
+- `--max-age <days>` — change the reuse window (e.g. `0` to disable reuse).
+- `--force` — ignore the catalog and re-scrape every subregion.
+- `--no-cache` — implies `--force` *and* bypasses the raw Overpass cache.
+
+So a weekly cron job only pays the Overpass cost for subregions that have
+actually aged out, and a same-day re-run does almost no work.
 
 After running, **restart the Node app** (or just hit `/api/voyager/pois`
 once) — the front-end picks the new file up automatically and merges
@@ -78,13 +105,14 @@ _tools/voyager-scraper/
 │  └─ overpass.mjs          # Overpass API client (cached, polite, multi-mirror)
 ├─ pipeline/
 │  ├─ normalize.mjs         # Raw OSM element → Voyager POI
-│  └─ dedupe.mjs            # Merge near-duplicates within ~80 m
+│  ├─ dedupe.mjs            # Merge near-duplicates within ~80 m
+│  └─ catalog.mjs           # Per-subregion "last scraped" manifest → skip fresh ones
 └─ data/
    ├─ raw/                  # Per-bbox Overpass response cache (gitignored)
-   └─ out/                  # Final JSON output (gitignored)
+   └─ out/                  # Final JSON output + catalog.json (gitignored)
 ```
 
-Five short, focused files. The pipeline is a one-way conveyor
+Six short, focused files. The pipeline is a one-way conveyor
 (`fetch → normalize → resolve region → dedupe → write`) so adding a new
 source never tangles the existing flow.
 
@@ -177,8 +205,10 @@ export async function fetchWikidata(bbox) {
   ratings, we either compute our own or partner.
 - **Politeness:** the Overpass client has a 90-second timeout, retries
   three mirrors, sets a real `User-Agent`, and caches every response on
-  disk so re-runs don't hit the public servers. Don't disable the cache
-  for casual development work.
+  disk so re-runs don't hit the public servers. On top of that, the
+  **scrape catalog** skips subregions scraped within `--max-age` days, so a
+  re-run typically makes **zero** Overpass calls. Don't disable the cache
+  or use `--force` for casual development work.
 
 ---
 

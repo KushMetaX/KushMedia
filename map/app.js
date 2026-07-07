@@ -165,6 +165,8 @@
       setView(parseHash());
     });
 
+    bindHeaderCollapse();
+
     var stored = null;
     try { stored = localStorage.getItem("nsv-theme"); } catch (_) {}
     if (stored === "light" || stored === "dark") {
@@ -213,6 +215,24 @@
     bindDiscoverFilters();
     bindMapViewLayers();
     bindModalDismiss();
+  }
+
+  function bindHeaderCollapse() {
+    var header = document.querySelector(".nsv-header");
+    if (!header) return;
+    var ticking = false;
+    function update() {
+      ticking = false;
+      if (window.pageYOffset > 24) header.classList.add("is-scrolled");
+      else header.classList.remove("is-scrolled");
+    }
+    window.addEventListener("scroll", function () {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(update);
+      }
+    }, { passive: true });
+    update();
   }
 
   function bindModalDismiss() {

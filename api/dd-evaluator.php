@@ -195,6 +195,9 @@ function dd_paywall_quota_storage_path($day) {
 }
 
 function dd_paywall_quota_try_consume($bucketKey, $cap) {
+    // Paywall removed: the evaluator is fully open, so guest quotas no longer apply.
+    return;
+
     $day = gmdate('Y-m-d');
     $ip = dd_paywall_client_ip_php();
 
@@ -607,9 +610,14 @@ function mergeApprovedSuggestionPhp($item) {
     } elseif ($kind === 'lore_only') {
         $dogNumber = strval(isset($payload['dogNumber']) ? $payload['dogNumber'] : '');
         $lore = isset($payload['lore']) ? strval($payload['lore']) : '';
+        $submittedBy = isset($payload['submittedBy']) ? trim(strval($payload['submittedBy'])) : '';
         $ns = readCommunityNotesStorePhp();
         $notes = isset($ns['notes']) && is_array($ns['notes']) ? $ns['notes'] : array();
-        $notes[$dogNumber] = $lore;
+        if ($submittedBy !== '') {
+            $notes[$dogNumber] = array('lore' => $lore, 'submittedBy' => substr($submittedBy, 0, 120));
+        } else {
+            $notes[$dogNumber] = $lore;
+        }
         $ns['notes'] = $notes;
         writeCommunityNotesStorePhp($ns);
         $mergeResult['dogNumber'] = $payload['dogNumber'];
@@ -766,6 +774,7 @@ function validateSuggestionPayloadPhp($kind, $raw) {
     if ($k === 'lore_only') {
         $dogNumber = intval(isset($raw['dogNumber']) ? $raw['dogNumber'] : 0);
         $lore = trim(strval(isset($raw['lore']) ? $raw['lore'] : ''));
+        $submittedBy = substr(trim(strval(isset($raw['submittedBy']) ? $raw['submittedBy'] : '')), 0, 120);
 
         if ($dogNumber < 1 || $dogNumber > 10000) {
             throw new Exception('dogNumber must be 1–10000.');
@@ -776,8 +785,11 @@ function validateSuggestionPayloadPhp($kind, $raw) {
         if (strlen($lore) > 8000) {
             throw new Exception('lore is too long.');
         }
+        if ($submittedBy === '') {
+            throw new Exception('submittedBy is required.');
+        }
 
-        return array('dogNumber' => $dogNumber, 'lore' => $lore);
+        return array('dogNumber' => $dogNumber, 'lore' => $lore, 'submittedBy' => $submittedBy);
     }
 
     throw new Exception('Unknown suggestion kind.');
@@ -2072,12 +2084,16 @@ function getActiveListingCount($limit = 100, $maxPages = 100) {
     $cachePath = getWritableCachePath($MARKET_PULSE_CACHE_CANDIDATE_PATHS);
     $cacheTtl = 300;
     $cachedPayload = readJsonCacheFile($cachePath);
-    $cachedGeneratedAt = is_array($cachedPayload) && isset($cachedPayload['generatedAt']) ? strtotime($cachedPayload['generatedAt']) : false;
+    // Use a dedicated timestamp so this writer cannot reset the freshness gate
+    // of other datasets sharing this cache file (e.g. topSales).
+    $cachedListingsAt = is_array($cachedPayload) && isset($cachedPayload['totalListingsAt'])
+        ? strtotime($cachedPayload['totalListingsAt'])
+        : false;
     $cachedCount = is_array($cachedPayload) && isset($cachedPayload['totalListings'])
         ? intval($cachedPayload['totalListings'])
         : null;
 
-    if ($cachedCount !== null && $cachedGeneratedAt !== false && (time() - $cachedGeneratedAt) < $cacheTtl) {
+    if ($cachedCount !== null && $cachedListingsAt !== false && (time() - $cachedListingsAt) < $cacheTtl) {
         $cache[$cacheKey] = $cachedCount;
         return $cache[$cacheKey];
     }
@@ -2109,6 +2125,7 @@ function getActiveListingCount($limit = 100, $maxPages = 100) {
 
     $cacheData = is_array($cachedPayload) ? $cachedPayload : array();
     $cacheData['generatedAt'] = gmdate('c');
+    $cacheData['totalListingsAt'] = gmdate('c');
     $cacheData['totalListings'] = $count;
     writeJsonCacheFile($cachePath, $cacheData);
 
@@ -2133,6 +2150,79 @@ function getRecentSaleActivity($limit = 6) {
             continue;
         }
 
+        // Priced on-chain purchases only. OTC/unpriced trades have no priceDoge
+        // and are surfaced separately by getRecentOtcSales().
+        if (isset($activity['otc']) && $activity['otc']) {
+            continue;
+        }
+        $price = normalizeNumber(isset($activity['priceDoge']) ? $activity['priceDoge'] : null);
+        if ($price === null || $price <= 0) {
+            continue;
+        }
+
+        $saleState = normalizeSaleActivityState($activity);
+
+        $dogNumber = null;
+        if (isset($activity['dogName']) && preg_match('/#(\d+)/', $activity['dogName'], $matches)) {
+            $dogNumber = intval($matches[1]);
+        }
+
+        $sales[] = array(
+            'dogNumber' => $dogNumber,
+            'name' => isset($activity['dogName']) ? $activity['dogName'] : ($dogNumber !== null ? 'Doginal Dog #' . $dogNumber : 'Doginal Dog'),
+            'priceDoge' => $price,
+            'status' => $saleState['status'],
+            'date' => $saleState['date'],
+            'confirmedAt' => $saleState['confirmedAt'],
+            'isConfirmed' => $saleState['isConfirmed'],
+            'txid' => isset($activity['txid']) ? $activity['txid'] : null,
+            'imageUrl' => buildDogImageUrl($dogNumber),
+            'sortAt' => $saleState['date'] ? strtotime($saleState['date']) : 0,
+        );
+
+    }
+
+    // Newest purchase first so this reflects live market activity, not a frozen
+    // all-time leaderboard. The upstream feed is already newest-first, but sort
+    // defensively in case the order changes.
+    usort($sales, function ($left, $right) {
+        return intval(isset($right['sortAt']) ? $right['sortAt'] : 0) - intval(isset($left['sortAt']) ? $left['sortAt'] : 0);
+    });
+    $sales = array_slice($sales, 0, $limit);
+
+    $cache[$limit] = $sales;
+    return $cache[$limit];
+}
+
+/**
+ * Recent OTC / manually-recorded trades. These come through the global activity
+ * feed with no priceDoge, so they cannot be ranked by price like normal sales.
+ * We surface them as their own "OTC" entries, newest first.
+ */
+function getRecentOtcSales($limit = 6) {
+    static $cache = array();
+    $limit = max(1, min(12, intval($limit)));
+
+    if (array_key_exists($limit, $cache)) {
+        return $cache[$limit];
+    }
+
+    $data = trpcData('activity.getGlobal', array('limit' => 100), 'activity');
+    $activities = isset($data['activities']) && is_array($data['activities']) ? $data['activities'] : array();
+    $sales = array();
+
+    foreach ($activities as $activity) {
+        if (!isset($activity['activityType']) || $activity['activityType'] !== 'sale') {
+            continue;
+        }
+
+        // Only true OTC trades have no price; `isManual` sales carry a real
+        // priceDoge and belong in the priced Top Sales list instead.
+        $isOtc = isset($activity['otc']) && $activity['otc'];
+        if (!$isOtc) {
+            continue;
+        }
+
         $saleState = normalizeSaleActivityState($activity);
 
         $dogNumber = null;
@@ -2150,11 +2240,13 @@ function getRecentSaleActivity($limit = 6) {
             'isConfirmed' => $saleState['isConfirmed'],
             'txid' => isset($activity['txid']) ? $activity['txid'] : null,
             'imageUrl' => buildDogImageUrl($dogNumber),
+            'otc' => true,
         );
 
+        if (count($sales) >= $limit) {
+            break;
+        }
     }
-
-    $sales = selectTopSales($sales, $limit);
 
     $cache[$limit] = $sales;
     return $cache[$limit];
@@ -2195,11 +2287,52 @@ function getAllGlobalActivity($limit = 100, $maxPages = 100) {
     return $cache[$cacheKey];
 }
 
+/**
+ * Stable identity for a sale so the all-time leaderboard can be merged
+ * incrementally without double-counting. Prefer the on-chain txid; fall back to
+ * a dog/price/date composite when a txid is missing.
+ */
+function ddTopSaleKey($sale) {
+    $txid = isset($sale['txid']) ? trim(strval($sale['txid'])) : '';
+    if ($txid !== '') {
+        return 'tx:' . $txid;
+    }
+    $dn = isset($sale['dogNumber']) ? strval($sale['dogNumber']) : '';
+    $px = isset($sale['priceDoge']) ? strval($sale['priceDoge']) : '';
+    $dt = isset($sale['date']) ? strval($sale['date']) : '';
+    return 'k:' . $dn . '|' . $px . '|' . $dt;
+}
+
+/** Build a normalized sale record from a raw global-activity entry (or null). */
+function ddBuildTopSaleRecord($activity) {
+    if (!is_array($activity) || !isset($activity['activityType']) || $activity['activityType'] !== 'sale') {
+        return null;
+    }
+
+    $saleState = normalizeSaleActivityState($activity);
+    $dogNumber = null;
+    if (isset($activity['dogName']) && preg_match('/#(\d+)/', $activity['dogName'], $matches)) {
+        $dogNumber = intval($matches[1]);
+    }
+
+    return array(
+        'dogNumber' => $dogNumber,
+        'name' => isset($activity['dogName']) ? $activity['dogName'] : ($dogNumber !== null ? 'Doginal Dog #' . $dogNumber : 'Doginal Dog'),
+        'priceDoge' => normalizeNumber(isset($activity['priceDoge']) ? $activity['priceDoge'] : null),
+        'status' => $saleState['status'],
+        'date' => $saleState['date'],
+        'confirmedAt' => $saleState['confirmedAt'],
+        'isConfirmed' => $saleState['isConfirmed'],
+        'txid' => isset($activity['txid']) ? $activity['txid'] : null,
+        'imageUrl' => buildDogImageUrl($dogNumber),
+    );
+}
+
 function getAllTimeTopSales($limit = 5) {
     global $MARKET_PULSE_CACHE_CANDIDATE_PATHS;
 
     static $cache = array();
-    $limit = max(1, min(12, intval($limit)));
+    $limit = max(1, min(50, intval($limit)));
 
     if (array_key_exists($limit, $cache)) {
         return $cache[$limit];
@@ -2208,45 +2341,64 @@ function getAllTimeTopSales($limit = 5) {
     $cachePath = getWritableCachePath($MARKET_PULSE_CACHE_CANDIDATE_PATHS);
     $cacheTtl = 900;
     $cachedPayload = readJsonCacheFile($cachePath);
-    $cachedGeneratedAt = is_array($cachedPayload) && isset($cachedPayload['generatedAt']) ? strtotime($cachedPayload['generatedAt']) : false;
+    // Use a dedicated timestamp for top sales. Sharing the generic `generatedAt`
+    // let other writers (e.g. getActiveListingCount) keep resetting it, which
+    // froze topSales here and dropped the newest/biggest sales from the feed.
+    $cachedSalesAt = is_array($cachedPayload) && isset($cachedPayload['topSalesAt'])
+        ? strtotime($cachedPayload['topSalesAt'])
+        : false;
     $cachedSales = is_array($cachedPayload) && isset($cachedPayload['topSales']) && is_array($cachedPayload['topSales'])
         ? $cachedPayload['topSales']
         : null;
 
-    if ($cachedSales !== null && $cachedGeneratedAt !== false && (time() - $cachedGeneratedAt) < $cacheTtl && count($cachedSales) >= $limit) {
+    if ($cachedSales !== null && $cachedSalesAt !== false && (time() - $cachedSalesAt) < $cacheTtl && count($cachedSales) >= $limit) {
         $cache[$limit] = array_slice($cachedSales, 0, $limit);
         return $cache[$limit];
     }
 
-    $activities = getAllGlobalActivity(100, 100);
-    $sales = array();
+    // Incremental refresh: once a leaderboard has been built, we only need to
+    // pull the newest activity pages and fold them in. A full deep scan only
+    // happens on first build (bootstrap) or if the persisted leaderboard was
+    // lost. This keeps periodic refreshes cheap instead of re-scanning ~10k
+    // activities every 15 minutes.
+    $haveCache = is_array($cachedSales) && count($cachedSales) > 0;
+    $scanPages = $haveCache ? 3 : 100;
+    $activities = getAllGlobalActivity(100, $scanPages);
+
+    $fresh = array();
     foreach ($activities as $activity) {
-        if (!isset($activity['activityType']) || $activity['activityType'] !== 'sale') {
-            continue;
+        $rec = ddBuildTopSaleRecord($activity);
+        if ($rec !== null) {
+            $fresh[] = $rec;
         }
-
-        $saleState = normalizeSaleActivityState($activity);
-        $dogNumber = null;
-        if (isset($activity['dogName']) && preg_match('/#(\d+)/', $activity['dogName'], $matches)) {
-            $dogNumber = intval($matches[1]);
-        }
-
-        $sales[] = array(
-            'dogNumber' => $dogNumber,
-            'name' => isset($activity['dogName']) ? $activity['dogName'] : ($dogNumber !== null ? 'Doginal Dog #' . $dogNumber : 'Doginal Dog'),
-            'priceDoge' => normalizeNumber(isset($activity['priceDoge']) ? $activity['priceDoge'] : null),
-            'status' => $saleState['status'],
-            'date' => $saleState['date'],
-            'confirmedAt' => $saleState['confirmedAt'],
-            'isConfirmed' => $saleState['isConfirmed'],
-            'txid' => isset($activity['txid']) ? $activity['txid'] : null,
-            'imageUrl' => buildDogImageUrl($dogNumber),
-        );
     }
 
-    $topSales = selectTopSales($sales, 12);
+    // Merge freshly-seen sales onto the persisted leaderboard, de-duplicating by
+    // sale identity so a big historic sale is never dropped just because it aged
+    // out of the recent pages we now scan.
+    $seed = $haveCache ? array_merge($cachedSales, $fresh) : $fresh;
+    $byKey = array();
+    $merged = array();
+    foreach ($seed as $sale) {
+        if (!is_array($sale)) {
+            continue;
+        }
+        $price = normalizeNumber(isset($sale['priceDoge']) ? $sale['priceDoge'] : null);
+        if ($price === null || $price <= 0) {
+            continue;
+        }
+        $key = ddTopSaleKey($sale);
+        if (isset($byKey[$key])) {
+            continue;
+        }
+        $byKey[$key] = true;
+        $merged[] = $sale;
+    }
+
+    $topSales = selectTopSales($merged, 50);
     $cacheData = is_array($cachedPayload) ? $cachedPayload : array();
     $cacheData['generatedAt'] = gmdate('c');
+    $cacheData['topSalesAt'] = gmdate('c');
     $cacheData['topSales'] = $topSales;
     writeJsonCacheFile($cachePath, $cacheData);
 
@@ -2258,7 +2410,8 @@ function getMarketPulsePayload($offersLimit = 6, $salesLimit = 6) {
     $dogeUsd = getDogecoinPrice();
     $offers = getActiveListings($offersLimit);
     $totalListings = getActiveListingCount();
-    $sales = getAllTimeTopSales($salesLimit);
+    $sales = getRecentSaleActivity($salesLimit);
+    $otcSales = getRecentOtcSales($salesLimit);
     $floorListing = count($offers) > 0 ? $offers[0] : getFloorListing();
     $floorDoge = is_array($floorListing) && isset($floorListing['priceDoge'])
         ? normalizeNumber($floorListing['priceDoge'])
@@ -2279,7 +2432,7 @@ function getMarketPulsePayload($offersLimit = 6, $salesLimit = 6) {
         'dogeUsd' => $dogeUsd,
         'freshness' => array(
             'offersSource' => 'live',
-            'salesSource' => 'all-time',
+            'salesSource' => 'recent',
             'priceSource' => 'live',
         ),
         'snapshot' => array(
@@ -2294,6 +2447,7 @@ function getMarketPulsePayload($offersLimit = 6, $salesLimit = 6) {
         ),
         'currentOffers' => $offers,
         'topSales' => $sales,
+        'recentOtcSales' => $otcSales,
     );
 }
 
@@ -4229,9 +4383,28 @@ if ($action === 'market-pulse') {
         $offersLimit = isset($_GET['offers']) ? intval($_GET['offers']) : 6;
         $salesLimit = isset($_GET['sales']) ? intval($_GET['sales']) : 6;
         $result = getMarketPulsePayload($offersLimit, $salesLimit);
-        sendJson($result, 200, 300);
+        sendJson($result, 200, 60);
     } catch (Exception $e) {
         sendError('Market pulse failed: ' . $e->getMessage(), 502);
+    }
+}
+
+if ($action === 'top-sales') {
+    try {
+        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 25;
+        $sales = getAllTimeTopSales($limit);
+        $dogeUsd = getDogecoinPrice();
+        foreach ($sales as &$sale) {
+            $sale['priceUsd'] = toUsdValue(isset($sale['priceDoge']) ? $sale['priceDoge'] : null, $dogeUsd);
+        }
+        unset($sale);
+        sendJson(array(
+            'generatedAt' => gmdate('c'),
+            'dogeUsd' => $dogeUsd,
+            'topSales' => $sales,
+        ), 200, 300);
+    } catch (Exception $e) {
+        sendError('Top sales failed: ' . $e->getMessage(), 502);
     }
 }
 
@@ -4642,10 +4815,17 @@ if ($action === 'evaluate') {
 }
 
 if ($action === 'wallet') {
-    sendJson(array(
-        'code' => 'dd_wallet_plus_only',
-        'error' => 'Wallet portfolio valuations are exclusive to KushMetaX Doginal Dogs Plus subscribers.',
-    ), 403, 0);
+    // Paywall removed: wallet portfolio valuations are free and open to everyone.
+    $address = isset($_GET['address']) ? trim(strval($_GET['address'])) : '';
+    if (!preg_match('/^[A-Za-z0-9]{24,80}$/', $address)) {
+        sendError('Invalid wallet address.', 400);
+    }
+    try {
+        $result = getWalletHoldingsSummary($address);
+        sendJson($result, 200, 0);
+    } catch (Exception $e) {
+        sendError('Wallet evaluation failed: ' . $e->getMessage(), 502);
+    }
 }
 
-sendError('Unknown action. Use evaluate, wallet, market-pulse, rank-lookup, snapshot_status, community-status, community-lore, community-suggestions, or admin routes.');
+sendError('Unknown action. Use evaluate, wallet, market-pulse, top-sales, rank-lookup, snapshot_status, community-status, community-lore, community-suggestions, or admin routes.');

@@ -480,15 +480,16 @@
               </div>
               <div class="dd-settings-subsection" id="clLorePendingWrap" style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid rgba(255,255,255,.08)" hidden aria-labelledby="clLorePendingTitle">
                 <h4 id="clLorePendingTitle" class="dd-settings-subtitle" style="font-size:.95rem;margin:0 0 .35rem">Pending lore-only (not yet published)</h4>
-                <p class="dd-settings-copy" style="margin:0 0 .75rem">These submissions are still in the queue. They do not appear in <code>dd-community-notes.json</code> (and not on the evaluator) until you approve them under <strong>Suggestions queue</strong>.</p>
+                <p class="dd-settings-copy" style="margin:0 0 .75rem">These submissions are still in the queue. Approve one here to publish it to <code>dd-community-notes.json</code> (and the evaluator), or reject to discard it.</p>
                 <div class="dd-settings-table-wrap">
                   <table class="dd-settings-table dd-lore-table" id="clLorePendingTable">
                     <thead>
                       <tr>
                         <th>ID</th>
                         <th>Dog #</th>
+                        <th>Suggested by</th>
                         <th>Lore</th>
-                        <th>Next step</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody id="clLorePendingTbody"></tbody>
@@ -2585,13 +2586,63 @@
         var pay = row.payload || {};
         var dog = pay.dogNumber != null ? String(pay.dogNumber) : '';
         var lore = pay.lore != null ? String(pay.lore) : '';
+        var by = pay.submittedBy ? String(pay.submittedBy) : '';
         var tr = document.createElement('tr');
         tr.innerHTML =
           '<td><code>' + esc(String(row.id || '').slice(0, 13)) + '…</code></td>' +
           '<td class="dd-lore-dog-col">' + esc(dog) + '</td>' +
+          '<td>' + (by ? esc(by) : '<span style="opacity:.5">—</span>') + '</td>' +
           '<td><pre class="cs-queue-pre">' + esc(lore) + '</pre></td>' +
-          '<td class="dd-settings-small">Open <strong>Suggestions queue</strong> → Load pending → Approve</td>';
+          '<td class="dd-lore-actions"></td>';
+        var tdAct = tr.querySelector('.dd-lore-actions');
+        var bOk = document.createElement('button');
+        bOk.type = 'button';
+        bOk.className = 'btn-primary';
+        bOk.textContent = 'Approve';
+        bOk.addEventListener('click', function(){ clReviewPending(row.id, 'approve'); });
+        var bNo = document.createElement('button');
+        bNo.type = 'button';
+        bNo.className = 'btn-outline';
+        bNo.textContent = 'Reject';
+        bNo.addEventListener('click', function(){ clReviewPending(row.id, 'reject'); });
+        tdAct.appendChild(bOk);
+        tdAct.appendChild(bNo);
         clLorePendingTbody.appendChild(tr);
+      });
+    }
+
+    function clReviewPending(id, actionName){
+      if(clLoreMsg){ clLoreMsg.textContent = ''; clLoreMsg.className = 'cs-queue-msg'; }
+      if(!getCsAdminPassword()){
+        if(clLoreMsg){ clLoreMsg.textContent = 'Enter the DD admin password (Suggestions queue field or DD save prompt).'; clLoreMsg.classList.add('err'); }
+        return;
+      }
+      fetch(suggestionApiBase + '/admin/suggestions/' + encodeURIComponent(id) + '/review', {
+        method: 'POST',
+        headers: csAuthHeaders(),
+        body: JSON.stringify({ action: actionName })
+      }).then(function(res){
+        return res.text().then(function(text){
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch(e2){}
+          if(!res.ok){
+            if(clLoreMsg){
+              clLoreMsg.textContent = (data && data.error) ? data.error : (res.status + ' ' + (res.statusText || '') + (text ? ': ' + text.slice(0, 200) : ''));
+              clLoreMsg.classList.add('err');
+            }
+            return;
+          }
+          if(clLoreMsg){
+            clLoreMsg.textContent = actionName === 'approve' ? 'Approved — lore published.' : 'Rejected.';
+            clLoreMsg.classList.add('ok');
+          }
+          loadCommunityLoreTable();
+        });
+      }).catch(function(err){
+        if(clLoreMsg){
+          clLoreMsg.textContent = err && err.message ? err.message : 'Request failed';
+          clLoreMsg.classList.add('err');
+        }
       });
     }
 

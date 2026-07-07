@@ -1510,6 +1510,7 @@ async function buildSnapshot(log = console.log) {
         date: saleState.date,
         confirmedAt: saleState.confirmedAt,
         isConfirmed: saleState.isConfirmed,
+        otc: !!a.otc,
         txid: a.txid,
       };
     });

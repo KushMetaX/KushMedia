@@ -605,6 +605,11 @@
     .eval-badge-listed{background:rgba(50,180,80,.15);color:#5d5;border:1px solid rgba(50,180,80,.3)}
     .eval-badge-unlisted{background:#1a1a1a;color:#777;border:1px solid #333}
     .eval-badge-rarity{background:rgba(120,80,200,.15);color:#b8a0e0;border:1px solid rgba(120,80,200,.3)}
+    /* Rarity tier colors pulled from market.doginaldogs.com (cY/f4 palette) */
+    .eval-rarity-orange{background:rgba(251,146,60,.06);color:#fb923c;border-color:rgba(251,146,60,.3)}
+    .eval-rarity-purple{background:rgba(192,132,252,.06);color:#c084fc;border-color:rgba(192,132,252,.3)}
+    .eval-rarity-blue{background:rgba(96,165,250,.06);color:#60a5fa;border-color:rgba(96,165,250,.3)}
+    .eval-rarity-grey{background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border-color:rgba(255,255,255,.08)}
     .eval-badge-special{background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.4)}
 
     /* Price grid */
@@ -674,7 +679,7 @@
     .eval-trait-floor{color:#666;font-size:.75rem;text-align:right;white-space:nowrap}
     .eval-trait-floor.unlisted{color:#a78bfa}
     .eval-trait-sale{color:#5d5;font-size:.7rem;font-weight:400}
-    .eval-trait-count{color:#555;font-size:.65rem}
+    .eval-trait-count{display:inline-block;font-size:.62rem;font-weight:600;padding:1px 6px;border-radius:4px;border:1px solid transparent;vertical-align:middle}
     .eval-top-sale-badge,.eval-trending-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;padding:3px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;line-height:1;vertical-align:middle;box-sizing:border-box}
     .eval-top-sale-badge{background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.4)}
     .eval-top-sale-badge svg{width:10px;height:10px;fill:#d4af37;flex-shrink:0}
@@ -1179,8 +1184,91 @@
       display:block;
       margin-top:.15rem
     }
+    .eval-mp-tile-px.eval-mp-tile-otc{
+      color:#9cc7ff;
+      letter-spacing:.06em
+    }
     .eval-mp-skel{min-height:5rem;border-radius:.6rem;background:rgba(255,255,255,.04);animation:evalPulse 1.2s ease-in-out infinite}
     @keyframes evalPulse{0%,100%{opacity:.45}50%{opacity:.85}}
+
+    /* Request community lore */
+    .eval-lore-request{text-align:center}
+    .eval-lore-request-title{
+      font-family:"Cormorant",Georgia,serif;
+      font-size:clamp(1.15rem,3.6vw,1.3rem);
+      font-weight:700;
+      color:#f5f0e6;
+      line-height:1.35;
+      margin:.35rem auto 0;
+      letter-spacing:.02em
+    }
+    .eval-lore-request-desc{
+      color:#827d73;
+      font-size:.83rem;
+      margin:.55rem auto 1rem;
+      line-height:1.5;
+      max-width:26rem;
+      text-wrap:pretty;
+      letter-spacing:.015em
+    }
+    .eval-lore-request-form{
+      display:flex;
+      flex-direction:column;
+      gap:.7rem;
+      text-align:left;
+      max-width:30rem;
+      margin:0 auto
+    }
+    .eval-lore-request-form label{
+      display:block;
+      font-size:.68rem;
+      text-transform:uppercase;
+      letter-spacing:.1em;
+      color:#8a857b;
+      font-weight:600;
+      margin:0 0 .3rem
+    }
+    .eval-lore-request-form input,
+    .eval-lore-request-form textarea{
+      width:100%;
+      box-sizing:border-box;
+      padding:.6rem .75rem;
+      border-radius:.6rem;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.32);
+      color:#f0ece2;
+      font:inherit;
+      line-height:1.5
+    }
+    .eval-lore-request-form textarea{min-height:5.5rem;resize:vertical}
+    .eval-lore-request-form input:focus,
+    .eval-lore-request-form textarea:focus{
+      outline:none;
+      border-color:rgba(212,175,55,.45)
+    }
+    .eval-lore-request-actions{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:.75rem;
+      margin-top:.15rem
+    }
+    .eval-lore-request-btn{
+      padding:.55rem 1.2rem;
+      font-size:.82rem;
+      font-weight:700;
+      border-radius:.55rem;
+      cursor:pointer;
+      border:1px solid rgba(212,175,55,.4);
+      color:var(--eval-gold);
+      background:linear-gradient(180deg, rgba(50,40,20,.4) 0%, rgba(10,8,4,.3) 100%);
+      transition:background .2s,border-color .2s,color .2s
+    }
+    .eval-lore-request-btn:hover{color:#fff0c0;border-color:rgba(232,200,100,.5)}
+    .eval-lore-request-btn:disabled{opacity:.55;cursor:default}
+    .eval-lore-request-msg{font-size:.8rem;line-height:1.4}
+    .eval-lore-request-msg.is-ok{color:#8fd19e}
+    .eval-lore-request-msg.is-err{color:#e39a9a}
 
     .eval-kennel-inner{
       position:relative;
@@ -1341,44 +1429,6 @@
       box-shadow:0 2px 10px rgba(201,162,60,.22)
     }
     .eval-auth-btn-primary:hover{filter:brightness(1.05)}
-    .eval-unlock-btn{
-      font:inherit;
-      font-weight:800;
-      font-size:.8rem;
-      text-transform:none;
-      letter-spacing:.04em;
-      padding:.56rem 1.05rem;
-      border-radius:.65rem;
-      cursor:pointer;
-      border:1px solid rgba(255,236,180,.42);
-      background:var(--eval-grad-cta-strong);
-      color:#0a0704;
-      box-shadow:
-        0 0 0 1px rgba(212,175,55,.15),
-        0 4px 22px rgba(212,175,55,.42),
-        0 0 42px rgba(232,197,71,.22),
-        inset 0 1px 0 rgba(255,255,255,.42);
-      transition:filter .22s ease,transform .2s ease,box-shadow .28s ease,border-color .22s ease;
-    }
-    .eval-unlock-btn:hover{
-      filter:brightness(1.07);
-      transform:translateY(-2px);
-      border-color:rgba(255,245,210,.55);
-      box-shadow:
-        0 0 0 1px rgba(232,197,71,.28),
-        0 8px 32px rgba(212,175,55,.48),
-        0 0 56px rgba(232,197,71,.28),
-        inset 0 1px 0 rgba(255,255,255,.48);
-    }
-    .eval-unlock-btn:active{transform:translateY(0) scale(.98)}
-    @media (prefers-reduced-motion: reduce){
-      .eval-unlock-btn:hover,
-      .eval-unlock-btn:active{transform:none}
-    }
-    .eval-sub-badge{
-      font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;
-      padding:.28rem .5rem;border-radius:999px;background:rgba(80,220,140,.14);color:#9be7b9;border:1px solid rgba(80,220,140,.35)
-    }
     .eval-modal{
       max-width:92vw;width:400px;border:none;border-radius:.75rem;padding:0;
       background:linear-gradient(180deg,#141210 0%,#0a0908 100%);
@@ -1761,6 +1811,211 @@
         gap:.72rem;
       }
     }
+
+    /* ============================================================
+       ✦ FANCY FX LAYER — interactive buttons: sheen, glow, motion
+       Purely additive & fully reversible; honors reduced-motion.
+       ============================================================ */
+    @keyframes evalGradShift{
+      0%{background-position:0% 50%}
+      100%{background-position:200% 50%}
+    }
+    @keyframes evalGlowPulse{
+      0%,100%{box-shadow:0 6px 22px rgba(180,150,50,.34), 0 0 0 rgba(232,197,71,0)}
+      50%{box-shadow:0 8px 28px rgba(205,172,62,.5), 0 0 30px rgba(232,197,71,.4)}
+    }
+    @keyframes evalRipple{
+      to{transform:scale(3.4);opacity:0}
+    }
+    @keyframes evalAccentSlide{
+      0%{background-position:0% 50%}
+      100%{background-position:200% 50%}
+    }
+
+    /* Shared interaction base — spring transition + clip for sheen */
+    .eval-btn,
+    .eval-modal-submit,
+    .eval-dex-spotlight-btn,
+    .eval-auth-btn,
+    .eval-mp-btn,
+    .eval-mode-btn,
+    .eval-tip-copy,
+    .eval-hero-tip-chip{
+      position:relative;
+      overflow:hidden;
+      transition:
+        transform .32s cubic-bezier(.34,1.56,.64,1),
+        filter .25s ease,
+        box-shadow .3s ease,
+        border-color .25s ease,
+        color .25s ease,
+        background-color .25s ease;
+    }
+
+    /* Diagonal light sheen that sweeps across on hover */
+    .eval-btn::after,
+    .eval-modal-submit::after,
+    .eval-dex-spotlight-btn::after,
+    .eval-auth-btn::after,
+    .eval-mp-btn::after,
+    .eval-mode-btn::after,
+    .eval-tip-copy::after,
+    .eval-hero-tip-chip::after{
+      content:"";
+      position:absolute;
+      top:-25%;
+      left:-160%;
+      width:65%;
+      height:150%;
+      background:linear-gradient(100deg,
+        transparent 0%,
+        rgba(255,248,222,.14) 38%,
+        rgba(255,250,232,.6) 50%,
+        rgba(255,248,222,.14) 62%,
+        transparent 100%);
+      transform:skewX(-20deg);
+      pointer-events:none;
+      z-index:3;
+      transition:left .8s cubic-bezier(.22,1,.36,1);
+    }
+    .eval-btn:hover::after,
+    .eval-modal-submit:hover::after,
+    .eval-dex-spotlight-btn:hover::after,
+    .eval-auth-btn:hover::after,
+    .eval-mp-btn:hover::after,
+    .eval-mode-btn:hover::after,
+    .eval-tip-copy:hover::after,
+    .eval-hero-tip-chip:hover::after{
+      left:170%;
+    }
+
+    /* Primary golden CTAs — living gradient + breathing glow + spring lift */
+    .eval-btn,
+    .eval-modal-submit,
+    .eval-auth-btn-primary,
+    .eval-mode-btn.active{
+      background-image:linear-gradient(100deg,
+        #fff8e0 0%, #f2dc86 20%, #d4af37 44%, #f2dc86 68%, #d4af37 100%);
+      background-size:220% 100%;
+      animation:evalGradShift 7s linear infinite, evalGlowPulse 3.8s ease-in-out infinite;
+    }
+    .eval-btn:hover,
+    .eval-modal-submit:hover,
+    .eval-auth-btn-primary:hover{
+      transform:translateY(-3px) scale(1.035);
+      filter:brightness(1.08) saturate(1.06);
+      box-shadow:0 14px 36px rgba(205,172,62,.5), 0 0 44px rgba(232,197,71,.45);
+      animation-play-state:paused;
+    }
+    .eval-btn:active,
+    .eval-modal-submit:active,
+    .eval-auth-btn-primary:active{
+      transform:translateY(-1px) scale(.975);
+    }
+    .eval-btn:disabled{
+      animation:none;
+      transform:none;
+      filter:none;
+    }
+
+    /* Ghost / secondary buttons — springy magnetic lift on hover */
+    .eval-dex-spotlight-btn:hover,
+    .eval-auth-btn:not(.eval-auth-btn-primary):hover,
+    .eval-mp-btn:hover,
+    .eval-hero-tip-chip:hover{
+      transform:translateY(-2px) scale(1.02);
+    }
+    .eval-dex-spotlight-btn:active,
+    .eval-auth-btn:not(.eval-auth-btn-primary):active,
+    .eval-mp-btn:active,
+    .eval-hero-tip-chip:active{
+      transform:translateY(0) scale(.97);
+    }
+
+    /* Inactive segment gets a gentle lift; active segment sits proud */
+    .eval-mode-btn:not(.active):hover{
+      transform:translateY(-1px);
+    }
+    .eval-mode-btn.active{
+      transform:translateY(-1px) scale(1.015);
+    }
+
+    /* Copy-to-clipboard confirm bounce */
+    .eval-tip-copy.eval-tip-copied{
+      transform:scale(1.08);
+    }
+
+    /* Click ripple (injected via JS) */
+    .eval-ripple{
+      position:absolute;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(255,252,235,.5) 0%, rgba(255,252,235,0) 70%);
+      transform:scale(0);
+      opacity:.9;
+      pointer-events:none;
+      z-index:4;
+      animation:evalRipple .62s ease-out forwards;
+    }
+
+    /* Animated gold accent line atop key panels for extra polish */
+    .eval-search-card.eval-block-card{
+      position:relative;
+    }
+    .eval-search-card.eval-block-card::before{
+      content:"";
+      position:absolute;
+      top:0;
+      left:14%;
+      right:14%;
+      height:2px;
+      border-radius:2px;
+      background:linear-gradient(90deg,
+        transparent 0%,
+        rgba(232,197,71,.15) 20%,
+        rgba(255,244,196,.9) 50%,
+        rgba(232,197,71,.15) 80%,
+        transparent 100%);
+      background-size:200% 100%;
+      animation:evalAccentSlide 5.5s linear infinite;
+      pointer-events:none;
+      z-index:2;
+    }
+
+    /* Input: animated focus halo to match the elevated buttons */
+    .eval-input:focus{
+      box-shadow:0 0 0 2px rgba(232,197,71,.35), 0 0 22px rgba(232,197,71,.18), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      .eval-btn,
+      .eval-modal-submit,
+      .eval-auth-btn-primary,
+      .eval-mode-btn.active,
+      .eval-search-card.eval-block-card::before{
+        animation:none !important;
+      }
+      .eval-btn::after,
+      .eval-modal-submit::after,
+      .eval-dex-spotlight-btn::after,
+      .eval-auth-btn::after,
+      .eval-mp-btn::after,
+      .eval-mode-btn::after,
+      .eval-tip-copy::after,
+      .eval-hero-tip-chip::after{
+        display:none;
+      }
+      .eval-btn:hover,
+      .eval-modal-submit:hover,
+      .eval-auth-btn-primary:hover,
+      .eval-dex-spotlight-btn:hover,
+      .eval-auth-btn:hover,
+      .eval-mp-btn:hover,
+      .eval-hero-tip-chip:hover,
+      .eval-mode-btn:hover,
+      .eval-mode-btn.active{
+        transform:none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1806,26 +2061,22 @@
             <h1 class="eval-title" id="evalMainTitle">Price Evaluator</h1>
             <p class="eval-subtitle">Trait-weighted valuation powered by live market data</p>
           </div>
-          <div class="eval-hero-divider" aria-hidden="true"></div>
-          <div class="eval-auth-bar" id="evalAuthBar">
-            <p class="eval-auth-bar-msg" id="evalAuthLabel">Log in (free) to sync your DogiDex. Upgrade to Plus for unlimited valuations and wallet estimates.</p>
+          <div class="eval-hero-divider" aria-hidden="true" style="display:none"></div>
+          <div class="eval-auth-bar" id="evalAuthBar" style="display:none">
+            <p class="eval-auth-bar-msg" id="evalAuthLabel">Log in (free) to sync your DogiDex. Every valuation tool is free and unlimited.</p>
             <div class="eval-auth-bar-actions">
               <span id="evalAuthGuestRow">
                 <button type="button" class="eval-auth-btn" id="evalAuthLoginBtn">Member log in</button>
-                <button type="button" class="eval-unlock-btn" id="evalUnlockPlusBtn">Unlock Plus — unlimited &amp; wallet</button>
               </span>
               <span id="evalAuthUserRow" hidden>
                 <span class="eval-auth-email" id="evalAuthEmail" title=""></span>
-                <span id="evalSubBadge" class="eval-sub-badge" hidden aria-label="Subscription status">Plus active</span>
-                <button type="button" class="eval-unlock-btn" id="evalUnlockPlusLoggedBtn" hidden>Upgrade to Plus</button>
-                <button type="button" class="eval-auth-btn" id="evalManageBillingBtn" hidden>Renew Plus</button>
                 <button type="button" class="eval-auth-btn" id="evalAuthLogoutBtn">Log out</button>
               </span>
             </div>
           </div>
         </div>
 
-        <div class="eval-dex-spotlight eval-glass-panel eval-block-card eval-lift-hover">
+        <div class="eval-dex-spotlight eval-glass-panel eval-block-card eval-lift-hover" style="display:none">
           <div class="eval-dex-spotlight-inner">
             <div class="eval-dex-spotlight-copy">
               <p class="eval-overline">Included with every account</p>
@@ -1854,13 +2105,40 @@
           </div>
         </div>
 
+        <div class="eval-lore-request eval-glass-panel eval-block-card eval-lift-hover" id="evalLoreRequest">
+          <p class="eval-mp-kicker">Community lore</p>
+          <h2 class="eval-lore-request-title">Request Community Lore</h2>
+          <p class="eval-lore-request-desc">Know the story behind a Doginal Dog? Submit lore for it. Once an admin approves your note, it appears on that dog&rsquo;s evaluation.</p>
+          <form class="eval-lore-request-form" id="evalLoreForm" autocomplete="off">
+            <div>
+              <label for="evalLoreDog">Dog number</label>
+              <input type="number" id="evalLoreDog" min="1" max="10000" step="1" placeholder="1&ndash;10000" required />
+            </div>
+            <div>
+              <label for="evalLoreBy">Your name / handle</label>
+              <input type="text" id="evalLoreBy" maxlength="120" autocomplete="off" placeholder="So we can credit you" required />
+            </div>
+            <div id="evalLorePwRow" hidden>
+              <label for="evalLorePw">Community password</label>
+              <input type="password" id="evalLorePw" autocomplete="off" />
+            </div>
+            <div>
+              <label for="evalLoreText">Lore</label>
+              <textarea id="evalLoreText" maxlength="8000" placeholder="Share the story, background, or significance of this dog&hellip;" required></textarea>
+            </div>
+            <div class="eval-lore-request-actions">
+              <button type="submit" class="eval-lore-request-btn" id="evalLoreSubmit">Submit for review</button>
+              <span class="eval-lore-request-msg" id="evalLoreMsg" aria-live="polite"></span>
+            </div>
+          </form>
+        </div>
+
         <div class="eval-search-card eval-glass-panel eval-block-card eval-lift-hover" role="search" aria-label="Inscription, rank, or wallet lookup">
         <div class="eval-mode-toggle" role="tablist" aria-label="Search mode">
           <button type="button" class="eval-mode-btn active" data-mode="inscription" role="tab" aria-selected="true">Inscription #</button>
           <button type="button" class="eval-mode-btn" data-mode="rank" role="tab" aria-selected="false">Rarity Rank</button>
           <button type="button" class="eval-mode-btn" data-mode="wallet" role="tab" aria-selected="false">Wallet Address</button>
         </div>
-        <p class="eval-mode-hint" id="evalFreeTierHint" style="display:block;margin:0">Free guests: 2 inscription valuations and 1 rarity valuation per UTC day at your IP. Wallet estimates require Plus.</p>
         <div id="modeHint" class="eval-mode-hint" style="display:none"></div>
 
         <form id="searchForm" class="eval-form">
@@ -2032,53 +2310,6 @@
       <p class="eval-tip-modal-footer">Seriously, thank you. 🐳</p>
     </div>
   </div>
-
-  <dialog class="eval-modal" id="evalSubscribeDialog" aria-labelledby="evalSubscribeTitle">
-    <div class="eval-modal-inner">
-      <button type="button" class="eval-modal-close" id="evalSubscribeDialogClose" aria-label="Close">&times;</button>
-      <h2 class="eval-modal-title" id="evalSubscribeTitle">DD Evaluator Plus</h2>
-      <p class="eval-modal-meta" style="font-size:.86rem;line-height:1.5;color:#b8b3aa;margin:0 0 .75rem">
-        Unlimited inscription &amp; rarity valuations and wallet portfolio estimates on your KushMedia account.
-        DogiDex stays free &mdash; sign in to sync your collection. Pay with cryptocurrency (BTC, ETH, SOL, DOGE via our payment processor); access extends for the prepaid period after the payment is confirmed.
-      </p>
-      <div id="evalSubscribeGuestEmailWrap" class="eval-modal-fields" style="margin:.35rem 0 .6rem;display:none">
-        <label style="display:block;margin:0;font-size:.84rem;line-height:1.35;color:#c9c4bc">Your email <span style="opacity:.72">(must match your KushMetaX account)</span>
-          <input type="email" id="evalSubscribeGuestEmail" autocomplete="email" placeholder="you@domain.com"
-            style="width:100%;margin-top:.35rem;padding:.45rem .55rem;border-radius:8px;border:1px solid #3a3935;background:#171614;color:#eee;font-size:.95rem" />
-        </label>
-      </div>
-      <div id="evalSubscribePlanStep">
-        <label style="display:block;margin:.25rem 0 .5rem;font-size:.84rem;line-height:1.35;color:#c9c4bc">Pay with
-          <select id="evalPayCurrencySelect" style="width:100%;margin-top:.35rem;padding:.45rem .55rem;border-radius:8px;border:1px solid #3a3935;background:#171614;color:#eee;font-size:.95rem">
-            <option value="btc">BTC</option>
-            <option value="eth">ETH</option>
-            <option value="sol">SOL</option>
-            <option value="doge">DOGE</option>
-          </select>
-        </label>
-        <div style="display:flex;flex-direction:column;gap:.55rem;margin-top:.5rem">
-          <button type="button" class="eval-btn eval-modal-submit" id="evalCheckoutMonthBtn">Prepay 1 month (USD price)</button>
-          <button type="button" class="eval-auth-btn" style="width:100%" id="evalCheckoutYearBtn">Prepay 1 year — best value</button>
-        </div>
-      </div>
-      <div id="evalSubscribePayStep" style="display:none;margin-top:.65rem">
-        <p class="eval-modal-meta" style="margin:0 0 .55rem;font-size:.85rem;line-height:1.45;color:#c9c4bc">
-          Send exactly <strong id="evalCryptoAmountStrong" translate="no">—</strong> <span id="evalCryptoCurrencyLabel"></span> to:
-        </p>
-        <div style="display:flex;gap:.4rem;align-items:flex-start;flex-wrap:wrap">
-          <code id="evalCryptoPayAddress" translate="no" style="flex:1;min-width:12rem;word-break:break-all;font-size:.82rem;padding:.45rem;border-radius:8px;background:#0f0e0c;border:1px solid #3a3935;color:#e8e4dc"></code>
-          <button type="button" class="eval-auth-btn" id="evalCryptoCopyAddrBtn" style="flex-shrink:0">Copy address</button>
-        </div>
-        <p class="eval-modal-meta" style="margin:.55rem 0 0;font-size:.78rem;color:#8a857c">Payment ID: <code id="evalCryptoPaymentIdEl" translate="no">—</code></p>
-        <div style="display:flex;flex-direction:column;gap:.45rem;margin-top:.75rem">
-          <button type="button" class="eval-btn eval-modal-submit" id="evalCryptoRefreshBtn">I paid — refresh status</button>
-          <button type="button" class="eval-auth-btn" style="width:100%" id="evalSubscribeBackBtn">Back to plans</button>
-        </div>
-      </div>
-      <p class="eval-modal-auth-hint" style="margin-top:.9rem"><strong>Same email as your KushMedia account</strong> — if you pay before registering, create your account with this email so Plus unlocks.</p>
-      <p class="eval-auth-msg" id="evalSubscribeErr" aria-live="polite"></p>
-    </div>
-  </dialog>
 
   <dialog class="eval-modal" id="evalAuthDialog" aria-labelledby="evalAuthDialogTitle">
     <div class="eval-modal-inner">
@@ -2311,11 +2542,6 @@
     var evalAuthUserRow = document.getElementById('evalAuthUserRow');
     var evalAuthEmail = document.getElementById('evalAuthEmail');
     var evalAuthLoginBtn = document.getElementById('evalAuthLoginBtn');
-    var evalUnlockPlusBtn = document.getElementById('evalUnlockPlusBtn');
-    var evalUnlockPlusLoggedBtn = document.getElementById('evalUnlockPlusLoggedBtn');
-    var evalSubBadge = document.getElementById('evalSubBadge');
-    var evalManageBillingBtn = document.getElementById('evalManageBillingBtn');
-    var evalFreeTierHint = document.getElementById('evalFreeTierHint');
     var evalAuthLogoutBtn = document.getElementById('evalAuthLogoutBtn');
     var evalDexSpotlightBtn = document.getElementById('evalDexSpotlightBtn');
     var evalAuthDialog = document.getElementById('evalAuthDialog');
@@ -2342,18 +2568,6 @@
     var evalDexProgressBar = document.getElementById('evalDexProgressBar');
     var evalDexErr = document.getElementById('evalDexErr');
     var evalDexSortMode = document.getElementById('evalDexSortMode');
-    var evalSubscribeDialog = document.getElementById('evalSubscribeDialog');
-    var evalSubscribeDialogClose = document.getElementById('evalSubscribeDialogClose');
-    var evalCheckoutMonthBtn = document.getElementById('evalCheckoutMonthBtn');
-    var evalCheckoutYearBtn = document.getElementById('evalCheckoutYearBtn');
-    var evalSubscribeErr = document.getElementById('evalSubscribeErr');
-    var evalSubscribePlanStep = document.getElementById('evalSubscribePlanStep');
-    var evalSubscribePayStep = document.getElementById('evalSubscribePayStep');
-    var evalPayCurrencySelect = document.getElementById('evalPayCurrencySelect');
-    var evalCryptoRefreshBtn = document.getElementById('evalCryptoRefreshBtn');
-    var evalSubscribeBackBtn = document.getElementById('evalSubscribeBackBtn');
-    var evalCryptoCopyAddrBtn = document.getElementById('evalCryptoCopyAddrBtn');
-    var cryptoCheckoutState = { paymentId: '', orderId: '' };
 
     /** GET /kmx-auth/me JSON or null — does not touch UI (for Supabase + bridge merge). */
     function fetchKushMePayload() {
@@ -2389,20 +2603,9 @@
       return s.slice(0, 6) + '…' + s.slice(at);
     }
 
-    function ddPlusActive(sess) {
-      var sub = sess && sess.subscription;
-      if (!sub) return false;
-      if (sub.active === true) return true;
-      if (sub.complimentary === true) return true;
-      return !!sub.active;
-    }
-
-    /** Keeps Supabase user (UUID) for DogiDex Postgres; attaches SQLite subscription + paywall state from /me when bridged. */
+    /** Keeps Supabase user (UUID) for DogiDex Postgres; attaches the DogiDex shelf from /me when bridged. */
     function mergeSupabaseWithKush(sb, kush) {
       if (!sb || !sb.user) return sb;
-      if (kush && kush.subscription) {
-        sb.subscription = kush.subscription;
-      }
       if (kush && kush.dex) {
         sb.dex = kush.dex;
       }
@@ -2488,12 +2691,11 @@
       } catch (_eW) {}
     }
 
-    /** Merges Plus/subscription onto Supabase-shaped session using bridge JSON or /me fallback. */
+    /** Merges the DogiDex shelf onto a Supabase-shaped session using bridge JSON or /me fallback. */
     function attachKushPlusAfterBridge(sb, br) {
       if (!sb || !sb.user) return Promise.resolve(sb);
-      if (br && br.ok && br.data && br.data.subscription) {
-        sb.subscription = br.data.subscription;
-        if (br.data.dex) sb.dex = sb.dex || br.data.dex;
+      if (br && br.ok && br.data && br.data.dex) {
+        sb.dex = sb.dex || br.data.dex;
         setAuthUiFromSession(sb);
         return Promise.resolve(sb);
       }
@@ -2525,38 +2727,16 @@
       var loggedIn = !!(session && session.user);
       evalAuthGuestRow.hidden = loggedIn;
       evalAuthUserRow.hidden = !loggedIn;
-      if (evalUnlockPlusBtn) evalUnlockPlusBtn.hidden = loggedIn;
-
-      var plus = ddPlusActive(session);
-
-      if (evalSubBadge) evalSubBadge.hidden = !loggedIn || !plus;
-      if (evalUnlockPlusLoggedBtn) evalUnlockPlusLoggedBtn.hidden = !loggedIn || plus;
 
       var authLabelEl = document.getElementById('evalAuthLabel');
       if (authLabelEl) {
         if (!loggedIn) {
           authLabelEl.textContent =
-            'Log in (free) to sync your DogiDex. Unlock Plus for unlimited valuations and wallet estimates — same email at checkout.';
-        } else if (plus) {
-          authLabelEl.textContent = 'Plus active — unlimited valuations and wallet estimates. DogiDex remains free on this account.';
+            'Log in (free) to sync your DogiDex. Every valuation tool is free and unlimited.';
         } else {
           authLabelEl.textContent =
-            'DogiDex is free while signed in. Upgrade to Plus for unlimited valuations and wallet portfolio estimates.';
+            'Signed in — your DogiDex is synced. All valuations and wallet estimates are free and unlimited.';
         }
-      }
-      if (evalManageBillingBtn) {
-        var canRenew = !!(session && session.subscription && session.subscription.canRenew === true);
-        var comp = !!(session && session.subscription && session.subscription.complimentary === true);
-        var plusOn = ddPlusActive(session);
-        evalManageBillingBtn.hidden = !loggedIn || !plusOn || !canRenew || comp;
-      }
-
-      var subGuestWrap = document.getElementById('evalSubscribeGuestEmailWrap');
-      if (subGuestWrap) subGuestWrap.style.display = loggedIn ? 'none' : 'block';
-
-      if (evalFreeTierHint) {
-        var showTier = !(loggedIn && plus);
-        evalFreeTierHint.style.display = showTier ? 'block' : 'none';
       }
 
       if (loggedIn && session.user) {
@@ -3139,196 +3319,12 @@
       });
     }
 
-    function populatePayCurrencyOptions() {
-      return fetch(authApi('/billing/pricing'), { credentials: 'include', headers: { accept: 'application/json' } })
-        .then(function(res) { return res.ok ? res.json() : null; })
-        .then(function(p) {
-          if (!evalPayCurrencySelect || !p || !p.payCurrencies || !p.payCurrencies.length) return;
-          var cur = evalPayCurrencySelect.value;
-          evalPayCurrencySelect.innerHTML = '';
-          p.payCurrencies.forEach(function(c) {
-            var o = document.createElement('option');
-            o.value = c;
-            o.textContent = String(c).toUpperCase();
-            evalPayCurrencySelect.appendChild(o);
-          });
-          if (cur && Array.prototype.some.call(evalPayCurrencySelect.options, function(o) { return o.value === cur; })) {
-            evalPayCurrencySelect.value = cur;
-          }
-        })
-        .catch(function() {});
-    }
-
-    function openSubscribePlusDialog() {
-      if (evalSubscribeErr) evalSubscribeErr.textContent = '';
-      cryptoCheckoutState = { paymentId: '', orderId: '' };
-      if (evalSubscribePlanStep) evalSubscribePlanStep.style.display = '';
-      if (evalSubscribePayStep) evalSubscribePayStep.style.display = 'none';
-      populatePayCurrencyOptions();
-      if (evalSubscribeDialog) evalSubscribeDialog.showModal();
-    }
-
-    function startDoginalPlusCheckout(plan) {
-      var isYear = plan === 'year';
-      if (evalSubscribeErr) {
-        evalSubscribeErr.textContent = '';
-        evalSubscribeErr.classList.remove('ok');
-      }
-      var payCurrency = evalPayCurrencySelect && evalPayCurrencySelect.value ? evalPayCurrencySelect.value : 'btc';
-      var checkoutPayload = { plan: isYear ? 'year' : 'month', payCurrency: payCurrency };
-      if (!(authSession && authSession.user)) {
-        var ge = document.getElementById('evalSubscribeGuestEmail');
-        var gum = ge && typeof ge.value === 'string' ? ge.value.trim() : '';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gum)) {
-          if (evalSubscribeErr) evalSubscribeErr.textContent = 'Enter the email tied to your KushMedia account.';
-          return;
-        }
-        checkoutPayload.email = gum;
-      }
-      fetch(authApi('/billing/create-checkout-session'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify(checkoutPayload)
-      })
-        .then(function(res) {
-          return res.json().then(function(body) { return { ok: res.ok, body: body }; });
-        })
-        .then(function(r) {
-          if (r.ok && r.body && r.body.ok && r.body.payAddress) {
-            cryptoCheckoutState.paymentId = r.body.paymentId || '';
-            cryptoCheckoutState.orderId = r.body.orderId || '';
-            var amtEl = document.getElementById('evalCryptoAmountStrong');
-            var curEl = document.getElementById('evalCryptoCurrencyLabel');
-            var addrEl = document.getElementById('evalCryptoPayAddress');
-            var pidEl = document.getElementById('evalCryptoPaymentIdEl');
-            if (amtEl) amtEl.textContent = r.body.payAmount || '—';
-            if (curEl) curEl.textContent = (r.body.payCurrency || '').toUpperCase();
-            if (addrEl) addrEl.textContent = r.body.payAddress;
-            if (pidEl) pidEl.textContent = r.body.paymentId || '—';
-            if (evalSubscribePlanStep) evalSubscribePlanStep.style.display = 'none';
-            if (evalSubscribePayStep) evalSubscribePayStep.style.display = 'block';
-            if (evalSubscribeErr) {
-              evalSubscribeErr.textContent = 'Send the exact amount from your wallet. Confirmations may take a few minutes.';
-            }
-            return;
-          }
-          var err = (r.body && (r.body.error || r.body.message)) ? (r.body.error || r.body.message) : 'Checkout is not available yet.';
-          if (evalSubscribeErr) evalSubscribeErr.textContent = err;
-        })
-        .catch(function() {
-          if (evalSubscribeErr) evalSubscribeErr.textContent = 'Could not start checkout.';
-        });
-    }
-
-    function refreshCryptoPaymentStatus() {
-      var pid = cryptoCheckoutState.paymentId;
-      var oid = cryptoCheckoutState.orderId;
-      if (!pid && !oid) return;
-      fetch(authApi('/billing/refresh-crypto-payment'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify(pid ? { paymentId: pid } : { orderId: oid })
-      })
-        .then(function(res) { return res.json().then(function(b) { return { ok: res.ok, b: b }; }); })
-        .then(function(r) {
-          if (evalSubscribeErr) {
-            evalSubscribeErr.classList.remove('ok');
-            if (r.b && r.b.finished) {
-              evalSubscribeErr.textContent = 'Payment confirmed. Refreshing your session…';
-              evalSubscribeErr.classList.add('ok');
-            } else {
-              evalSubscribeErr.textContent = (r.b && r.b.paymentStatus) ? ('Status: ' + r.b.paymentStatus) : 'Still waiting for confirmation.';
-            }
-          }
-          return refreshAuthSession();
-        })
-        .then(function() {
-          if (evalSubscribeDialog && evalSubscribeDialog.open && authSession && ddPlusActive(authSession)) {
-            evalSubscribeDialog.close();
-          }
-        })
-        .catch(function() {
-          if (evalSubscribeErr) evalSubscribeErr.textContent = 'Could not refresh status.';
-        });
-    }
-
-    /** After return from payment provider success_url (?orderId=). */
-    function maybeSyncCryptoReturnFromUrl() {
-      try {
-        var u = new URL(window.location.href);
-        var oid = String(u.searchParams.get('orderId') || '').trim();
-        if (!oid) return Promise.resolve();
-        return fetch(authApi('/billing/refresh-crypto-payment'), {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify({ orderId: oid })
-        })
-          .then(function() {
-            u.searchParams.delete('orderId');
-            window.history.replaceState({}, '', u.pathname + u.search + u.hash);
-          })
-          .catch(function() {});
-      } catch (_eU) {
-        return Promise.resolve();
-      }
-    }
-
     evalAuthLoginBtn.addEventListener('click', function() {
       authClearMsgs();
       authShowPanel('evalAuthPanelLogin');
       evalAuthDialog.showModal();
     });
 
-    if (evalUnlockPlusBtn) evalUnlockPlusBtn.addEventListener('click', function() {
-      openSubscribePlusDialog();
-    });
-    if (evalUnlockPlusLoggedBtn) evalUnlockPlusLoggedBtn.addEventListener('click', function() {
-      openSubscribePlusDialog();
-    });
-    if (evalCheckoutMonthBtn) evalCheckoutMonthBtn.addEventListener('click', function() {
-      startDoginalPlusCheckout('month');
-    });
-    if (evalCheckoutYearBtn) evalCheckoutYearBtn.addEventListener('click', function() {
-      startDoginalPlusCheckout('year');
-    });
-    if (evalSubscribeDialogClose && evalSubscribeDialog) {
-      evalSubscribeDialogClose.addEventListener('click', function() {
-        evalSubscribeDialog.close();
-      });
-      evalSubscribeDialog.addEventListener('cancel', function(e) {
-        e.preventDefault();
-        evalSubscribeDialog.close();
-      });
-    }
-    if (evalCryptoRefreshBtn) {
-      evalCryptoRefreshBtn.addEventListener('click', function() {
-        refreshCryptoPaymentStatus();
-      });
-    }
-    if (evalSubscribeBackBtn) {
-      evalSubscribeBackBtn.addEventListener('click', function() {
-        if (evalSubscribePlanStep) evalSubscribePlanStep.style.display = '';
-        if (evalSubscribePayStep) evalSubscribePayStep.style.display = 'none';
-        if (evalSubscribeErr) evalSubscribeErr.textContent = '';
-        cryptoCheckoutState = { paymentId: '', orderId: '' };
-      });
-    }
-    if (evalCryptoCopyAddrBtn) {
-      evalCryptoCopyAddrBtn.addEventListener('click', function() {
-        var addrEl = document.getElementById('evalCryptoPayAddress');
-        var t = addrEl && addrEl.textContent ? addrEl.textContent.trim() : '';
-        if (!t || !navigator.clipboard || !navigator.clipboard.writeText) return;
-        navigator.clipboard.writeText(t).then(function() {
-          if (evalSubscribeErr) {
-            evalSubscribeErr.textContent = 'Address copied.';
-            evalSubscribeErr.classList.add('ok');
-          }
-        }).catch(function() {});
-      });
-    }
     evalAuthLogoutBtn.addEventListener('click', function() {
       if (dogidexUseSupabase()) {
         fetch(authApi('/logout'), {
@@ -3362,11 +3358,6 @@
           return;
         }
         openDexModal();
-      });
-    }
-    if (evalManageBillingBtn) {
-      evalManageBillingBtn.addEventListener('click', function() {
-        openSubscribePlusDialog();
       });
     }
     evalAuthDialogClose.addEventListener('click', function() {
@@ -3618,9 +3609,7 @@
         });
     });
 
-    maybeSyncCryptoReturnFromUrl().then(function() {
-      refreshAuthSession();
-    });
+    refreshAuthSession();
 
     /* ---------- helpers ---------- */
     function sanitizeNumber(raw) {
@@ -3639,6 +3628,26 @@
     function fmtDoge(n) { return n != null ? fmt(n) + ' DOGE' : '\u2014'; }
     function fmtUsd(n)  { return n != null ? '$' + fmt(n, 2) : ''; }
     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    // Rarity Rank color band, mirroring market.doginaldogs.com f4(ceil(rank/100)).
+    function rarityRankClass(rank) {
+      var r = Number(rank);
+      if (!r || r < 1) return 'eval-rarity-grey';
+      var band = Math.ceil(r / 100);
+      if (band <= 5) return 'eval-rarity-orange';
+      if (band <= 15) return 'eval-rarity-purple';
+      if (band <= 35) return 'eval-rarity-blue';
+      return 'eval-rarity-grey';
+    }
+    // Per-trait rarity color band, mirroring market.doginaldogs.com cY(count).
+    function rarityTraitClass(count) {
+      var c = Number(count);
+      if (!c || c < 1) return 'eval-rarity-grey';
+      var pct = c / 10000 * 100;
+      if (pct <= 1) return 'eval-rarity-orange';
+      if (pct <= 5) return 'eval-rarity-purple';
+      if (pct <= 25) return 'eval-rarity-blue';
+      return 'eval-rarity-grey';
+    }
 
     function padDogDexNum(n) {
       var s = String(Math.floor(Number(n)) || 0);
@@ -3853,7 +3862,7 @@
           ? ' <span class="eval-trait-sale">(' + t.saleCount + ' sale' + (t.saleCount > 1 ? 's' : '') + ')</span>'
           : '';
         var countInfo = traitCount != null
-          ? ' <span class="eval-trait-count">(' + traitCount + '/10k)</span>'
+          ? ' <span class="eval-trait-count ' + rarityTraitClass(traitCount) + '">' + fmt(traitCount) + '/10k</span>'
           : '';
         var isUnlisted = t.topSale == null && t.floor == null;
         var topSaleBadge = t.isTopSale
@@ -3924,7 +3933,7 @@
               (d.inscriptionId ? '<div class="eval-dog-id">' + esc(d.inscriptionId) + '</div>' : '') +
               '<div class="eval-badges">' +
                 '<span class="eval-badge ' + (d.isListed ? 'eval-badge-listed' : 'eval-badge-unlisted') + '">' + (d.isListed ? 'Listed' : 'Not Listed') + '</span>' +
-                '<span class="eval-badge eval-badge-rarity">Rarity #' + fmt(d.rarityRank) + ' \u00B7 ' + esc(d.rarityLabel || '') + '</span>' +
+                '<span class="eval-badge eval-badge-rarity ' + rarityRankClass(d.rarityRank) + '">Rarity #' + fmt(d.rarityRank) + ' \u00B7 ' + esc(d.rarityLabel || '') + '</span>' +
                 (est.specialMultiplierDetails ? est.specialMultiplierDetails.map(detail => 
                   '<span class="eval-badge eval-badge-special" title="' + esc(detail.label) + ' (' + detail.multiplier + 'x)">⚡ ' + esc(detail.label) + '</span>'
                 ).join('') : '') +
@@ -4336,17 +4345,23 @@
     var MP_UNAVAIL = 'Market pulse is unavailable right now. You can still evaluate a dog or wallet.';
     var mpExpanded = false;
 
-    function mpTileHtml(dogNumber, priceDoge) {
+    function mpTileHtml(dogNumber, priceDoge, isOtc) {
       var n = Number(dogNumber);
       if (!Number.isFinite(n) || n < 1) return '';
       var img = 'https://market.doginaldogs.com/dogs/' + encodeURIComponent(n) + '.png';
+      var pxLabel = isOtc ? 'OTC' : fmtDoge(priceDoge);
+      var pxClass = isOtc ? 'eval-mp-tile-px eval-mp-tile-otc' : 'eval-mp-tile-px';
       return (
         '<button type="button" class="eval-mp-tile" data-dog="' + n + '">' +
           '<img src="' + esc(img) + '" alt="" loading="lazy" />' +
           '<span class="eval-mp-tile-num">#' + fmt(n) + '</span>' +
-          '<span class="eval-mp-tile-px">' + fmtDoge(priceDoge) + '</span>' +
+          '<span class="' + pxClass + '">' + pxLabel + '</span>' +
         '</button>'
       );
+    }
+
+    function mpIsOtcRow(row) {
+      return !!(row && (row.otc || !(Number(row.priceDoge) > 0)));
     }
 
     function mpFetchJson(url) {
@@ -4363,10 +4378,16 @@
       try { return new Date(iso).toLocaleString(); } catch (_e) { return null; }
     }
 
-    function mpRenderSections(floorRows, salesRows, metaLine) {
+    function mpRenderSections(floorRows, salesRows, otcRows, allTimeRows, metaLine) {
+      var allTimeSorted = (allTimeRows || [])
+        .filter(function(x) { return x && x.dogNumber && Number(x.priceDoge) > 0; })
+        .slice()
+        .sort(function(a, b) { return Number(b.priceDoge) - Number(a.priceDoge); });
       var floorHtml = (floorRows || []).map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
-      var saleHtml = (salesRows || []).map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
-      if (!floorHtml.length && !saleHtml.length) {
+      var saleHtml = (salesRows || []).slice(0, 10).map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
+      var allTimeHtml = allTimeSorted.map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
+      var otcHtml = (otcRows || []).slice(0, 10).map(function(row) { return mpTileHtml(row.dogNumber, null, true); }).filter(Boolean);
+      if (!floorHtml.length && !saleHtml.length && !allTimeHtml.length && !otcHtml.length) {
         marketPulseEmpty.textContent = MP_UNAVAIL;
         marketPulseEmpty.style.display = 'block';
         marketPulseContent.style.display = 'none';
@@ -4374,16 +4395,36 @@
         return;
       }
       var html = '';
+      if (allTimeHtml.length) {
+        html += '<div class="eval-mp-section"><h3 class="eval-mp-h">All time top sales</h3><div class="eval-mp-grid">' + allTimeHtml.join('') + '</div></div>';
+      }
       if (floorHtml.length) {
         html += '<div class="eval-mp-section"><h3 class="eval-mp-h">Current floor listings</h3><div class="eval-mp-grid">' + floorHtml.join('') + '</div></div>';
       }
       if (saleHtml.length) {
-        html += '<div class="eval-mp-section"><h3 class="eval-mp-h">Top sales (recent activity)</h3><div class="eval-mp-grid">' + saleHtml.join('') + '</div></div>';
+        html += '<div class="eval-mp-section"><h3 class="eval-mp-h">Recent purchases</h3><div class="eval-mp-grid">' + saleHtml.join('') + '</div></div>';
+      }
+      if (otcHtml.length) {
+        html += '<div class="eval-mp-section"><h3 class="eval-mp-h">Recent OTC trades</h3><div class="eval-mp-grid">' + otcHtml.join('') + '</div></div>';
       }
       marketPulseContent.innerHTML = html;
       marketPulseContent.style.display = 'block';
       marketPulseEmpty.style.display = 'none';
       marketPulseMeta.textContent = metaLine != null && metaLine !== '' ? metaLine : '';
+    }
+
+    function mpSnapToEvaluation() {
+      // Scroll the evaluation area into view so the clicked dog's result is
+      // front-and-center. The search card holds the filled-in input, and the
+      // loading spinner / result render just below it.
+      var target = document.querySelector('.eval-search-card') || statusEl || resultEl;
+      if (!target || typeof target.scrollIntoView !== 'function') return;
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      try {
+        target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      } catch (_e) {
+        target.scrollIntoView();
+      }
     }
 
     function mpBindTiles() {
@@ -4399,6 +4440,7 @@
           applySearchMode();
           input.value = String(d);
           evaluate();
+          mpSnapToEvaluation();
         });
       });
     }
@@ -4421,20 +4463,32 @@
 
       var floorRows = [];
       var salesRows = [];
+      var otcRows = [];
+      var allTimeRows = [];
       var metaLine = '';
+
+      // All-time top sales come from the PHP feed, which scans the full global
+      // activity history (the Node feed only carries the recent window).
+      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=top-sales&limit=25');
+      if (atr.ok && atr.data && atr.data.topSales) {
+        allTimeRows = atr.data.topSales.filter(function(x) { return x && x.dogNumber && Number(x.priceDoge) > 0; });
+      }
 
       if (nodeUsable) {
         floorRows = (listings.listings || []).filter(function(x) { return x && x.dogNumber; });
-        salesRows = (act.sales || []).filter(function(x) { return x && x.dogNumber; });
+        var nodeSales = (act.sales || []).filter(function(x) { return x && x.dogNumber; });
+        salesRows = nodeSales.filter(function(x) { return !mpIsOtcRow(x); });
+        otcRows = nodeSales.filter(mpIsOtcRow);
         if (stData && stData.builtAt) metaLine = 'Snapshot ' + mpFormatWhen(stData.builtAt);
       }
 
-      if (!nodeUsable || (!floorRows.length && !salesRows.length)) {
+      if (!nodeUsable || (!floorRows.length && !salesRows.length && !otcRows.length)) {
         var rPhp = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=market-pulse&offers=20&sales=10');
         if (rPhp.ok && rPhp.data) {
           var p = rPhp.data;
           floorRows = (p.currentOffers || []).filter(function(x) { return x && x.dogNumber; });
           salesRows = (p.topSales || []).filter(function(x) { return x && x.dogNumber; });
+          otcRows = (p.recentOtcSales || []).filter(function(x) { return x && x.dogNumber; });
           if (p.snapshot && p.snapshot.builtAt) {
             metaLine = 'Data ' + mpFormatWhen(p.snapshot.builtAt) + ' (on-demand feed)';
           } else if (p.generatedAt) {
@@ -4446,7 +4500,7 @@
       }
 
       marketPulseLoading.style.display = 'none';
-      mpRenderSections(floorRows, salesRows, metaLine);
+      mpRenderSections(floorRows, salesRows, otcRows, allTimeRows, metaLine);
       mpBindTiles();
     }
 
@@ -4471,6 +4525,128 @@
           }
           loadMarketPulse();
         }
+      });
+    }
+
+    /* ---------- Request community lore ---------- */
+    var loreForm = document.getElementById('evalLoreForm');
+    var loreDogInput = document.getElementById('evalLoreDog');
+    var loreByInput = document.getElementById('evalLoreBy');
+    var loreTextInput = document.getElementById('evalLoreText');
+    var lorePwRow = document.getElementById('evalLorePwRow');
+    var lorePwInput = document.getElementById('evalLorePw');
+    var loreSubmitBtn = document.getElementById('evalLoreSubmit');
+    var loreMsg = document.getElementById('evalLoreMsg');
+    var lorePwRequired = false;
+
+    function loreSetMsg(text, kind) {
+      if (!loreMsg) return;
+      loreMsg.textContent = text || '';
+      loreMsg.className = 'eval-lore-request-msg' + (kind ? ' is-' + kind : '');
+    }
+
+    function loreDetectPasswordRequirement() {
+      if (!lorePwRow) return;
+      mpFetchJson(API_BASE + '/api/dd-evaluator/community/status')
+        .then(function(r) {
+          if (r.ok && r.data) return r;
+          return mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=community-status');
+        })
+        .then(function(r) {
+          lorePwRequired = !!(r && r.ok && r.data && r.data.communityPasswordRequired);
+          lorePwRow.hidden = !lorePwRequired;
+        })
+        .catch(function() { lorePwRow.hidden = true; });
+    }
+
+    function lorePostSuggestion(body, headers) {
+      var opts = { method: 'POST', headers: headers, body: JSON.stringify(body) };
+      return fetch(API_BASE + '/api/dd-evaluator/community/suggestions', opts)
+        .then(function(res) {
+          // Fall back to the PHP endpoint only when the Node route is absent.
+          if (res.status === 404 || res.status === 501) {
+            return fetch(API_BASE + '/api/dd-evaluator.php?action=community-suggestions', opts);
+          }
+          return res;
+        })
+        .catch(function() {
+          return fetch(API_BASE + '/api/dd-evaluator.php?action=community-suggestions', opts);
+        });
+    }
+
+    if (loreForm) {
+      loreDetectPasswordRequirement();
+
+      // Prefill the dog number from the current inscription search when handy.
+      if (loreDogInput && typeof input !== 'undefined') {
+        loreDogInput.addEventListener('focus', function() {
+          if (loreDogInput.value.trim() !== '') return;
+          var cur = parseInt(String(input.value || '').replace(/[^0-9]/g, ''), 10);
+          if (searchMode === 'inscription' && cur >= 1 && cur <= 10000) {
+            loreDogInput.value = String(cur);
+          }
+        });
+      }
+
+      loreForm.addEventListener('submit', function(ev) {
+        ev.preventDefault();
+        loreSetMsg('');
+
+        var dogNumber = parseInt(String(loreDogInput && loreDogInput.value || '').replace(/[^0-9]/g, ''), 10);
+        var lore = loreTextInput ? String(loreTextInput.value || '').trim() : '';
+        var submittedBy = loreByInput ? String(loreByInput.value || '').trim() : '';
+        var pw = lorePwInput ? String(lorePwInput.value || '').trim() : '';
+
+        if (!dogNumber || dogNumber < 1 || dogNumber > 10000) {
+          loreSetMsg('Enter a dog number between 1 and 10000.', 'err');
+          return;
+        }
+        if (!submittedBy) {
+          loreSetMsg('Please enter your name or handle.', 'err');
+          return;
+        }
+        if (!lore) {
+          loreSetMsg('Please add some lore text.', 'err');
+          return;
+        }
+        if (lore.length > 8000) {
+          loreSetMsg('Lore is too long (max 8000 characters).', 'err');
+          return;
+        }
+        if (lorePwRequired && !pw) {
+          loreSetMsg('This community requires a password to submit.', 'err');
+          return;
+        }
+
+        var body = { kind: 'lore_only', dogNumber: dogNumber, lore: lore, submittedBy: submittedBy.slice(0, 120) };
+        if (pw) body.communityPassword = pw;
+        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        if (pw) headers['x-dd-community-password'] = pw;
+
+        if (loreSubmitBtn) loreSubmitBtn.disabled = true;
+        loreSetMsg('Submitting\u2026');
+
+        lorePostSuggestion(body, headers)
+          .then(function(res) {
+            return res.text().then(function(text) {
+              var data = {};
+              try { data = text ? JSON.parse(text) : {}; } catch (_e) {}
+              if (!res.ok) {
+                loreSetMsg((data && data.error) ? data.error : ('Submission failed (HTTP ' + res.status + ').'), 'err');
+                return;
+              }
+              loreSetMsg('Thanks! Your lore for #' + dogNumber + ' was submitted for review.', 'ok');
+              if (loreTextInput) loreTextInput.value = '';
+              if (loreByInput) loreByInput.value = '';
+              if (lorePwInput) lorePwInput.value = '';
+            });
+          })
+          .catch(function(err) {
+            loreSetMsg(err && err.message ? err.message : 'Submission failed.', 'err');
+          })
+          .then(function() {
+            if (loreSubmitBtn) loreSubmitBtn.disabled = false;
+          });
       });
     }
 
@@ -4762,6 +4938,28 @@
     if (evalShouldAutofocusSearch()) {
       try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
     }
+
+    /* ✦ Fancy FX — click ripple on interactive buttons */
+    (function () {
+      var reduce = false;
+      try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+      if (reduce) return;
+      var sel = '.eval-btn,.eval-modal-submit,.eval-dex-spotlight-btn,.eval-auth-btn,.eval-mp-btn,.eval-mode-btn,.eval-tip-copy,.eval-hero-tip-chip';
+      document.addEventListener('pointerdown', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest(sel) : null;
+        if (!btn || btn.disabled) return;
+        var rect = btn.getBoundingClientRect();
+        if (!rect.width) return;
+        var size = Math.max(rect.width, rect.height);
+        var ripple = document.createElement('span');
+        ripple.className = 'eval-ripple';
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+        ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+        btn.appendChild(ripple);
+        setTimeout(function () { if (ripple.parentNode) ripple.parentNode.removeChild(ripple); }, 640);
+      }, { passive: true });
+    })();
   </script>
 </body>
 </html>
