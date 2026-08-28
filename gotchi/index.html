@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Doginal Gotchi — KushMedia</title>
+  <meta name="description" content="Doginal Gotchi: a playable 1996 Tamagotchi-style handheld starring GARY and MARY. Powered by KDAO.">
+  <link rel="icon" href="/assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/Kush.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;650;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/gotchi/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/index.html" class="header-logo">
+        <img src="/assets/Kush.png" alt="KushMedia" class="header-logo-img">
+        <span>KushMedia</span>
+      </a>
+      <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="nav-overlay" aria-label="Main navigation">
+    <ul class="nav-list">
+      <li><a href="/index.html" class="nav-link">Home</a></li>
+      <li><a href="/about.html" class="nav-link">About</a></li>
+      <li><a href="/gallery.html" class="nav-link">Gallery</a></li>
+      <li><a href="/services.html" class="nav-link">Services</a></li>
+      <li><a href="/dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="/ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
+      <li><a href="/voyager.html" class="nav-link">Voyager</a></li>
+      <li><a href="/contact.html" class="nav-link">Connect</a></li>
+    </ul>
+  </nav>
+
+  <div class="studio">
+    <div class="device-col">
+      <div class="page-intro">
+        <h1>Doginal Gotchi</h1>
+        <p>A 1996 handheld replica starring Doginal Dogs. Keep GARY or MARY alive — then embed the egg on KushMedia.xyz.</p>
+      </div>
+
+      <div class="toolbar" role="group" aria-label="Device controls">
+        <button type="button" id="muteBtn" aria-pressed="false">Mute</button>
+        <button type="button" id="resetBtn">Reset</button>
+        <button type="button" id="speedBtn">1x</button>
+      </div>
+
+      <div class="egg-wrap">
+        <div class="strap" aria-hidden="true"></div>
+        <div class="egg" id="egg" data-pet="gary">
+          <div class="print-top">DOGINAL DOGS</div>
+          <div class="bezel">
+            <div class="bezel-glass">
+              <canvas id="lcd" width="64" height="48" aria-label="Doginal Gotchi LCD"></canvas>
+            </div>
+          </div>
+          <div class="print-bottom">POWERED BY KDAO</div>
+          <div class="buttons">
+            <button type="button" class="btn btn-a" id="btnA" aria-label="Button A">A</button>
+            <button type="button" class="btn btn-b" id="btnB" aria-label="Button B">B</button>
+            <button type="button" class="btn btn-c" id="btnC" aria-label="Button C">C</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="guide">
+      <h2>Care guide</h2>
+      <p>Original P1 rules, sped up. 400ms real time is one game minute.</p>
+      <h3>Buttons</h3>
+      <ul>
+        <li><kbd>A</kbd> cycles Food → Lights → Game → Medicine → Toilet → Status → Discipline</li>
+        <li><kbd>B</kbd> opens or confirms</li>
+        <li><kbd>C</kbd> backs out. Game: A left, C right</li>
+        <li>Keys: A / Left, S Space Enter, D / Right / Esc</li>
+      </ul>
+      <h3>Keep them alive</h3>
+      <ul>
+        <li>Meals fill hunger (+1g, 4/day). Snacks add hunger and happy (+2g); 4+ snacks make them sick</li>
+        <li>Night is 21:00–08:00. Lights off to sleep. Lights on at night is a care mistake. Lights off in the day and they call</li>
+        <li>Flush poop after meals. Two piles → sick. Medicine only works with the skull</li>
+        <li>Win 3 of 5 left/right rounds for +2 happy and −1g</li>
+        <li>Scold only when they call with full meters (naughty)</li>
+      </ul>
+      <h3>Life</h3>
+      <ul>
+        <li>Egg 48m → baby 7h → child 11h → teen 14h → adult. Old age around 6–8 days</li>
+        <li>Baby Mary has no bow yet</li>
+        <li>Progress saves in this browser. Tab hidden pauses time</li>
+      </ul>
+    </aside>
+  </div>
+
+  <footer class="site-footer">
+    <p>Doginal Gotchi · KushMedia.xyz · fan work, not a BanDai product</p>
+    <p><a href="/about.html">Back to KushMedia</a></p>
+  </footer>
+
+  <script src="/brand.js"></script>
+  <script type="module" src="/gotchi/app.js"></script>
+</body>
+</html>

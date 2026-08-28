@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DDL Tourney - Legends Bracket</title>
+  <meta name="description" content="Host Doginal Dogs Legends pack tournaments. DOGE entry, paid roster, live brackets.">
+  <link rel="canonical" href="https://kushmedia.xyz/tourney/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DDL Tourney - Legends Bracket">
+  <meta name="twitter:description" content="Host Doginal Dogs Legends pack tournaments. DOGE entry, paid roster, live brackets.">
+  <meta name="twitter:image" content="https://kushmedia.xyz/bracket/og.jpg">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="KushMetaX">
+  <meta property="og:title" content="DDL Tourney - Legends Bracket">
+  <meta property="og:description" content="Host Doginal Dogs Legends pack tournaments. DOGE entry, paid roster, live brackets.">
+  <meta property="og:url" content="https://kushmedia.xyz/tourney/">
+  <meta property="og:image" content="https://kushmedia.xyz/bracket/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="DDL Tourney - Legends Bracket">
+  <link rel="icon" href="/assets/Kush.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Figtree:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/bracket/styles.css?v=bracket-ui-27">
+</head>
+<body>
+  <div class="bg" aria-hidden="true">
+    <img src="/bracket/flames.jpg" alt="" onerror="this.onerror=null;this.src='/assets/tourney-flames.jpg'">
+  </div>
+  <header class="top">
+    <a class="brand" href="/tourney/" data-tip="Home — every open arena.">
+      <img src="/bracket/crest.jpg" alt="">
+      <span>
+        <small>DDL Tourney</small>
+        <strong>Legends Bracket</strong>
+      </span>
+    </a>
+    <button type="button" id="nav-toggle" class="nav-toggle" aria-expanded="false" aria-controls="top-nav" aria-label="Menu">
+      <i></i><i></i><i></i>
+    </button>
+    <nav id="top-nav">
+      <button type="button" id="tips-toggle" class="tips-toggle" aria-pressed="true" aria-label="Toggle usage tips">Tips on</button>
+      <a href="/tourney/" data-tip="Browse arenas. Open one to register and follow the bracket.">Arenas</a>
+      <a href="/tourney/#/records" data-tip="Champions, accolades, and past official results.">Records</a>
+      <a class="host" href="/tourney/#/create" id="nav-create" hidden data-tip="Open a new arena.">New tournament</a>
+      <a id="discord-login" class="discord-login" href="/kmx-auth/discord/start?return=/tourney/" data-tip="Sign in with Discord. No password is stored.">Sign in with Discord</a>
+      <div id="player-session" class="player-session" hidden>
+        <img id="player-avatar" alt="" width="28" height="28" referrerpolicy="no-referrer" hidden>
+        <a id="player-name" href="/tourney/#/records"></a>
+        <button type="button" id="player-signout" class="host-toggle">Sign out</button>
+      </div>
+      <button type="button" id="host-toggle" class="host-toggle">Host sign in</button>
+    </nav>
+  </header>
+  <div id="tip-bubble" hidden role="tooltip"></div>
+  <main id="app"></main>
+  <script src="/bracket/app.js?v=bracket-ui-27"></script>
+</body>
+</html>

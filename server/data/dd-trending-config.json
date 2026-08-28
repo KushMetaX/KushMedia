@@ -1,6 +1,10 @@
 {
     "manualMultipliers": {
-        "head:Wizard": 1.5,
+        "head:Wizard": 2,
+        "head:Pirate": 2,
+        "head:Crown": 2,
+        "accessory:Bow": 2,
+        "furPattern:Zombie": 2,
         "head:Beret": 1.25,
         "clothes:Suit": 1.5,
         "furColor:Orange": 1,
@@ -25,6 +29,19 @@
             "updatedBy": "admin.html"
         }
     },
+    "officialLore": {
+        "3381": {
+            "dogNumber": 3381,
+            "minOfferUsd": 25000,
+            "minOfferDoge": null,
+            "note": "Official DDL TCG mascot. Owned by Duval. Sniped before the TCG launch.",
+            "imageUrl": "/assets/ddl-tcg-mascot.png",
+            "updatedAt": "2026-08-01T22:30:00+00:00",
+            "updatedBy": "admin"
+        }
+    },
+    "tcgInspirations": [],
+    "tcgCardHoldings": [],
     "autoTrend": {
         "enabled": true,
         "maxTraitCount": 500,
@@ -74,27 +91,25 @@
             {
                 "id": "tr8-gang-2558b920efed",
                 "label": "Tr8 Gang",
-                "conditions": [
-                    {
-                        "trait": "background",
-                        "op": "eq",
-                        "value": "Any"
-                    },
-                    {
-                        "trait": "furColor",
-                        "op": "eq",
-                        "value": "Any"
-                    },
-                    {
-                        "trait": "furPattern",
-                        "op": "eq",
-                        "value": "Any"
-                    }
-                ],
+                "conditions": [],
+                "dogNumbers": [1764, 4502, 5530, 5583, 6397, 7028, 7733, 7774],
                 "multiplier": 1.15,
                 "enabled": true
             }
         ],
+        "tcgSet": {
+            "enabled": true,
+            "label": "DDL TCG",
+            "traits": [
+                { "trait": "head", "value": "Pirate" },
+                { "trait": "head", "value": "Wizard" },
+                { "trait": "head", "value": "Crown" },
+                { "trait": "accessory", "value": "Bow" },
+                { "trait": "furPattern", "value": "Zombie" }
+            ],
+            "dualMultiplier": 1.08,
+            "tripleMultiplier": 1.18
+        },
         "angelNumbers": {
             "quadRepeater": {
                 "enabled": true,

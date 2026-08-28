@@ -1,0 +1,11 @@
+node_modules
+.vercel
+.tanstack
+.output
+dist
+*.local
+.DS_Store
+.env
+.env.*
+!.env.example
+.tourney-password

@@ -8,6 +8,7 @@ const express = require('express');
 const { timingSafeEqualString } = require('../security-utils');
 const ddPaywall = require('./dd-paywall');
 const doginalDogsService = require('../services/doginal-dogs');
+const ddTraitCatalog = require('../services/dd-trait-catalog');
 const router = express.Router();
 
 const CLIENT_INTERNAL_ERROR = 'An unexpected error occurred.';
@@ -81,7 +82,7 @@ function getDdRequestPassword(req) {
     return traitSecret;
   }
 
-  return String(req.query.password || '').trim();
+  return '';
 }
 
 function verifyDdAdminPassword(req, res) {
@@ -363,20 +364,33 @@ function validateSuggestionPayload(kind, raw) {
       const valueRaw = String(c.value || '').trim();
       if (!DD_TRAIT_KEYS.has(trait) || !valueRaw) continue;
       const vl = valueRaw.toLowerCase();
-      const normVal = vl === 'any' ? 'Any' : vl === 'none' ? 'None' : valueRaw;
+      if (vl === 'any') continue; // wildcard / no constraint
+      const normVal = vl === 'none' ? 'None' : valueRaw;
       normalizedCond.push({
         trait,
         op: c.op === 'contains' ? 'contains' : 'eq',
         value: normVal,
       });
     }
-    if (normalizedCond.length === 0) {
-      throw new Error('combo requires at least one valid condition.');
+    const dogNumbers = [];
+    const seenDogs = new Set();
+    const dogSource = Array.isArray(raw.dogNumbers)
+      ? raw.dogNumbers
+      : (typeof raw.dogNumbers === 'string' ? String(raw.dogNumbers).split(/[\s,;]+/) : []);
+    for (const entry of dogSource) {
+      const n = Number.parseInt(String(entry).trim(), 10);
+      if (!Number.isInteger(n) || n < 1 || n > 10000 || seenDogs.has(n)) continue;
+      seenDogs.add(n);
+      dogNumbers.push(n);
+    }
+    if (normalizedCond.length === 0 && dogNumbers.length === 0) {
+      throw new Error('combo requires trait conditions and/or a dog # allowlist.');
     }
     return {
       label,
       multiplier,
       conditions: normalizedCond,
+      dogNumbers,
     };
   }
   if (k === 'suppress_trend') {
@@ -441,14 +455,18 @@ async function mergeApprovedSuggestion(item) {
   } else if (kind === 'combo') {
     const comboId = slugComboId(payload.label, item.id);
     const combos = [...(((cfg.specialMultipliers || {}).combos) || [])];
+    const idx = combos.findIndex(c => String(c.id) === comboId);
+    const dogNumbers = Array.isArray(payload.dogNumbers) && payload.dogNumbers.length
+      ? payload.dogNumbers
+      : (idx >= 0 && Array.isArray(combos[idx]?.dogNumbers) ? combos[idx].dogNumbers : []);
     const entry = {
       id: comboId,
       label: payload.label,
       conditions: payload.conditions,
+      dogNumbers,
       multiplier: payload.multiplier,
       enabled: true,
     };
-    const idx = combos.findIndex(c => String(c.id) === comboId);
     if (idx >= 0) {
       combos[idx] = entry;
     } else {
@@ -772,6 +790,141 @@ router.get('/evaluate/:dogNumber', requireSnapshot, ddPaywall.mwEvaluateDog(), a
   }
 });
 
+function extractDogNumbersFromHoldings(rawHoldings) {
+  const seen = new Set();
+  return (Array.isArray(rawHoldings) ? rawHoldings : [])
+    .map(holding => ({ dogNumber: Number(holding?.dogId), imageUrl: String(holding?.imageUrl || '') }))
+    .filter(holding => Number.isInteger(holding.dogNumber) && holding.dogNumber >= 1 && holding.dogNumber <= 10000)
+    .filter(holding => !holding.imageUrl || holding.imageUrl.startsWith('/dogs/'))
+    .filter(holding => {
+      if (seen.has(holding.dogNumber)) {
+        return false;
+      }
+      seen.add(holding.dogNumber);
+      return true;
+    })
+    .map(holding => holding.dogNumber)
+    .sort((left, right) => left - right);
+}
+
+async function buildWalletHoldingsSummary(api, address) {
+  const walletData = await api.getWalletData(address);
+  const rawHoldings = Array.isArray(walletData?.holdings) ? walletData.holdings : [];
+  const dogNumbers = extractDogNumbersFromHoldings(rawHoldings);
+  const profile = await buildWalletProfile(api, address, dogNumbers);
+  let tcgRegistry = { inspirations: [], holdings: [], multipliers: {} };
+  try {
+    const evaluator = await loadEvaluator();
+    const config = await evaluator.getTrendingConfig();
+    tcgRegistry = {
+      inspirations: Array.isArray(config?.tcgInspirations) ? config.tcgInspirations : [],
+      holdings: Array.isArray(config?.tcgCardHoldings) ? config.tcgCardHoldings : [],
+      multipliers: config?.tcgInspirationMultipliers || {},
+    };
+  } catch (_err) {
+    // Registry is optional; wallet lookup should still succeed.
+  }
+  return {
+    address,
+    totalHoldings: rawHoldings.length,
+    totalDogs: dogNumbers.length,
+    nonDoginalHoldings: Math.max(0, rawHoldings.length - dogNumbers.length),
+    dogNumbers,
+    balance: walletData?.balance || null,
+    collections: Array.isArray(walletData?.collections) ? walletData.collections : [],
+    profile,
+    tcgRegistry,
+    evaluatedAt: new Date().toISOString(),
+  };
+}
+
+function normalizeOwnerQuery(raw) {
+  return String(raw || '').trim().replace(/^@+/, '');
+}
+
+function isWalletAddressQuery(query) {
+  return /^[A-Za-z0-9]{24,80}$/.test(query);
+}
+
+function isDogNumberQuery(query) {
+  return /^[1-9]\d{0,4}$/.test(query) && Number(query) >= 1 && Number(query) <= 10000;
+}
+
+async function resolveOwnerSearch(api, query, listings = []) {
+  const q = normalizeOwnerQuery(query);
+  if (!q) {
+    const err = new Error('Enter a wallet address, X handle, or listed dog number.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  let address = null;
+  let matchType = null;
+  let listedDog = null;
+  let searchHits = [];
+
+  if (isWalletAddressQuery(q)) {
+    address = q;
+    matchType = 'wallet';
+  } else if (isDogNumberQuery(q)) {
+    const dogNumber = Number(q);
+    const listing = (Array.isArray(listings) ? listings : [])
+      .find(item => Number(item?.dogNumber) === dogNumber);
+    if (!listing || !listing.sellerAddress) {
+      const err = new Error(
+        'Owner wallet is only available for dogs currently listed on the marketplace. Search by wallet address or linked X handle instead.'
+      );
+      err.statusCode = 404;
+      throw err;
+    }
+    address = String(listing.sellerAddress).trim();
+    matchType = 'listedDog';
+    listedDog = {
+      dogNumber,
+      priceDoge: listing.priceDoge != null ? Number(listing.priceDoge) : null,
+      priceUsd: listing.priceUsd != null ? Number(listing.priceUsd) : null,
+      listingId: listing.listingId || listing.id || null,
+      marketUrl: `${api.MARKET_BASE}/dog/${dogNumber}`,
+    };
+  } else {
+    const ownerSearch = typeof api.searchOwners === 'function'
+      ? await api.searchOwners(q, 10)
+      : null;
+    const walletHit = ownerSearch?.wallet || null;
+    searchHits = Array.isArray(ownerSearch?.results) ? ownerSearch.results : [];
+    if (!walletHit?.address) {
+      const err = new Error('No marketplace owner matched that X handle.');
+      err.statusCode = 404;
+      throw err;
+    }
+    address = String(walletHit.address).trim();
+    matchType = 'twitter';
+  }
+
+  if (!isWalletAddressQuery(address)) {
+    const err = new Error('Resolved owner address was invalid.');
+    err.statusCode = 502;
+    throw err;
+  }
+
+  const wallet = await buildWalletHoldingsSummary(api, address);
+  return {
+    query: q,
+    matchType,
+    listedDog,
+    searchHits: searchHits
+      .filter(hit => hit && hit.address)
+      .slice(0, 5)
+      .map(hit => ({
+        address: String(hit.address),
+        twitterUsername: hit.twitterUsername || null,
+        twitterDisplayName: hit.twitterDisplayName || null,
+        twitterVerified: Boolean(hit.twitterVerified),
+      })),
+    ...wallet,
+  };
+}
+
 // GET /api/dd-evaluator/wallet/:address
 router.get('/wallet/:address', requireSnapshot, ddPaywall.mwWallet(), async (req, res) => {
   const address = String(req.params.address || '').trim();
@@ -781,38 +934,34 @@ router.get('/wallet/:address', requireSnapshot, ddPaywall.mwWallet(), async (req
 
   try {
     const api = await loadApi();
-    const walletData = await api.getWalletData(address);
-    const rawHoldings = Array.isArray(walletData?.holdings) ? walletData.holdings : [];
-    const seen = new Set();
-    const dogNumbers = rawHoldings
-      .map(holding => ({ dogNumber: Number(holding?.dogId), imageUrl: String(holding?.imageUrl || '') }))
-      .filter(holding => Number.isInteger(holding.dogNumber) && holding.dogNumber >= 1 && holding.dogNumber <= 10000)
-      .filter(holding => !holding.imageUrl || holding.imageUrl.startsWith('/dogs/'))
-      .filter(holding => {
-        if (seen.has(holding.dogNumber)) {
-          return false;
-        }
-        seen.add(holding.dogNumber);
-        return true;
-      })
-      .map(holding => holding.dogNumber)
-      .sort((left, right) => left - right);
-    const profile = await buildWalletProfile(api, address, dogNumbers);
-
-    const result = {
-      address,
-      totalHoldings: rawHoldings.length,
-      totalDogs: dogNumbers.length,
-      nonDoginalHoldings: Math.max(0, rawHoldings.length - dogNumbers.length),
-      dogNumbers,
-      balance: walletData?.balance || null,
-      collections: Array.isArray(walletData?.collections) ? walletData.collections : [],
-      profile,
-      evaluatedAt: new Date().toISOString(),
-    };
+    const result = await buildWalletHoldingsSummary(api, address);
     res.json(result);
   } catch (err) {
     console.error('[dd-evaluator] Wallet:', err);
+    res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
+  }
+});
+
+// GET /api/dd-evaluator/owner-search?q=
+router.get('/owner-search', requireSnapshot, ddPaywall.mwWallet(), async (req, res) => {
+  const query = normalizeOwnerQuery(req.query.q || req.query.query || '');
+  if (!query) {
+    return res.status(400).json({ error: 'Enter a wallet address, X handle, or listed dog number.' });
+  }
+
+  try {
+    const api = await loadApi();
+    const ev = await loadEvaluator();
+    const listings = ev.isReady() ? (ev.getSnapshot()?.listings || []) : [];
+    const result = await resolveOwnerSearch(api, query, listings);
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json(result);
+  } catch (err) {
+    const status = Number(err?.statusCode) || 500;
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({ error: err.message || 'Owner search failed.' });
+    }
+    console.error('[dd-evaluator] Owner search:', err);
     res.status(500).json({ error: CLIENT_INTERNAL_ERROR });
   }
 });
@@ -925,6 +1074,56 @@ router.get('/price', requireSnapshot, async (req, res) => {
   res.json({ dogeUsd: snap.dogeUsd, snapshotAge: snap.builtAt });
 });
 
+// GET /api/dd-evaluator/trait-catalog — unique trait values for autocomplete
+router.get('/trait-catalog', async (_req, res) => {
+  try {
+    const traits = await ddTraitCatalog.getCatalogTraitValues();
+    if (!traits) {
+      return res.status(503).json({ ok: false, error: 'Trait catalog unavailable. Ensure DoginalDogsCatalog.json is present.' });
+    }
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.json({ ok: true, traits, count: traits.length });
+  } catch (err) {
+    console.error('[dd-evaluator] trait-catalog:', err && err.message ? err.message : err);
+    return res.status(500).json({
+      ok: false,
+      error: (err && err.message) ? String(err.message) : CLIENT_INTERNAL_ERROR
+    });
+  }
+});
+
+// GET /api/dd-evaluator/trait-search?q=Cowboy | ?trait=head&value=Cowboy
+router.get('/trait-search', async (req, res) => {
+  try {
+    const result = await ddTraitCatalog.searchCatalogByTrait({
+      q: req.query.q || req.query.query,
+      traits: req.query.traits,
+      traitKey: req.query.trait || req.query.traitKey,
+      value: req.query.value,
+      limit: req.query.limit,
+      offset: req.query.offset
+    });
+    if (!result || result.ok === false) {
+      const status = result && result.error === 'catalog_unavailable' ? 503 : 404;
+      return res.status(status).json({
+        ok: false,
+        error: result && result.error === 'catalog_unavailable'
+          ? 'Trait catalog unavailable. Ensure DoginalDogsCatalog.json is present.'
+          : (result && result.error) || 'No matching trait found.',
+        matches: (result && result.matches) || []
+      });
+    }
+    res.set('Cache-Control', 'public, max-age=300');
+    return res.json(result);
+  } catch (err) {
+    console.error('[dd-evaluator] trait-search:', err && err.message ? err.message : err);
+    return res.status(500).json({
+      ok: false,
+      error: (err && err.message) ? String(err.message) : CLIENT_INTERNAL_ERROR
+    });
+  }
+});
+
 // GET /api/dd-evaluator/rank-lookup/:rank
 router.get('/rank-lookup/:rank', requireSnapshot, async (req, res) => {
   const ev = await loadEvaluator();
@@ -960,11 +1159,17 @@ router.get('/snapshot/status', async (req, res) => {
   });
 });
 
-router.get('/admin/trending', requireSnapshot, async (req, res) => {
+router.get('/admin/trending', (req, res, next) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+  next();
+}, requireSnapshot, async (req, res) => {
   try {
     const evaluator = await loadEvaluator();
     const dashboard = await evaluator.getTrendingDashboardData();
     dashboard.saveEnabled = getExpectedDdAdminPassword() != null;
+    res.set('Cache-Control', 'no-store');
     res.json(dashboard);
   } catch (err) {
     console.error('Trending dashboard error:', err);
@@ -997,6 +1202,73 @@ router.post('/admin/trending', async (req, res) => {
   } catch (err) {
     console.error('[dd-evaluator] admin/trending POST:', err);
     res.status(500).json({ error: 'Failed to save trending config.' });
+  }
+});
+
+const LORE_MEDIA_MIME = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+};
+
+function resolveLoreMediaDir() {
+  const candidates = [
+    path.resolve(__dirname, '..', '..', 'assets', 'lore-media'),
+    path.resolve(__dirname, '..', '..', '..', 'assets', 'lore-media'),
+  ];
+  for (const dir of candidates) {
+    const assetsParent = path.dirname(dir);
+    if (fs.existsSync(assetsParent) && fs.statSync(assetsParent).isDirectory()) {
+      return dir;
+    }
+  }
+  return candidates[0];
+}
+
+router.post('/admin/lore-media', (req, res) => {
+  if (!verifyDdAdminPassword(req, res)) {
+    return;
+  }
+
+  const dogNumber = Number(req.body?.dogNumber);
+  const contentType = String(req.body?.contentType || '').trim().toLowerCase();
+  const dataBase64 = String(req.body?.dataBase64 || '').replace(/\s+/g, '');
+  if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
+    return res.status(400).json({ error: 'dogNumber must be 1–10000.' });
+  }
+  const ext = LORE_MEDIA_MIME[contentType];
+  if (!ext) {
+    return res.status(400).json({ error: 'Unsupported image type. Use PNG, JPEG, GIF, or WebP.' });
+  }
+  if (!dataBase64) {
+    return res.status(400).json({ error: 'dataBase64 is required.' });
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(dataBase64, 'base64');
+  } catch (_err) {
+    return res.status(400).json({ error: 'Invalid base64 image data.' });
+  }
+  if (!buffer.length || buffer.length > 2.5 * 1024 * 1024) {
+    return res.status(400).json({ error: 'Image must be between 1 byte and 2.5 MB.' });
+  }
+
+  const dir = resolveLoreMediaDir();
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
+    }
+    const name = `${dogNumber}-${Date.now()}${ext}`;
+    const filePath = path.join(dir, name);
+    fs.writeFileSync(filePath, buffer);
+    const imageUrl = `/assets/lore-media/${name}`;
+    res.json({ ok: true, imageUrl, dogNumber });
+  } catch (err) {
+    console.error('[dd-evaluator] lore-media upload:', err);
+    res.status(500).json({ error: 'Failed to save lore media.' });
   }
 });
 

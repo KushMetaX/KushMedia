@@ -62,7 +62,13 @@ app.post(
 	},
 );
 
-app.use(express.json({ limit: '100kb' }));
+app.use((req, res, next) => {
+	const pathOnly = String(req.path || '').split('?')[0];
+	if (pathOnly === '/api/dd-evaluator/admin/lore-media') {
+		return express.json({ limit: '3mb' })(req, res, next);
+	}
+	return express.json({ limit: '100kb' })(req, res, next);
+});
 app.use(cookieParser(resolveSessionSecret() || ''));
 
 function pathLooksSensitive(rawPath) {
@@ -103,7 +109,8 @@ function pathLooksSensitive(rawPath) {
 app.use((request, response, next) => {
 	response.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.set('X-Content-Type-Options', 'nosniff');
-	response.set('Cross-Origin-Resource-Policy', 'same-origin');
+	const shareImage = /\/bracket\/og\.jpg$/i.test(String(request.path || ''));
+	response.set('Cross-Origin-Resource-Policy', shareImage ? 'cross-origin' : 'same-origin');
 	response.set('Cross-Origin-Opener-Policy', 'same-origin');
 	response.set('X-Frame-Options', 'DENY');
 	response.set(
@@ -132,6 +139,29 @@ app.use((request, response, next) => {
 		return;
 	}
 
+	next();
+});
+
+function isDdlTcgHost(request) {
+	const host = String(request.headers.host || '').split(':')[0].toLowerCase();
+	return host === 'ddl.kushmedia.xyz' || host === 'www.ddl.kushmedia.xyz' ||
+		host === 'ddltcg.kushmetax.com' || host === 'www.ddltcg.kushmetax.com';
+}
+
+// When a DDL host is an alias of this vhost, do not leak the rest of
+// the site. Rewrite every path onto the gated companion before other routes.
+app.use((request, response, next) => {
+	if (!isDdlTcgHost(request)) {
+		return next();
+	}
+	if (String(request.path || '').startsWith('/__ddl_gate')) {
+		return next();
+	}
+	const pathOnly = String(request.path || '/');
+	const rest = pathOnly === '/' ? '/' : pathOnly;
+	const queryIndex = String(request.url || '').indexOf('?');
+	const query = queryIndex >= 0 ? request.url.slice(queryIndex) : '';
+	request.url = '/__ddl_gate' + (rest.startsWith('/') ? rest : '/' + rest) + query;
 	next();
 });
 
@@ -198,8 +228,74 @@ app.get('/nail-designer', (request, response) => {
 	response.sendFile(path.join(siteRoot, 'nail-designer', 'index.html'));
 });
 
-app.get('/dd-evaluator', (request, response) => {
-	response.sendFile(path.join(siteRoot, 'dd-evaluator', 'index.html'));
+app.get('/gotchi', (request, response) => {
+	response.redirect(301, '/gotchi/');
+});
+app.get('/gotchi/', (request, response) => {
+	response.sendFile(path.join(siteRoot, 'gotchi', 'index.html'));
+});
+
+// DDL Tourney — static files in /bracket, JSON API on this same Node process.
+// No Vite and no extra port. Apache may rewrite /tourney → /__tourney_gate.
+const bracketDir = path.join(siteRoot, 'bracket');
+const tourneyDataDir = path.join(__dirname, 'data');
+const createTourneyRouter = require('./routes/tourney-bracket');
+const tourneyApi = createTourneyRouter({
+	dataDir: tourneyDataDir,
+});
+function sendBracketPage(request, response) {
+	if (typeof createTourneyRouter.sendAppPage === 'function') {
+		createTourneyRouter.sendAppPage({
+			bracketDir,
+			dataDir: tourneyDataDir,
+			request,
+			response,
+		});
+		return;
+	}
+	response.sendFile(path.join(bracketDir, 'index.html'), {
+		headers: { 'Cache-Control': 'no-store, private' },
+	});
+}
+app.use('/tourney-api', tourneyApi);
+app.use('/kmx-tourney', tourneyApi);
+app.use('/kk-tourney', tourneyApi);
+app.get('/__tourney_status', (_request, response) => {
+	response.json({ ok: true, mode: 'static', proxy: false });
+});
+function redirectTourneyShare(request, response) {
+	const slug = String((request.params && request.params.slug) || '').trim();
+	response.redirect(302, `/tourney/?t=${encodeURIComponent(slug)}`);
+}
+app.get([
+	'/tourney/t/:slug', '/tourney/t/:slug/',
+	'/__tourney_gate/t/:slug', '/__tourney_gate/t/:slug/',
+], redirectTourneyShare);
+app.get([
+	'/tourney', '/tourney/',
+	'/__tourney_gate', '/__tourney_gate/',
+], sendBracketPage);
+function bracketStaticHeaders(res, filePath) {
+	if (/\.(js|css|html)$/i.test(String(filePath || ''))) {
+		res.setHeader('Cache-Control', 'no-store, private');
+	}
+}
+app.use('/tourney', express.static(bracketDir, { setHeaders: bracketStaticHeaders }));
+app.use('/__tourney_gate', express.static(bracketDir, { setHeaders: bracketStaticHeaders }));
+app.use('/bracket', express.static(bracketDir, { setHeaders: bracketStaticHeaders }));
+app.get(['/tourney/*', '/__tourney_gate/*'], (request, response) => {
+	const match = String(request.path || '').match(/\/t\/([^/]+)\/?$/);
+	if (match) {
+		response.redirect(302, `/tourney/?t=${encodeURIComponent(match[1])}`);
+		return;
+	}
+	sendBracketPage(request, response);
+});
+
+app.get(['/dd-evaluator', '/dd-evaluator/'], (request, response) => {
+	response.sendFile(path.join(siteRoot, 'dd-evaluator', 'index.html'), {
+		headers: { 'Cache-Control': 'no-store, private' },
+	});
 });
 
 // =============================================================================
@@ -299,6 +395,108 @@ app.get(/^\/map\/.+$/, voyagerGate, (request, response, next) => {
 	const safeRoot = path.join(siteRoot, 'map') + path.sep;
 	if (!filePath.startsWith(safeRoot)) {
 		return voyagerHidden(response);
+	}
+	response.sendFile(filePath, {
+		headers: {
+			'Cache-Control': 'no-store, private',
+			'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive'
+		}
+	}, (err) => {
+		if (err) next();
+	});
+});
+
+// =============================================================================
+// DDL TCG companion password gate (/ddl, ddl.kushmedia.xyz, ddltcg.kushmetax.com fallback).
+// Same contract as Voyager: Basic Auth, timing-safe, 404 if no password.
+// Apache rewrites /ddl/* → /__ddl_gate/* (see ddl/.htaccess).
+// =============================================================================
+function resolveDdlPassword() {
+	const direct = String(process.env.DDL_PASSWORD || '').trim();
+	if (direct) return direct;
+	const filePath = String(process.env.DDL_PASSWORD_FILE || '').trim();
+	const candidates = [];
+	if (filePath) candidates.push(filePath);
+	candidates.push(path.join(__dirname, 'data', '.ddl-password'));
+	candidates.push(path.join(siteRoot, '.ddl-password'));
+	for (const candidate of candidates) {
+		try {
+			const first = String(fs.readFileSync(candidate, 'utf8') || '').split(/\r?\n/)[0].trim();
+			if (first) return first;
+		} catch (_err) { /* missing file => try next */ }
+	}
+	return '';
+}
+
+function ddlHidden(response) {
+	response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+	response.set('Cache-Control', 'no-store, private');
+	response.status(404).send('Not found');
+}
+
+function ddlChallenge(response) {
+	response.set('WWW-Authenticate', 'Basic realm="DDL TCG Companion", charset="UTF-8"');
+	response.set('Cache-Control', 'no-store, private');
+	response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+	response.status(401).send('Unauthorized');
+}
+
+function ddlGate(request, response, next) {
+	if (/^(1|true|yes|on)$/i.test(String(process.env.DDL_PUBLIC || ''))) {
+		response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+		return next();
+	}
+	const expected = resolveDdlPassword();
+	if (!expected) {
+		return ddlHidden(response);
+	}
+	const auth = request.headers.authorization;
+	if (!auth || typeof auth !== 'string' || !auth.startsWith('Basic ')) {
+		return ddlChallenge(response);
+	}
+	let password = '';
+	try {
+		const decoded = Buffer.from(auth.slice(6).trim(), 'base64').toString('utf8');
+		const colon = decoded.indexOf(':');
+		password = colon >= 0 ? decoded.slice(colon + 1) : decoded;
+	} catch (_err) {
+		return ddlChallenge(response);
+	}
+	if (!timingSafeEqualString(expected, password)) {
+		return ddlChallenge(response);
+	}
+	response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+	response.set('Cache-Control', 'no-store, private');
+	return next();
+}
+
+app.use('/__ddl_gate', ddlGate, express.static(path.join(siteRoot, 'ddl'), {
+	dotfiles: 'deny',
+	index: 'index.html',
+	extensions: ['html'],
+	setHeaders(response) {
+		response.setHeader('Cache-Control', 'no-store, private');
+		response.setHeader('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+	}
+}));
+
+app.get(['/ddl', '/ddl/'], ddlGate, (request, response) => {
+	response.sendFile(path.join(siteRoot, 'ddl', 'index.html'), {
+		headers: {
+			'Cache-Control': 'no-store, private',
+			'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive'
+		}
+	});
+});
+app.get(/^\/ddl\/.+$/, ddlGate, (request, response, next) => {
+	const sub = request.path.replace(/^\/ddl\//, '');
+	if (!sub || /(^|\/)\.\.(\/|$)/.test(sub) || sub.startsWith('.')) {
+		return ddlHidden(response);
+	}
+	const filePath = path.join(siteRoot, 'ddl', sub);
+	const safeRoot = path.join(siteRoot, 'ddl') + path.sep;
+	if (!filePath.startsWith(safeRoot)) {
+		return ddlHidden(response);
 	}
 	response.sendFile(filePath, {
 		headers: {
@@ -411,26 +609,37 @@ app.get('/api/voyager/pois', voyagerGate, (request, response) => {
 
 function sendDdAdminHtml(response) {
 	response.sendFile(path.join(siteRoot, 'admin.html'), {
-		headers: { 'Cache-Control': 'no-store' },
+		headers: {
+			'Cache-Control': 'no-store, private',
+			'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive',
+		},
 	});
 }
 
-app.get('/admin.html', (request, response) => {
-	if (/^(1|true|yes)$/i.test(String(process.env.DD_ADMIN_UI_PUBLIC || ''))) {
-		sendDdAdminHtml(response);
-		return;
+function ddAdminHtmlHidden(response) {
+	response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+	response.set('Cache-Control', 'no-store, private');
+	response.status(404).send('Not found');
+}
+
+function ddAdminHtmlChallenge(response) {
+	response.set('WWW-Authenticate', 'Basic realm="DD Evaluator Admin", charset="UTF-8"');
+	response.set('Cache-Control', 'no-store, private');
+	response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+	response.status(401).send('Unauthorized');
+}
+
+function ddAdminHtmlGate(request, response, next) {
+	if (/^(1|true|yes|on)$/i.test(String(process.env.DD_ADMIN_UI_PUBLIC || ''))) {
+		return next();
 	}
 	const gate = ddEvaluatorRouter.resolveAdminHtmlGatePassword();
 	if (!gate) {
-		sendDdAdminHtml(response);
-		return;
+		return ddAdminHtmlHidden(response);
 	}
 	const auth = request.headers.authorization;
 	if (!auth || typeof auth !== 'string' || !auth.startsWith('Basic ')) {
-		response.set('WWW-Authenticate', 'Basic realm="DD Evaluator Admin"');
-		response.set('Cache-Control', 'no-store');
-		response.status(401).send('Unauthorized');
-		return;
+		return ddAdminHtmlChallenge(response);
 	}
 	let password = '';
 	try {
@@ -438,17 +647,15 @@ app.get('/admin.html', (request, response) => {
 		const colon = decoded.indexOf(':');
 		password = colon >= 0 ? decoded.slice(colon + 1) : decoded;
 	} catch (_err) {
-		response.set('WWW-Authenticate', 'Basic realm="DD Evaluator Admin"');
-		response.set('Cache-Control', 'no-store');
-		response.status(401).send('Unauthorized');
-		return;
+		return ddAdminHtmlChallenge(response);
 	}
 	if (!timingSafeEqualString(gate, password)) {
-		response.set('WWW-Authenticate', 'Basic realm="DD Evaluator Admin"');
-		response.set('Cache-Control', 'no-store');
-		response.status(401).send('Unauthorized');
-		return;
+		return ddAdminHtmlChallenge(response);
 	}
+	return next();
+}
+
+app.get(['/admin', '/admin.html', '/__admin_gate', '/__admin_gate/'], ddAdminHtmlGate, (request, response) => {
 	sendDdAdminHtml(response);
 });
 
@@ -480,8 +687,16 @@ if (require.main === module) {
 		if (uiPw && traitPw && uiPw !== traitPw) {
 			console.log('[dd-evaluator] DD_ADMIN_UI_PASSWORD and DD_ADMIN_PASSWORD both set and differ — API saves use the trait secret (DD_ADMIN_PASSWORD), not the UI Basic gate.');
 		}
+		if (!ddEvaluatorRouter.resolveAdminHtmlGatePassword() && !/^(1|true|yes|on)$/i.test(String(process.env.DD_ADMIN_UI_PUBLIC || ''))) {
+			console.log('[dd-evaluator] /admin.html hidden (404) until DD_ADMIN_PASSWORD or DD_ADMIN_UI_PASSWORD is set.');
+		}
 		if (ddEvaluatorRouter.getCommunitySubmitPassword()) {
 			console.log('[dd-evaluator] Community suggestion submissions require DD_COMMUNITY_PASSWORD.');
+		}
+		if (String(process.env.DDL_PASSWORD || '').trim() || String(process.env.DDL_PASSWORD_FILE || '').trim()) {
+			console.log('[ddl-tcg] password gate on /ddl, ddl.kushmedia.xyz, ddltcg.kushmetax.com');
+		} else {
+			console.log('[ddl-tcg] hidden (404) until DDL_PASSWORD is set');
 		}
 	};
 	if (process.env.PORT) {

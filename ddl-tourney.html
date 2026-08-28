@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DDL Tourney - Legends Bracket — KushMetaX</title>
+  <meta name="description" content="DDL Tourney - Legends Bracket. Host Doginal Dogs Legends pack tournaments: DOGE entry, paid roster, Challonge-style brackets.">
+  <link rel="canonical" href="https://kushmedia.xyz/ddl-tourney.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DDL Tourney - Legends Bracket">
+  <meta name="twitter:description" content="Host Doginal Dogs Legends pack tournaments: DOGE entry, paid roster, Challonge-style brackets.">
+  <meta name="twitter:image" content="https://kushmedia.xyz/bracket/og.jpg">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="KushMetaX">
+  <meta property="og:title" content="DDL Tourney - Legends Bracket">
+  <meta property="og:description" content="Host Doginal Dogs Legends pack tournaments: DOGE entry, paid roster, Challonge-style brackets.">
+  <meta property="og:url" content="https://kushmedia.xyz/ddl-tourney.html">
+  <meta property="og:image" content="https://kushmedia.xyz/bracket/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="DDL Tourney - Legends Bracket">
+  <link rel="icon" href="assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/Kush.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css">
+  <style>
+    .tourney-hero {
+      position: relative;
+      min-height: calc(100dvh - var(--header-h));
+      display: grid;
+      place-items: center;
+      padding: 48px 20px 80px;
+      overflow: hidden;
+    }
+    .tourney-hero-bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+    .tourney-hero-bg img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+    .tourney-hero-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(20,10,4,.82) 55%, rgba(0,0,0,.92) 100%);
+    }
+    .tourney-hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+      text-align: center;
+    }
+    .tourney-crest {
+      width: 112px;
+      height: 112px;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 0 0 1px rgba(232,163,23,.45), 0 12px 40px rgba(0,0,0,.45);
+    }
+    .tourney-kicker {
+      font-family: var(--font-logo);
+      font-size: 11px;
+      letter-spacing: .42em;
+      text-transform: uppercase;
+      color: #e8a317;
+    }
+    .tourney-hero h1 {
+      font-family: var(--font-logo);
+      font-size: clamp(1.8rem, 5vw, 3.1rem);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin: 12px 0 16px;
+      line-height: 1.15;
+    }
+    .tourney-hero p {
+      color: var(--grey-light);
+      font-size: 1.05rem;
+      max-width: 34rem;
+      margin: 0 auto 28px;
+    }
+    .tourney-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 28px;
+      border-radius: 8px;
+      background: #e8a317;
+      color: #1a0c04;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    .tourney-cta:hover { filter: brightness(1.08); }
+    .tourney-points {
+      display: grid;
+      gap: 12px;
+      margin-top: 36px;
+      text-align: left;
+    }
+    @media (min-width: 640px) {
+      .tourney-points { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    .tourney-points article {
+      background: rgba(17,17,17,.78);
+      border: 1px solid rgba(232,163,23,.18);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .tourney-points h2 {
+      font-size: .95rem;
+      margin-bottom: 6px;
+      color: #f6e7c8;
+    }
+    .tourney-points p {
+      margin: 0;
+      font-size: .85rem;
+      color: var(--grey-light);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="header-logo">
+        <img src="assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+        <span class="header-logo-text">KushMetaX</span>
+      </a>
+      <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="nav-overlay" aria-label="Main navigation">
+    <ul class="nav-list">
+      <li><a href="index.html" class="nav-link">Home</a></li>
+      <li><a href="about.html" class="nav-link">About</a></li>
+      <li><a href="gallery.html" class="nav-link">Gallery</a></li>
+      <li><a href="services.html" class="nav-link">Services</a></li>
+      <li><a href="dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
+      <li><a href="voyager.html" class="nav-link">Voyager</a></li>
+      <li><a href="contact.html" class="nav-link">Connect</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="tourney-hero">
+      <div class="tourney-hero-bg" aria-hidden="true">
+        <img src="/bracket/flames.jpg" alt="">
+      </div>
+      <div class="tourney-hero-inner">
+        <img class="tourney-crest" src="/bracket/crest.jpg" alt="">
+        <p class="tourney-kicker">Doginal Dogs Legends</p>
+        <h1>DDL Tourney<br>Legends Bracket</h1>
+        <p>Pick an open arena, sign in with Discord (no password stored), and register. Hosts confirm payments, then lock the paid roster into a Challonge-style bracket. Official finishes become records you can seed into a grand tournament.</p>
+        <a class="tourney-cta" href="/tourney/">Enter the arena →</a>
+        <div class="tourney-points">
+          <article>
+            <h2>Discord accounts</h2>
+            <p>Sign in with Discord to keep a handle across events. We never store a tournament password. Walk-ins can still be added by the host.</p>
+          </article>
+          <article>
+            <h2>Pending until confirmed</h2>
+            <p>New seats sit pending. A host marks the payment seen, then you are in the paid pack.</p>
+          </article>
+          <article>
+            <h2>Live brackets</h2>
+            <p>Report scores, advance winners, crown a champion. Only hosting uses a Node password.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-content">
+      <div class="footer-links">
+        <a href="https://doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Doginal Dogs</a>
+        <a href="https://market.doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Marketplace</a>
+        <a href="pricing.html" class="footer-link">Pricing</a>
+        <a href="legal/terms-of-service.html" class="footer-link">Terms</a>
+        <a href="legal/privacy-policy.html" class="footer-link">Privacy</a>
+        <a href="legal/refund-policy.html" class="footer-link">Refunds</a>
+      </div>
+      <p class="footer-copy">&copy; 2026 KushMetaX. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="brand.js"></script>
+</body>
+</html>

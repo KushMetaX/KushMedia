@@ -2,12 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <!-- prevent browser caching so nav edits appear immediately -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>KushMetaX — DD Price Evaluator</title>
   <meta name="description" content="Trait-weighted Doginal Dogs price evaluation powered by live market data.">
   <link rel="icon" href="../assets/Kush.png" type="image/png">
   <link rel="apple-touch-icon" href="../assets/Kush.png">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant:ital,wght@0,500;0,600;0,700&family=Outfit:wght@400;500;600;700;800&family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant:ital,wght@0,500;0,600;0,700&family=Great+Vibes&family=Outfit:wght@400;500;600;700;800&family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css">
   <style>
     /* Avoid smooth-scroll fighting touch momentum / focused-field scroll corrections */
@@ -133,6 +137,7 @@
     .eval-shell > .eval-dex-spotlight,
     .eval-shell > .eval-market-pulse,
     .eval-shell > .eval-search-card,
+    .eval-shell > .eval-owner-search,
     .eval-shell > .eval-status,
     .eval-shell > #result,
     .eval-shell > .eval-kennel,
@@ -287,16 +292,29 @@
     }
     .eval-hero .eval-intro{margin-bottom:1.35rem}
     .eval-hero .eval-title{
-      font-family:"Outfit",system-ui,sans-serif;
-      font-size:clamp(2.35rem,6.8vw,3.05rem);
-      font-weight:800;
-      letter-spacing:-.03em;
-      line-height:1.06;
-      color:#faf8f2;
-      text-shadow:
-        0 2px 28px rgba(0,0,0,.75),
-        0 0 48px rgba(232,197,71,.08),
-        0 0 1px rgba(255,255,255,.12);
+      font-family:"Great Vibes",cursive;
+      font-size:clamp(3.2rem,10vw,4.75rem);
+      font-weight:400;
+      letter-spacing:.01em;
+      line-height:1.3;
+      padding-bottom:.22em;
+      overflow:visible;
+      background:linear-gradient(160deg,
+        #fff7de 0%, #f6e196 26%, #e8c547 52%, #c9a227 74%, #f4e6a0 100%);
+      background-size:180% 180%;
+      -webkit-background-clip:text;
+      background-clip:text;
+      -webkit-text-fill-color:transparent;
+      color:transparent;
+      filter:drop-shadow(0 2px 18px rgba(0,0,0,.6)) drop-shadow(0 0 26px rgba(232,197,71,.28));
+      animation:evalTitleShimmer 8s ease-in-out infinite;
+    }
+    @keyframes evalTitleShimmer{
+      0%,100%{background-position:0% 50%}
+      50%{background-position:100% 50%}
+    }
+    @media (prefers-reduced-motion: reduce){
+      .eval-hero .eval-title{animation:none}
     }
     .eval-hero .eval-subtitle{
       margin-top:.95rem;
@@ -461,6 +479,7 @@
     /* Search mode toggle — equal width segments, inactive = solid dark like cards */
     .eval-mode-toggle{
       display:flex;
+      flex-wrap:wrap;
       justify-content:stretch;
       width:100%;
       gap:0;
@@ -469,12 +488,12 @@
     .eval-mode-btn{
       flex:1 1 0;
       min-width:0;
-      padding:.62rem .65rem;
+      padding:.62rem .55rem;
       text-align:center;
       background:linear-gradient(180deg, #161412 0%, #0c0a08 100%);
       border:1px solid rgba(212,175,55,.22);
       color:#b5b0a4;
-      font-size:.8rem;
+      font-size:.76rem;
       font-weight:600;
       cursor:pointer;
       transition:background .2s,border-color .2s,color .2s,box-shadow .2s
@@ -515,6 +534,140 @@
     }
     .eval-input-wrap{position:relative;flex:1;min-width:200px;min-height:2.9rem}
     .eval-input-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--eval-gold);font-weight:700;font-size:1.1rem;pointer-events:none;opacity:.9}
+    /* In-flow trait suggestions: expand the search card instead of overlaying KennelDAO */
+    .eval-trait-suggest{
+      display:none;
+      flex:1 1 100%;
+      width:100%;
+      max-height:220px;
+      overflow:auto;
+      margin:0;
+      background:linear-gradient(180deg, #161412 0%, #0c0a08 100%);
+      border:1px solid rgba(212,175,55,.28);
+      border-radius:.55rem;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04)
+    }
+    .eval-trait-suggest.open{display:block}
+    .eval-search-card:has(.eval-trait-suggest.open){
+      position:relative;
+      z-index:2
+    }
+    .eval-trait-chips{
+      display:none;
+      flex:1 1 100%;
+      width:100%;
+      flex-wrap:wrap;
+      gap:.4rem;
+      align-items:center;
+      margin:0
+    }
+    .eval-trait-chips.has-chips{display:flex}
+    .eval-trait-chip-sel{
+      display:inline-flex;
+      align-items:center;
+      gap:.35rem;
+      padding:.28rem .55rem;
+      border-radius:.4rem;
+      border:1px solid rgba(212,175,55,.3);
+      background:rgba(212,175,55,.08);
+      color:#f0ebe0;
+      font-size:.75rem;
+      font-weight:600
+    }
+    .eval-trait-chip-sel span{color:#8a857a;font-weight:500}
+    .eval-trait-chip-x{
+      border:0;background:transparent;color:#b5b0a4;cursor:pointer;
+      font-size:.9rem;line-height:1;padding:0 0 0 .15rem
+    }
+    .eval-trait-chip-x:hover{color:#fff}
+    .eval-trait-add-btn{
+      display:none;
+      flex:0 0 auto;
+      align-items:center;
+      justify-content:center;
+      min-height:2.9rem;
+      padding:.65rem .95rem;
+      box-sizing:border-box;
+      border-radius:.55rem;
+      border:1px solid rgba(212,175,55,.28);
+      background:linear-gradient(180deg, #161412 0%, #0c0a08 100%);
+      color:#d8d3c8;
+      font:inherit;
+      font-size:.8rem;
+      font-weight:600;
+      cursor:pointer;
+      white-space:nowrap
+    }
+    .eval-trait-add-btn:hover{
+      border-color:rgba(212,175,55,.45);
+      color:#fff;
+      background:linear-gradient(180deg, #1c1a16 0%, #12100d 100%)
+    }
+    .eval-search-card.trait-mode .eval-trait-add-btn{display:inline-flex}
+    .eval-trait-suggest-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:.75rem;
+      width:100%;
+      padding:.65rem .85rem;
+      border:0;
+      border-bottom:1px solid rgba(255,255,255,.05);
+      background:transparent;
+      color:#eee;
+      font:inherit;
+      font-size:.84rem;
+      text-align:left;
+      cursor:pointer
+    }
+    .eval-trait-suggest-item:last-child{border-bottom:0}
+    .eval-trait-suggest-item:hover,
+    .eval-trait-suggest-item.active{background:rgba(212,175,55,.1)}
+    .eval-trait-suggest-main{display:flex;flex-direction:column;gap:.15rem;min-width:0}
+    .eval-trait-suggest-value{color:#fff;font-weight:600}
+    .eval-trait-suggest-meta{color:#8a857a;font-size:.72rem}
+    .eval-trait-suggest-count{color:var(--eval-gold);font-size:.72rem;font-weight:600;white-space:nowrap}
+    .eval-trait-results-meta{
+      display:flex;flex-wrap:wrap;gap:.75rem 1.25rem;
+      padding:1rem 1.5rem;border-bottom:1px solid #2a2a2a;
+      font-size:.74rem;color:#777
+    }
+    .eval-trait-results-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(96px,1fr));
+      gap:.65rem;
+      padding:1.25rem 1.5rem 1.5rem
+    }
+    .eval-trait-result-tile{
+      display:flex;flex-direction:column;gap:.35rem;align-items:stretch;
+      padding:.45rem;border-radius:.55rem;
+      background:#0d0d0d;border:1px solid #2a2a2a;
+      color:inherit;font:inherit;cursor:pointer;text-align:left;
+      transition:border-color .15s,background .15s,transform .12s
+    }
+    .eval-trait-result-tile:hover{
+      border-color:rgba(212,175,55,.4);
+      background:rgba(212,175,55,.06);
+      transform:translateY(-1px)
+    }
+    .eval-trait-result-tile img{
+      width:100%;aspect-ratio:1;object-fit:cover;border-radius:.35rem;
+      image-rendering:pixelated;background:#111;display:block
+    }
+    .eval-trait-result-num{font-size:.78rem;font-weight:700;color:#fff}
+    .eval-trait-result-rank{font-size:.68rem;color:#8a857a}
+    .eval-trait-disambiguation{
+      display:flex;flex-direction:column;gap:.5rem;padding:1.25rem 1.5rem 1.5rem
+    }
+    .eval-trait-disambiguation-btn{
+      display:flex;justify-content:space-between;align-items:center;gap:1rem;
+      padding:.75rem .9rem;border-radius:.5rem;
+      background:#0d0d0d;border:1px solid #2a2a2a;color:#eee;
+      font:inherit;cursor:pointer;text-align:left
+    }
+    .eval-trait-disambiguation-btn:hover{border-color:rgba(212,175,55,.35);background:rgba(212,175,55,.06)}
+    .eval-trait-load-more{display:flex;justify-content:center;padding:0 1.5rem 1.5rem}
+    .eval-trait-load-more .eval-btn{min-width:180px}
     .eval-input{
       width:100%;
       height:100%;
@@ -559,7 +712,8 @@
     .eval-btn:disabled{opacity:.45;pointer-events:none;box-shadow:none}
 
     /* Status */
-    .eval-status{text-align:center;margin-top:0;min-height:2rem}
+    .eval-status{text-align:center;margin-top:0;min-height:2rem;scroll-margin-top:5.5rem}
+    #result{scroll-margin-top:5.5rem}
     .eval-spinner{display:inline-flex;align-items:center;gap:.5rem;color:#888}
     .eval-spinner svg{width:20px;height:20px;animation:evalSpin .8s linear infinite}
     @keyframes evalSpin{to{transform:rotate(360deg)}}
@@ -611,6 +765,26 @@
     .eval-rarity-blue{background:rgba(96,165,250,.06);color:#60a5fa;border-color:rgba(96,165,250,.3)}
     .eval-rarity-grey{background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);border-color:rgba(255,255,255,.08)}
     .eval-badge-special{background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.4)}
+    .eval-badge-tcg{
+      position:relative;
+      overflow:hidden;
+      background:linear-gradient(135deg, rgba(180,40,60,.22) 0%, rgba(212,175,55,.2) 45%, rgba(40,90,160,.22) 100%);
+      color:#f3e6b0;
+      border:1px solid rgba(240,200,90,.55);
+      letter-spacing:.04em;
+      text-shadow:0 0 10px rgba(240,200,90,.35);
+      box-shadow:0 0 14px rgba(180,50,70,.18), inset 0 1px 0 rgba(255,240,200,.2);
+      animation:evalTcgPulse 2.4s ease-in-out infinite
+    }
+    .eval-badge-tcg::after{
+      content:"";
+      position:absolute;inset:0;
+      background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.28) 48%, transparent 62%);
+      transform:translateX(-120%);
+      animation:evalTcgShimmer 2.8s ease-in-out infinite
+    }
+    @keyframes evalTcgPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.12)}}
+    @keyframes evalTcgShimmer{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
 
     /* Price grid */
     .eval-prices{
@@ -656,6 +830,48 @@
     .eval-wallet-pfp{width:78px;height:78px;border-radius:999px;overflow:hidden;background:#0d0d0d;display:block}
     .eval-wallet-pfp img{width:100%;height:100%;display:block;object-fit:cover;image-rendering:pixelated;background:#0d0d0d}
     .eval-wallet-pfp-ring{position:absolute;inset:-5px;border-radius:999px;pointer-events:none}
+    .eval-owner-search-title{
+      font-family:'Orbitron',sans-serif;
+      font-size:.78rem;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--eval-gold);
+      margin:0 0 .35rem;
+      text-align:center
+    }
+    .eval-owner-search-hint{
+      text-align:center;
+      font-size:.72rem;
+      color:#8a857a;
+      margin:0 0 .85rem;
+      line-height:1.45
+    }
+    .eval-owner-x-link{
+      color:#1d9bf0;
+      text-decoration:none;
+      font-weight:600
+    }
+    .eval-owner-x-link:hover{text-decoration:underline}
+    .eval-owner-address{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      font-size:.78rem;
+      color:#bbb;
+      word-break:break-all
+    }
+    .eval-owner-dogs{
+      display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.85rem
+    }
+    .eval-owner-dog-chip{
+      display:inline-flex;align-items:center;gap:.35rem;
+      padding:.35rem .55rem;border-radius:.45rem;
+      border:1px solid rgba(212,175,55,.22);
+      background:rgba(0,0,0,.28);color:#eee;
+      font-size:.74rem;font-weight:600;text-decoration:none;cursor:pointer
+    }
+    .eval-owner-dog-chip:hover{border-color:rgba(212,175,55,.45);background:rgba(212,175,55,.08)}
+    .eval-owner-dog-chip img{width:22px;height:22px;border-radius:.25rem;image-rendering:pixelated;background:#111}
+    .eval-owner-actions{display:flex;flex-wrap:wrap;gap:.6rem;padding:0 1.5rem 1.35rem}
+    .eval-owner-actions .eval-btn{min-height:2.4rem;padding:.55rem 1.1rem;font-size:.82rem}
 
     /* Listing analysis */
     .eval-listing{padding:1.5rem;border-bottom:1px solid #2a2a2a}
@@ -688,6 +904,8 @@
     .eval-trait-chip.trending-row{border-color:rgba(255,100,50,.3);background:rgba(255,100,50,.04)}
     .eval-trait-chip.combo-row{border-color:rgba(147,197,253,.28);background:rgba(147,197,253,.05)}
     .eval-combo-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;padding:3px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;line-height:1;vertical-align:middle;box-sizing:border-box;background:rgba(147,197,253,.12);color:#93c5fd;border:1px solid rgba(147,197,253,.4)}
+    .eval-tcg-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;padding:3px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;line-height:1;vertical-align:middle;box-sizing:border-box;background:linear-gradient(135deg, rgba(180,40,60,.2), rgba(212,175,55,.18));color:#f0d78c;border:1px solid rgba(240,200,90,.45);text-shadow:0 0 8px rgba(240,200,90,.3)}
+    .eval-trait-chip.tcg-row{border-color:rgba(240,200,90,.35);background:linear-gradient(90deg, rgba(180,40,60,.06), rgba(212,175,55,.05))}
 
     /* Community lore (approved notes) — directly under price boxes */
     .eval-community-lore{padding:1.25rem 1.5rem;border-top:1px solid #2a2a2a;border-bottom:1px solid #2a2a2a;background:rgba(255,255,255,.03)}
@@ -703,6 +921,15 @@
     .eval-refused-floor{border-top:1px solid #2a2a2a}
     .eval-refused-floor-sub{font-size:.9rem;color:rgba(212,175,55,.82);margin-top:.08rem;font-weight:500}
     .eval-refused-floor-note{font-size:.78rem;color:rgba(200,195,175,.67);margin-top:.35rem;max-width:40rem;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+    .eval-official-lore{border-top:1px solid #2a2a2a;background:linear-gradient(90deg, rgba(180,40,60,.06), rgba(212,175,55,.05))}
+    .eval-official-lore-label{color:#f0d78c}
+    .eval-official-lore .eval-own-sale-value{color:#f0d78c}
+    .eval-official-lore-sub{font-size:.9rem;color:rgba(240,215,140,.82);margin-top:.08rem;font-weight:500}
+    .eval-official-lore-note{font-size:.78rem;color:rgba(200,195,175,.75);margin-top:.35rem;max-width:40rem;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+    .eval-tcg-inspiration{border-top:1px solid #2a2a2a;background:linear-gradient(90deg, rgba(180,40,60,.08), rgba(212,175,55,.07))}
+    .eval-tcg-inspiration-label{color:#f0d78c}
+    .eval-tcg-inspiration .eval-own-sale-value{color:#f0d78c;font-size:1.05rem}
+    .eval-tcg-inspiration-note{font-size:.78rem;color:rgba(200,195,175,.75);margin-top:.35rem;max-width:40rem;line-height:1.4}
 
     /* Timestamp */
     .eval-timestamp{padding:0 1.5rem 1rem;text-align:right;font-size:.65rem;color:#444}
@@ -751,9 +978,14 @@
       .eval-form{flex-direction:column}
       .eval-form .eval-btn{width:100%}
       .eval-mode-btn{
-        font-size:.72rem;
-        padding:.58rem .4rem
+        flex:1 1 40%;
+        font-size:.7rem;
+        padding:.55rem .35rem
       }
+      .eval-mode-btn:nth-child(1){border-radius:.55rem 0 0 0}
+      .eval-mode-btn:nth-child(2){border-radius:0 .55rem 0 0;margin-left:-1px}
+      .eval-mode-btn:nth-child(3){border-radius:0 0 0 .55rem;margin-left:0;margin-top:-1px}
+      .eval-mode-btn:nth-child(4){border-radius:0 0 .55rem 0;margin-left:-1px;margin-top:-1px}
       .eval-prices{grid-template-columns:1fr}
       .eval-banner{flex-direction:column;text-align:center;align-items:center}
       .eval-banner .eval-dog-img{margin:0 auto}
@@ -1205,12 +1437,21 @@
     .eval-lore-request-desc{
       color:#827d73;
       font-size:.83rem;
-      margin:.55rem auto 1rem;
+      margin:.55rem auto .85rem;
       line-height:1.5;
       max-width:26rem;
       text-wrap:pretty;
       letter-spacing:.015em
     }
+    .eval-lore-request-actions-bar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:.55rem;
+      justify-content:center;
+      margin:0 0 .15rem
+    }
+    .eval-lore-request-body{margin-top:.85rem;text-align:left}
+    .eval-lore-request-body[hidden]{display:none !important}
     .eval-lore-request-form{
       display:flex;
       flex-direction:column;
@@ -2039,6 +2280,7 @@
       <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
       <li><a href="../services.html" class="nav-link">Services</a></li>
       <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="../ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
       <li><a href="../voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="../contact.html" class="nav-link">Connect</a></li>
     </ul>
@@ -2108,7 +2350,11 @@
         <div class="eval-lore-request eval-glass-panel eval-block-card eval-lift-hover" id="evalLoreRequest">
           <p class="eval-mp-kicker">Community lore</p>
           <h2 class="eval-lore-request-title">Request Community Lore</h2>
-          <p class="eval-lore-request-desc">Know the story behind a Doginal Dog? Submit lore for it. Once an admin approves your note, it appears on that dog&rsquo;s evaluation.</p>
+          <p class="eval-lore-request-desc">Know the story behind a Doginal Dog? Submit lore for review &mdash; approved notes show on that dog&rsquo;s evaluation.</p>
+          <div class="eval-lore-request-actions-bar">
+            <button type="button" class="eval-mp-btn eval-mp-btn-primary" id="evalLoreToggle" aria-expanded="false" aria-controls="evalLoreBody">Expand Form</button>
+          </div>
+          <div class="eval-lore-request-body" id="evalLoreBody" hidden>
           <form class="eval-lore-request-form" id="evalLoreForm" autocomplete="off">
             <div>
               <label for="evalLoreDog">Dog number</label>
@@ -2131,13 +2377,15 @@
               <span class="eval-lore-request-msg" id="evalLoreMsg" aria-live="polite"></span>
             </div>
           </form>
+          </div>
         </div>
 
-        <div class="eval-search-card eval-glass-panel eval-block-card eval-lift-hover" role="search" aria-label="Inscription, rank, or wallet lookup">
+        <div class="eval-search-card eval-glass-panel eval-block-card eval-lift-hover" role="search" aria-label="Inscription, rank, wallet, or trait lookup">
         <div class="eval-mode-toggle" role="tablist" aria-label="Search mode">
           <button type="button" class="eval-mode-btn active" data-mode="inscription" role="tab" aria-selected="true">Inscription #</button>
           <button type="button" class="eval-mode-btn" data-mode="rank" role="tab" aria-selected="false">Rarity Rank</button>
           <button type="button" class="eval-mode-btn" data-mode="wallet" role="tab" aria-selected="false">Wallet Address</button>
+          <button type="button" class="eval-mode-btn" data-mode="trait" role="tab" aria-selected="false">Trait</button>
         </div>
         <div id="modeHint" class="eval-mode-hint" style="display:none"></div>
 
@@ -2147,8 +2395,24 @@
             <input id="dogInput" type="text" inputmode="numeric" autocomplete="off"
                    placeholder="Enter dog number (1–10000)" class="eval-input" />
           </div>
+          <button type="button" id="traitAddBtn" class="eval-trait-add-btn" hidden>+ Add trait</button>
           <button type="submit" id="evalBtn" class="eval-btn">Evaluate Price</button>
+          <div id="traitChips" class="eval-trait-chips" aria-label="Selected traits"></div>
+          <div id="traitSuggest" class="eval-trait-suggest" role="listbox" aria-label="Matching traits" hidden></div>
         </form>
+        </div>
+
+        <div class="eval-owner-search eval-glass-panel eval-block-card eval-lift-hover" role="search" aria-label="Marketplace owner search">
+          <h3 class="eval-owner-search-title">Owner Search</h3>
+          <p class="eval-owner-search-hint">Look up a marketplace wallet, linked X account, or currently listed dog seller.</p>
+          <form id="ownerSearchForm" class="eval-form">
+            <div class="eval-input-wrap">
+              <span class="eval-input-prefix" aria-hidden="true">@</span>
+              <input id="ownerInput" type="text" inputmode="text" autocomplete="off"
+                     placeholder="Wallet, @handle, or listed dog #" class="eval-input" style="padding-left:2.1rem" />
+            </div>
+            <button type="submit" id="ownerSearchBtn" class="eval-btn">Find Owner</button>
+          </form>
         </div>
 
         <div class="eval-kennel eval-glass-panel eval-lift-hover" id="kennelRoot" role="region" aria-roledescription="carousel" aria-label="KennelDAO" aria-live="polite">
@@ -2168,11 +2432,11 @@
             <p>Estimates use a <strong>market snapshot</strong> from Doginal Dogs listings and recent sales (refreshed on a timer, typically every ~12 hours). Live prints can move between refreshes, so numbers are a model output on that snapshot, not a live order book.</p>
 
             <h4>Step 1 &mdash; Per-trait blend (used inside the anchor)</h4>
-            <p>For each trait value we combine <strong>listing floor</strong> and <strong>sale comps</strong> into one <strong>blended</strong> anchor price: mostly floor-weighted when both exist, with sale depth nudging the weight; top sales can only lift the blend so far unless there is enough trade history. It is <strong>not</strong> simply &ldquo;max of floor and last sale.&rdquo;</p>
+            <p>For each trait value we combine <strong>listing floor</strong> and <strong>sale comps</strong> into one <strong>blended</strong> anchor price: mostly floor-weighted when both exist, with sale depth nudging the weight; top sales can only lift the blend so far unless there is enough trade history. A <strong>single listing</strong> is not used as the floor (vanity asks cannot set the book). High-premium traits (TCG / Diamond / Shiny / strong trend) do not copy their ask or sale into other trait books. It is <strong>not</strong> simply &ldquo;max of floor and last sale.&rdquo;</p>
 
             <h4>Step 2 &mdash; Compound base (max of the rarest layers)</h4>
             <ul>
-              <li>We take non-synthetic traits with a known count of <strong>&le; 2,500</strong> out of 10,000, sort from <strong>rarest upward</strong>, and keep the <strong>top three</strong>.</li>
+              <li>We take non-synthetic traits with a known count of <strong>&le; 500</strong> out of 10,000, sort from <strong>rarest upward</strong>, and keep the <strong>top three</strong>.</li>
               <li>We compute the blended price above for <strong>each</strong> of those layers.</li>
               <li><strong>Base price</strong> = the <strong>maximum</strong> of those blends, so a strong market on one layer (e.g. Shiba) is not ignored just because another layer is numerically rarer (e.g. Poncho).</li>
               <li><strong>Thin-market nudge:</strong> If the layer that <strong>wins</strong> that max has <strong>&lt; 100</strong> supply and the snapshot shows <strong>no listings and no sales</strong> for that value, base is multiplied by <strong>1.08</strong>. If there is still no numeric base, we may seed from the <strong>collection floor</strong> &times; 1.08 when the overall rarest layer qualifies the same way.</li>
@@ -2185,7 +2449,7 @@
             <p>Traits that are <strong>not</strong> in the three-layer compound anchor, have count <strong>&le; 500</strong>, and show a <strong>top sale or floor</strong> above the current base add <strong>20%</strong> of the difference, each. (So the anchor layers are not double-counted here.)</p>
 
             <h4>Step 5 &mdash; Core estimate</h4>
-            <p><strong>(Base + trait bonus) &times; rarity rank multiplier &times; trending multiplier.</strong> Rarity uses overall rank bands: top 1% &rarr; 1.5&times;, top 5% &rarr; 1.25&times;, top 15% &rarr; 1.1&times;, top 25% &rarr; 1.05&times;. Trending uses the strongest <strong>admin-configured</strong> trait demand multiplier that applies to this dog.</p>
+            <p><strong>(Base + trait bonus) &times; rarity rank multiplier &times; trending multiplier.</strong> Rarity uses overall rank bands: top 1% &rarr; 1.5&times;, top 5% &rarr; 1.25&times;, top 15% &rarr; 1.1&times;, top 25% &rarr; 1.05&times;. Trending uses the strongest <strong>admin-configured</strong> trait demand multiplier that applies to this dog, unless that trait already has listing or sale comps in the snapshot (the market is then already in the blend, so the extra multiply is skipped).</p>
             <p>If there is no usable base at all, we fall back to the <strong>average of available per-trait listing floors</strong>, then apply rarity and trending the same way.</p>
 
             <h4>Step 6 &mdash; Floors and scarcity bump</h4>
@@ -2201,11 +2465,13 @@
               <li><strong>Minimal / aesthetic tiers:</strong> e.g. ultra-clean, minimal, visor-minimal, black classic (configurable in admin).</li>
               <li><strong>Custom combos:</strong> admin-defined trait combinations can multiply the result (multiple matches multiply together).</li>
               <li><strong>Angel / vanity dog numbers:</strong> quad or triple repeaters and listed trend numbers (configurable caps).</li>
+              <li><strong>DDL TCG set:</strong> Pirate, Wizard, Crown, Bow, and Zombie get a spotlight tag (manual 2&times; trending). Two of those traits add a small stack boost; three or more get a stronger stack boost (separate from the 2&times;, not compounding it).</li>
             </ul>
 
             <h4>Step 8 &mdash; Community floors and lore</h4>
             <ul>
               <li><strong>Refused community offer floor:</strong> when a minimum refused offer is recorded (USD converted live to DOGE), the <strong>final</strong> estimate is not left below that floor.</li>
+              <li><strong>Official lore floor:</strong> same floor format for canon project lore (e.g. official mascots). Applied after refused-offer floors.</li>
               <li><strong>Community lore:</strong> when a lore entry carries a signed price multiplier, it adjusts the estimate after the steps above.</li>
             </ul>
 
@@ -2394,7 +2660,7 @@
     </div>
   </dialog>
 
-  <script src="../brand.js"></script>
+  <script src="../brand.js?v=ddl-tourney"></script>
   <!-- emailRedirectUrl: public base URL for auth emails (magic link, confirm, recover). Must match Supabase Redirect URLs. Without it, localhost dev leaks into those links. -->
   <script>
     window.__DOGIDEX_SUPABASE__ = Object.assign(
@@ -2480,19 +2746,42 @@
     const form     = document.getElementById('searchForm');
     const input    = document.getElementById('dogInput');
     const evalBtn  = document.getElementById('evalBtn');
+    const ownerSearchForm = document.getElementById('ownerSearchForm');
+    const ownerInput = document.getElementById('ownerInput');
+    const ownerSearchBtn = document.getElementById('ownerSearchBtn');
     const statusEl = document.getElementById('status');
     const resultEl = document.getElementById('result');
     const modeHint = document.getElementById('modeHint');
     const inputPrefix = document.getElementById('inputPrefix');
+    const traitSuggestEl = document.getElementById('traitSuggest');
+    const traitChipsEl = document.getElementById('traitChips');
+    const traitAddBtn = document.getElementById('traitAddBtn');
+    const searchCardEl = document.querySelector('.eval-search-card');
     const modeBtns = document.querySelectorAll('.eval-mode-btn');
-    let searchMode = 'inscription'; // 'inscription' | 'rank' | 'wallet'
+    let searchMode = 'inscription'; // 'inscription' | 'rank' | 'wallet' | 'trait'
+    var traitCatalog = null;
+    var traitCatalogPromise = null;
+    var selectedTraits = []; // [{ traitKey, traitLabel, value, count }, ...]
+    var traitSuggestItems = [];
+    var traitSuggestActive = -1;
+    var traitSearchState = null; // last successful trait-search payload + paging
+    var pendingTraitDisambiguation = null; // resolvedTraits while picking ambiguous segment
 
     function applySearchMode() {
+      hideTraitSuggest();
+      selectedTraits = [];
+      pendingTraitDisambiguation = null;
+      renderTraitChips();
+      if (searchCardEl) searchCardEl.classList.toggle('trait-mode', searchMode === 'trait');
+      if (traitAddBtn) traitAddBtn.hidden = searchMode !== 'trait';
+
       if (searchMode === 'rank') {
         inputPrefix.hidden = false;
         inputPrefix.textContent = '#';
         input.style.paddingLeft = '2.1rem';
+        input.inputMode = 'numeric';
         input.placeholder = 'Enter rarity rank (1–10000)';
+        evalBtn.textContent = 'Evaluate Price';
         modeHint.textContent = 'Rank search uses your local scraped index to map rank to dog number.';
         modeHint.style.display = '';
         return;
@@ -2501,16 +2790,32 @@
       if (searchMode === 'wallet') {
         inputPrefix.hidden = true;
         input.style.paddingLeft = '.85rem';
+        input.inputMode = 'text';
         input.placeholder = 'Enter Dogecoin wallet address';
+        evalBtn.textContent = 'Evaluate Price';
         modeHint.textContent = 'Estimated Value of Doginal Dogs currently held by that address.';
         modeHint.style.display = '';
+        return;
+      }
+
+      if (searchMode === 'trait') {
+        inputPrefix.hidden = true;
+        input.style.paddingLeft = '.85rem';
+        input.inputMode = 'text';
+        input.placeholder = 'e.g. Black, Visor, Solid';
+        evalBtn.textContent = 'Search Trait';
+        modeHint.textContent = 'Multi-trait AND search: commas or + Add trait. Try “Black, Visor” or “Black fur color, Visor eyes, Solid”. Sorted by rarity.';
+        modeHint.style.display = '';
+        ensureTraitCatalog();
         return;
       }
 
       inputPrefix.hidden = false;
       inputPrefix.textContent = '#';
       input.style.paddingLeft = '2.1rem';
+      input.inputMode = 'numeric';
       input.placeholder = 'Enter dog number (1–10000)';
+      evalBtn.textContent = 'Evaluate Price';
       modeHint.style.display = 'none';
     }
 
@@ -3757,8 +4062,14 @@
       var marketUrl = profile && profile.marketUrl ? profile.marketUrl : 'https://market.doginaldogs.com/wallet/' + encodeURIComponent(wallet.address || '');
       var imageUrl = getWalletProfileImage(profile, wallet.dogNumbers);
       var displayName = profile && profile.displayName ? profile.displayName : shortAddress(wallet.address || '');
-      var handle = profile && profile.username ? '@' + String(profile.username).trim() : shortAddress(wallet.address || '');
+      var username = profile && profile.username ? String(profile.username).trim() : '';
+      var handle = username ? '@' + username : shortAddress(wallet.address || '');
       var verifiedLabel = profile && profile.verified ? ' · verified' : '';
+      var xUrl = username ? 'https://x.com/' + encodeURIComponent(username) : '';
+      var handleHtml = username
+        ? '<a class="eval-wallet-handle eval-owner-x-link" href="' + esc(xUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(handle) + '</a>' +
+          (verifiedLabel ? '<span class="eval-wallet-handle">' + esc(verifiedLabel) + '</span>' : '')
+        : '<div class="eval-wallet-handle">' + esc(handle + verifiedLabel) + '</div>';
       var rankHtml = profile && profile.rank != null
         ? '<div class="eval-wallet-rank-value" style="color:' + esc(tier.color) + '">#' + fmt(profile.rank) + '</div>'
         : '<div class="eval-wallet-rank-value unranked">Unranked</div>';
@@ -3768,7 +4079,7 @@
           '<div class="eval-wallet-rank-label">Market Leaderboard</div>' +
           rankHtml +
           '<a class="eval-wallet-owner-link" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(displayName) + '</a>' +
-          '<div class="eval-wallet-handle">' + esc(handle + verifiedLabel) + '</div>' +
+          handleHtml +
           '<div class="eval-wallet-tier-badge" style="' + badgeStyle + '">' + esc(tier.label) + ' Tier</div>' +
         '</div>' +
         '<a class="eval-wallet-pfp-wrap" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer" aria-label="Open market wallet profile">' +
@@ -3787,10 +4098,14 @@
         var usdHtml = entry.estimatedUsd != null
           ? '<span class="eval-wallet-breakdown-value-sub">' + fmtUsd(entry.estimatedUsd) + '</span>'
           : '';
+        var note = entry.note || (entry.kind === 'tcg_card' ? 'DDL TCG graded card' : 'Included in portfolio estimate');
+        var label = entry.kind === 'tcg_card'
+          ? (entry.cardName ? ('TCG card · ' + entry.cardName) : 'TCG card')
+          : ('Inscription #' + fmt(entry.dogNumber));
         return '<div class="eval-wallet-breakdown-row">' +
           '<div class="eval-wallet-breakdown-label">' +
-            '<span>Inscription #' + fmt(entry.dogNumber) + '</span>' +
-            '<span class="eval-wallet-breakdown-note">Included in portfolio estimate</span>' +
+            '<span>' + esc(label) + '</span>' +
+            '<span class="eval-wallet-breakdown-note">' + esc(note) + '</span>' +
           '</div>' +
           '<div class="eval-wallet-breakdown-value">' +
             '<span>' + fmtDoge(entry.estimatedDoge) + '</span>' +
@@ -3830,17 +4145,38 @@
     }
 
     /* ---------- loading / error ---------- */
-    function showLoading() {
+    function scrollToEvalOutput(preferResult) {
+      var target = (preferResult && resultEl && resultEl.innerHTML)
+        ? resultEl
+        : (statusEl && statusEl.innerHTML ? statusEl : resultEl);
+      if (!target) return;
+      requestAnimationFrame(function() {
+        try {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (_) {
+          try { target.scrollIntoView(true); } catch (_e) {}
+        }
+      });
+    }
+    function showLoading(label) {
       evalBtn.disabled = true;
-      statusEl.innerHTML = '<div class="eval-spinner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg><span>Evaluating\u2026</span></div>';
+      if (ownerSearchBtn) ownerSearchBtn.disabled = true;
+      statusEl.innerHTML = '<div class="eval-spinner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg><span>' + esc(label || 'Evaluating\u2026') + '</span></div>';
       resultEl.innerHTML = '';
+      scrollToEvalOutput(false);
     }
     function showError(msg) {
       evalBtn.disabled = false;
+      if (ownerSearchBtn) ownerSearchBtn.disabled = false;
       statusEl.innerHTML = '<div class="eval-error"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>' + esc(msg) + '</div>';
       resultEl.innerHTML = '';
+      scrollToEvalOutput(false);
     }
-    function clearStatus() { evalBtn.disabled = false; statusEl.innerHTML = ''; }
+    function clearStatus() {
+      evalBtn.disabled = false;
+      if (ownerSearchBtn) ownerSearchBtn.disabled = false;
+      statusEl.innerHTML = '';
+    }
 
     /* ---------- render result ---------- */
     function renderResult(d) {
@@ -3874,15 +4210,18 @@
         var comboBadge = t.comboPart
           ? ' <span class="eval-combo-badge" title="Combo: ' + esc(t.comboPart.label) + '">🔗 ' + esc(t.comboPart.label) + '</span>'
           : '';
+        var tcgBadge = t.tcgPart
+          ? ' <span class="eval-tcg-badge" title="DDL TCG set trait">🃏 ' + esc(t.tcgPart.label || 'DDL TCG') + '</span>'
+          : '';
         var rareBadge = t.displayBadge
           ? ' <span class="eval-rare-badge">' + esc(t.displayBadge) + '</span>'
           : '';
-        var rowClass = 'eval-trait-chip' + (t.isTopSale ? ' top-sale-row' : '') + (t.trending ? ' trending-row' : '') + (t.comboPart ? ' combo-row' : '');
+        var rowClass = 'eval-trait-chip' + (t.isTopSale ? ' top-sale-row' : '') + (t.trending ? ' trending-row' : '') + (t.comboPart ? ' combo-row' : '') + (t.tcgPart ? ' tcg-row' : '');
         return '<div class="' + rowClass + '">' +
           '<span class="eval-trait-key">' + esc(t.trait) + countInfo + '</span>' +
           '<span class="eval-trait-val">' + esc(traitValue) + rareBadge + '</span>' +
           '<span class="eval-trait-floor' + (isUnlisted ? ' unlisted' : '') + '">' +
-            priceLabel + saleInfo + topSaleBadge + trendingBadge + comboBadge +
+            priceLabel + saleInfo + topSaleBadge + trendingBadge + comboBadge + tcgBadge +
           '</span></div>';
       }).join('');
 
@@ -3924,6 +4263,47 @@
           '</div>';
       }
 
+      var olf = est.officialLoreFloor;
+      var officialLoreHtml = '';
+      if (olf && olf.minOfferDoge != null && Number(olf.minOfferDoge) > 0) {
+        var olfDoge = Number(olf.minOfferDoge);
+        var olfUsd = olf.minOfferUsd != null && olf.minOfferUsd !== ''
+          ? Number(olf.minOfferUsd)
+          : (est.dogeUsd != null ? olfDoge * est.dogeUsd : null);
+        var olfImage = (olf.imageUrl && String(olf.imageUrl).trim())
+          ? String(olf.imageUrl).trim()
+          : (d.imageUrl ? String(d.imageUrl) : '../assets/DDSHOP.gif');
+        officialLoreHtml =
+          '<div class="eval-own-sale eval-official-lore">' +
+            '<div class="eval-own-sale-media"><img src="' + esc(olfImage) + '" alt="" onerror="this.onerror=null;this.src=\'../assets/DDSHOP.gif\'" /></div>' +
+            '<div class="eval-own-sale-copy">' +
+              '<div class="eval-own-sale-label eval-official-lore-label">Official Lore Floor</div>' +
+              '<div class="eval-own-sale-value">Minimum ' + fmtDoge(olfDoge) + '</div>' +
+              (olfUsd != null && isFinite(olfUsd) ? '<div class="eval-official-lore-sub">' + fmtUsd(olfUsd) + '</div>' : '') +
+              (olf.note ? '<div class="eval-official-lore-note">' + esc(String(olf.note)) + '</div>' : '') +
+            '</div>' +
+          '</div>';
+      }
+
+      var tcgInsp = est.tcgInspiration;
+      var tcgInspirationHtml = '';
+      if (tcgInsp && tcgInsp.label) {
+        var cardBits = Array.isArray(tcgInsp.cards) ? tcgInsp.cards.map(function(c) {
+          var bits = [c.cardName || c.cardId];
+          if (c.brandedHandle) bits.push('@' + c.brandedHandle);
+          return bits.join(' · ');
+        }).join(' · ') : '';
+        tcgInspirationHtml =
+          '<div class="eval-own-sale eval-tcg-inspiration">' +
+            '<div class="eval-own-sale-media"><img src="../assets/ddl-tcg-mascot.png" alt="" onerror="this.onerror=null;this.src=\'../assets/DDSHOP.gif\'" /></div>' +
+            '<div class="eval-own-sale-copy">' +
+              '<div class="eval-own-sale-label eval-tcg-inspiration-label">Official DDL TCG Inspiration</div>' +
+              '<div class="eval-own-sale-value">' + esc(tcgInsp.label) + '</div>' +
+              (cardBits ? '<div class="eval-tcg-inspiration-note">' + esc(cardBits) + (tcgInsp.dogOnlyMultiplier ? ' · dog-only ' + tcgInsp.dogOnlyMultiplier + 'x (wallet stacks higher with the matching card + PSA grade)' : '') + '</div>' : '') +
+            '</div>' +
+          '</div>';
+      }
+
       resultEl.innerHTML =
         '<div class="eval-card">' +
           '<div class="eval-banner">' +
@@ -3934,9 +4314,17 @@
               '<div class="eval-badges">' +
                 '<span class="eval-badge ' + (d.isListed ? 'eval-badge-listed' : 'eval-badge-unlisted') + '">' + (d.isListed ? 'Listed' : 'Not Listed') + '</span>' +
                 '<span class="eval-badge eval-badge-rarity ' + rarityRankClass(d.rarityRank) + '">Rarity #' + fmt(d.rarityRank) + ' \u00B7 ' + esc(d.rarityLabel || '') + '</span>' +
-                (est.specialMultiplierDetails ? est.specialMultiplierDetails.map(detail => 
-                  '<span class="eval-badge eval-badge-special" title="' + esc(detail.label) + ' (' + detail.multiplier + 'x)">⚡ ' + esc(detail.label) + '</span>'
-                ).join('') : '') +
+                (est.tcgSetMatch ? '<span class="eval-badge eval-badge-tcg" title="DDL TCG spotlight' + (est.tcgSetMatch.multiplier ? ' · stack ' + est.tcgSetMatch.multiplier + 'x' : ' · 2x trending multi') + '">🃏 ' + esc(est.tcgSetMatch.label || 'DDL TCG') + (est.tcgSetMatch.multiplier ? ' · ' + est.tcgSetMatch.multiplier + 'x' : '') + '</span>' : '') +
+                (est.tcgInspiration ? '<span class="eval-badge eval-badge-tcg" title="' + esc(est.tcgInspiration.label || 'DDL TCG inspiration') + '">🃏 ' + esc(est.tcgInspiration.label || 'TCG inspiration') + (est.tcgInspiration.dogOnlyMultiplier ? ' · ' + est.tcgInspiration.dogOnlyMultiplier + 'x' : '') + '</span>' : '') +
+                (est.comboMatch ? '<span class="eval-badge eval-badge-special" title="Combo: ' + esc(est.comboMatch.label) + (est.comboMatch.multiplier ? ' (' + est.comboMatch.multiplier + 'x)' : '') + '">🔗 ' + esc(est.comboMatch.label) + (est.comboMatch.multiplier ? ' · ' + est.comboMatch.multiplier + 'x' : '') + '</span>' : '') +
+                (est.specialMultiplierDetails ? est.specialMultiplierDetails.filter(function(detail){
+                  if (!detail || detail.type === 'tcg_set' || detail.type === 'tcg_inspiration') return false;
+                  // Avoid duplicate badge when comboMatch already renders the combo label.
+                  if (detail.type === 'combo' && est.comboMatch) return false;
+                  return true;
+                }).map(function(detail) {
+                  return '<span class="eval-badge eval-badge-special" title="' + esc(detail.label) + ' (' + detail.multiplier + 'x)">⚡ ' + esc(detail.label) + '</span>';
+                }).join('') : '') +
               '</div>' +
             '</div>' +
           '</div>' +
@@ -3947,6 +4335,10 @@
           '</div>' +
 
           refusedFloorHtml +
+
+          officialLoreHtml +
+
+          tcgInspirationHtml +
 
           loreHtml +
 
@@ -3964,6 +4356,8 @@
               (est.traitBonus > 0 ? '<span>Trait bonus: +' + fmtDoge(est.traitBonus) + '</span>' : '') +
               (est.valueMultiplier ? '<span>1/1 multiplier: ' + est.valueMultiplier + 'x</span>' : '') +
               (est.trendingMultiplier ? '<span>🔥 Trending: ' + est.trendingMultiplier + 'x</span>' : '') +
+              (est.tcgSetMatch ? '<span>🃏 ' + esc(est.tcgSetMatch.label || 'DDL TCG') + (est.tcgSetMatch.multiplier ? ': ' + est.tcgSetMatch.multiplier + 'x stack' : ' spotlight') + '</span>' : '') +
+              (est.tcgInspiration ? '<span>🃏 ' + esc(est.tcgInspiration.label) + (est.tcgInspiration.dogOnlyMultiplier ? ': ' + est.tcgInspiration.dogOnlyMultiplier + 'x' : '') + '</span>' : '') +
               (est.specialMultiplier ? '<span>⚡ Special: ' + est.specialMultiplier + 'x</span>' : '') +
               (est.comboMatch ? '<span>🔗 Combo: ' + esc(est.comboMatch.label) + (est.comboMatch.multiplier ? ' (' + est.comboMatch.multiplier + 'x)' : '') +
                 (est.comboMatch.inscriptionIds && est.comboMatch.inscriptionIds.length ? ' · insc. ' + esc(est.comboMatch.inscriptionIds.join(', ')) : '') +
@@ -3974,6 +4368,117 @@
 
           '<div class="eval-timestamp">Evaluated ' + new Date(d.evaluatedAt).toLocaleString() + '</div>' +
         '</div>';
+      scrollToEvalOutput(true);
+    }
+
+    function renderOwnerResult(d) {
+      clearStatus();
+      if (ownerSearchBtn) ownerSearchBtn.disabled = false;
+
+      var profile = d.profile || null;
+      var marketUrl = profile && profile.marketUrl
+        ? profile.marketUrl
+        : 'https://market.doginaldogs.com/wallet/' + encodeURIComponent(d.address || '');
+      var username = profile && profile.username ? String(profile.username).trim() : '';
+      var xUrl = username ? 'https://x.com/' + encodeURIComponent(username) : '';
+      var matchLabel = d.matchType === 'twitter'
+        ? 'Matched via linked X account'
+        : (d.matchType === 'listedDog'
+          ? 'Matched via active marketplace listing'
+          : 'Matched via wallet address');
+
+      var listedHtml = '';
+      if (d.listedDog && d.listedDog.dogNumber != null) {
+        listedHtml =
+          '<div class="eval-wallet-meta">' +
+            '<span>Listed dog: #' + fmt(d.listedDog.dogNumber) + '</span>' +
+            (d.listedDog.priceDoge != null ? '<span>Ask: ' + fmtDoge(d.listedDog.priceDoge) + '</span>' : '') +
+            (d.listedDog.marketUrl
+              ? '<span><a class="eval-owner-x-link" href="' + esc(d.listedDog.marketUrl) + '" target="_blank" rel="noopener noreferrer">View listing</a></span>'
+              : '') +
+          '</div>';
+      }
+
+      var dogNumbers = Array.isArray(d.dogNumbers) ? d.dogNumbers : [];
+      var dogsHtml = dogNumbers.length
+        ? '<div class="eval-owner-dogs">' + dogNumbers.slice(0, 48).map(function(n) {
+            return '<button type="button" class="eval-owner-dog-chip" data-owner-dog="' + esc(String(n)) + '">' +
+              '<img src="https://market.doginaldogs.com/dogs/' + encodeURIComponent(n) + '.png" alt="" onerror="this.style.display=\'none\'" />' +
+              '#' + fmt(n) +
+            '</button>';
+          }).join('') +
+          (dogNumbers.length > 48 ? '<span class="eval-wallet-breakdown-note">+' + fmt(dogNumbers.length - 48) + ' more</span>' : '') +
+          '</div>'
+        : '<div class="eval-wallet-empty">No Doginal Dog holdings were found for this wallet.</div>';
+
+      var xRow = username
+        ? '<div class="eval-wallet-meta">' +
+            '<span>Linked X: <a class="eval-owner-x-link" href="' + esc(xUrl) + '" target="_blank" rel="noopener noreferrer">@' + esc(username) + '</a>' +
+            (profile && profile.verified ? ' · verified' : '') + '</span>' +
+            '<span><a class="eval-owner-x-link" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer">Open market wallet</a></span>' +
+          '</div>'
+        : '<div class="eval-wallet-meta">' +
+            '<span>No linked X account found on the marketplace profile.</span>' +
+            '<span><a class="eval-owner-x-link" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer">Open market wallet</a></span>' +
+          '</div>';
+
+      resultEl.innerHTML =
+        '<div class="eval-card">' +
+          '<div class="eval-banner">' +
+            '<div class="eval-dog-info">' +
+              '<div class="eval-dog-name">Marketplace Owner</div>' +
+              '<div class="eval-dog-id eval-owner-address">' + esc(d.address || '') + '</div>' +
+              '<div class="eval-badges">' +
+                '<span class="eval-badge eval-badge-rarity">' + fmt(d.totalDogs || 0) + ' Doginal Dog' + ((d.totalDogs || 0) === 1 ? '' : 's') + '</span>' +
+                '<span class="eval-badge eval-badge-unlisted">' + esc(matchLabel) + '</span>' +
+              '</div>' +
+            '</div>' +
+            renderWalletProfile(profile, d) +
+          '</div>' +
+          xRow +
+          listedHtml +
+          '<div class="eval-traits">' +
+            '<h3 class="eval-section-title">Dogs Held</h3>' +
+            dogsHtml +
+          '</div>' +
+          '<div class="eval-owner-actions">' +
+            '<button type="button" class="eval-btn" id="ownerEstimateBtn">Estimate Portfolio</button>' +
+            '<a class="eval-btn" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Open on Market</a>' +
+          '</div>' +
+          '<div class="eval-timestamp">Looked up ' + new Date(d.evaluatedAt || Date.now()).toLocaleString() + '</div>' +
+        '</div>';
+
+      Array.prototype.forEach.call(resultEl.querySelectorAll('[data-owner-dog]'), function(btn) {
+        btn.addEventListener('click', function() {
+          var dogNumber = Number(btn.getAttribute('data-owner-dog'));
+          if (!dogNumber) return;
+          searchMode = 'inscription';
+          modeBtns.forEach(function(b) {
+            b.classList.toggle('active', b.getAttribute('data-mode') === 'inscription');
+          });
+          syncModeTabs();
+          applySearchMode();
+          input.value = String(dogNumber);
+          evaluate();
+        });
+      });
+
+      var estimateBtn = document.getElementById('ownerEstimateBtn');
+      if (estimateBtn) {
+        estimateBtn.addEventListener('click', function() {
+          if (!d.address) return;
+          searchMode = 'wallet';
+          modeBtns.forEach(function(b) {
+            b.classList.toggle('active', b.getAttribute('data-mode') === 'wallet');
+          });
+          syncModeTabs();
+          applySearchMode();
+          input.value = d.address;
+          evaluate();
+        });
+      }
+
+      scrollToEvalOutput(true);
     }
 
     function renderWalletResult(d) {
@@ -4031,6 +4536,111 @@
 
           '<div class="eval-timestamp">Evaluated ' + new Date(d.evaluatedAt).toLocaleString() + '</div>' +
         '</div>';
+      scrollToEvalOutput(true);
+    }
+
+    function tcgNormHandle(raw) {
+      return String(raw || '').trim().replace(/^@+/, '').toLowerCase();
+    }
+    function tcgWalletsEq(a, b) {
+      return String(a || '').trim() !== '' && String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+    }
+    function tcgCardsEq(a, b) {
+      var idA = String((a && a.cardId) || '').trim().toLowerCase();
+      var idB = String((b && b.cardId) || '').trim().toLowerCase();
+      if (idA && idB && idA === idB) return true;
+      var nA = String((a && a.cardName) || '').trim().toLowerCase();
+      var nB = String((b && b.cardName) || '').trim().toLowerCase();
+      return !!(nA && nB && nA === nB);
+    }
+    function tcgPsaScale(grade) {
+      var g = Number(grade);
+      if (!Number.isFinite(g)) return 0.725;
+      g = Math.round(g);
+      if (g < 1 || g > 10) return 0.725;
+      return 0.45 + (g / 10) * 0.55;
+    }
+    function tcgInterp(psa1, psa10, grade) {
+      var lo = Math.max(1, Number(psa1) || 1);
+      var hi = Math.max(lo, Number(psa10) || lo);
+      var t = (tcgPsaScale(grade) - 0.45) / 0.55;
+      if (t < 0) t = 0;
+      if (t > 1) t = 1;
+      return +(lo + (hi - lo) * t).toFixed(4);
+    }
+    function tcgIsSubject(ins, owner) {
+      if (!ins) return false;
+      var h = tcgNormHandle(owner && owner.handle);
+      if (h && ins.brandedHandle && h === tcgNormHandle(ins.brandedHandle)) return true;
+      var wallets = Array.isArray(ins.brandedWallets) ? ins.brandedWallets : [];
+      return wallets.some(function(w) { return tcgWalletsEq(w, owner && owner.address); });
+    }
+    function tcgHoldingMatches(holding, owner) {
+      if (!holding) return false;
+      if (holding.wallet && tcgWalletsEq(holding.wallet, owner && owner.address)) return true;
+      var h = tcgNormHandle(owner && owner.handle);
+      return !!(h && holding.handle && h === tcgNormHandle(holding.handle));
+    }
+    function applyClientTcgSynergy(evaluations, dogNumbers, wallet) {
+      var registry = wallet.tcgRegistry || {};
+      var inspirations = Array.isArray(registry.inspirations) ? registry.inspirations : [];
+      var holdings = Array.isArray(registry.holdings) ? registry.holdings : [];
+      var m = registry.multipliers || {};
+      var dogOnly = Number(m.dogOnly) > 1 ? Number(m.dogOnly) : 1.08;
+      var owner = {
+        address: wallet.address,
+        handle: wallet.profile && (wallet.profile.username || wallet.profile.twitterUsername)
+      };
+      var dogSet = {};
+      (dogNumbers || []).forEach(function(n) { dogSet[Number(n)] = true; });
+      var extras = [];
+      var byIndex = {};
+
+      evaluations.forEach(function(evaluation, index) {
+        if (!evaluation) return;
+        var dogNumber = Number(evaluation.dogNumber);
+        var est = evaluation.estimation || {};
+        var estimatedDoge = est.displayEstimatedDoge != null ? Number(est.displayEstimatedDoge) : Number(est.estimatedDoge || 0);
+        var hits = inspirations.filter(function(ins) { return Number(ins.dogNumber) === dogNumber; });
+        if (!hits.length) return;
+        var base = dogOnly > 1 ? estimatedDoge / dogOnly : estimatedDoge;
+        var best = { multi: dogOnly, label: (hits[0].cardName || 'TCG') + ' inspiration dog' };
+        hits.forEach(function(hit) {
+          var isSubject = tcgIsSubject(hit, owner);
+          var holding = null;
+          holdings.forEach(function(h) {
+            if (tcgHoldingMatches(h, owner) && tcgCardsEq(h, hit)) {
+              if (!holding || (h.psaGrade || 0) > (holding.psaGrade || 0)) holding = h;
+            }
+          });
+          var multi = !holding
+            ? (isSubject ? (Number(m.subjectDogOnly) || 1.18) : dogOnly)
+            : (isSubject
+              ? tcgInterp(m.subjectDogAndCardPsa1 || 1.22, m.subjectDogAndCardPsa10 || 1.75, holding.psaGrade)
+              : tcgInterp(m.holderDogAndCardPsa1 || 1.12, m.holderDogAndCardPsa10 || 1.40, holding.psaGrade));
+          if (multi >= best.multi) {
+            var label = hit.cardName + ' inspiration dog';
+            if (isSubject && holding) label = hit.cardName + ' PSA ' + (holding.psaGrade || '?') + ' subject set';
+            else if (holding) label = hit.cardName + ' PSA ' + (holding.psaGrade || '?') + ' + dog';
+            else if (isSubject) label = hit.cardName + ' subject dog';
+            best = { multi: multi, label: label };
+          }
+        });
+        byIndex[index] = {
+          estimatedDoge: Math.round(base * best.multi),
+          note: best.label
+        };
+      });
+
+      holdings.forEach(function(holding) {
+        if (!tcgHoldingMatches(holding, owner)) return;
+        var matched = inspirations.filter(function(ins) { return tcgCardsEq(ins, holding); });
+        if (!matched.length) return;
+        if (matched.some(function(ins) { return dogSet[Number(ins.dogNumber)]; })) return;
+        extras.push({ holding: holding, inspiration: matched[0] });
+      });
+
+      return { byIndex: byIndex, extras: extras, dogOnly: dogOnly, owner: owner };
     }
 
     async function buildWalletEstimate(address) {
@@ -4047,6 +4657,7 @@
       var collectionFloorDoge = null;
       var floorEquivalentDoge = null;
       var floorEquivalentUsd = null;
+      var evaluations = new Array(dogNumbers.length);
       var concurrency = 3;
       var cursor = 0;
 
@@ -4064,11 +4675,13 @@
           var currentIndex = cursor;
           cursor += 1;
           var evaluation = await getEvaluation(dogNumbers[currentIndex], 'inscription');
+          evaluations[currentIndex] = evaluation;
           var estimate = effectiveEstimate(evaluation.estimation || {});
           breakdown[currentIndex] = {
             dogNumber: dogNumbers[currentIndex],
             estimatedDoge: estimate.estimatedDoge,
-            estimatedUsd: estimate.estimatedUsd != null ? +estimate.estimatedUsd.toFixed(2) : null
+            estimatedUsd: estimate.estimatedUsd != null ? +estimate.estimatedUsd.toFixed(2) : null,
+            note: 'Included in portfolio estimate'
           };
           totals.estimatedDoge += estimate.estimatedDoge;
           totals.estimatedUsd += estimate.estimatedUsd;
@@ -4088,6 +4701,52 @@
       }
 
       await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, dogNumbers.length || 1)) }, function() { return worker(); }));
+
+      var synergy = applyClientTcgSynergy(evaluations, dogNumbers, wallet);
+      Object.keys(synergy.byIndex).forEach(function(key) {
+        var idx = Number(key);
+        var adj = synergy.byIndex[idx];
+        if (!breakdown[idx] || !adj) return;
+        totals.estimatedDoge += adj.estimatedDoge - (breakdown[idx].estimatedDoge || 0);
+        var dogeUsd = evaluations[idx] && evaluations[idx].estimation && evaluations[idx].estimation.dogeUsd;
+        if (dogeUsd) {
+          var newUsd = +(adj.estimatedDoge * dogeUsd).toFixed(2);
+          totals.estimatedUsd += newUsd - (breakdown[idx].estimatedUsd || 0);
+          breakdown[idx].estimatedUsd = newUsd;
+        }
+        breakdown[idx].estimatedDoge = adj.estimatedDoge;
+        breakdown[idx].note = adj.note;
+      });
+
+      for (var e = 0; e < synergy.extras.length; e += 1) {
+        var extra = synergy.extras[e];
+        var ins = extra.inspiration;
+        var holding = extra.holding;
+        var sourceDoge = 0;
+        try {
+          var sourceEval = await getEvaluation(ins.dogNumber, 'inscription');
+          sourceDoge = effectiveEstimate(sourceEval.estimation || {}).estimatedDoge;
+        } catch (_err) {
+          sourceDoge = 0;
+        }
+        var weight = (Number((wallet.tcgRegistry && wallet.tcgRegistry.multipliers && wallet.tcgRegistry.multipliers.cardOnlyOfDogEval) || 0.12)) * tcgPsaScale(holding.psaGrade);
+        var base = synergy.dogOnly > 1 ? sourceDoge / synergy.dogOnly : sourceDoge;
+        var cardDoge = Math.round(base * weight);
+        if (!(cardDoge > 0)) continue;
+        var cardUsd = null;
+        var priced = evaluations.filter(function(ev) { return ev && ev.estimation && ev.estimation.dogeUsd; })[0];
+        if (priced) cardUsd = +(cardDoge * priced.estimation.dogeUsd).toFixed(2);
+        breakdown.push({
+          kind: 'tcg_card',
+          dogNumber: ins.dogNumber,
+          cardName: holding.cardName || ins.cardName,
+          estimatedDoge: cardDoge,
+          estimatedUsd: cardUsd,
+          note: (holding.cardName || ins.cardName) + ' PSA ' + (holding.psaGrade || '?') + ' (no inspiration dog in wallet)'
+        });
+        totals.estimatedDoge += cardDoge;
+        if (cardUsd != null) totals.estimatedUsd += cardUsd;
+      }
 
       if (collectionFloorDoge != null) {
         floorEquivalentDoge = collectionFloorDoge * dogNumbers.length;
@@ -4137,6 +4796,14 @@
     function getWalletEvaluationUrls(address) {
       var encoded = encodeURIComponent(address);
       return [API_BASE + '/api/dd-evaluator/wallet/' + encoded];
+    }
+
+    function getOwnerSearchUrls(query) {
+      var q = encodeURIComponent(query);
+      return [
+        API_BASE + '/api/dd-evaluator/owner-search?q=' + q,
+        API_BASE + '/api/dd-evaluator.php?action=owner-search&q=' + q
+      ];
     }
 
     async function readApiError(res) {
@@ -4262,6 +4929,47 @@
       throw lastError || new Error('Wallet evaluator backend is unavailable.');
     }
 
+    async function getOwnerSearch(query) {
+      var urls = getOwnerSearchUrls(query);
+      var lastError = null;
+
+      for (var i = 0; i < urls.length; i += 1) {
+        try {
+          var res = await fetch(urls[i], {
+            credentials: 'include',
+            headers: { accept: 'application/json' }
+          });
+
+          if (!res.ok) {
+            var message = await readApiError(res);
+            lastError = new Error(message);
+            if (res.status >= 400 && res.status < 500) {
+              throw lastError;
+            }
+            if (i + 1 < urls.length) continue;
+            throw lastError;
+          }
+
+          var data = await res.json().catch(function() { return null; });
+          if (!data || typeof data !== 'object') {
+            throw new Error('Owner search returned an invalid response.');
+          }
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          return data;
+        } catch (err) {
+          lastError = err;
+          if (err && err.message && /No marketplace owner|only available for dogs|Enter a wallet/i.test(err.message)) {
+            throw err;
+          }
+          if (i + 1 < urls.length) continue;
+        }
+      }
+
+      throw lastError || new Error('Owner search backend is unavailable.');
+    }
+
     /* ---------- rank lookup ---------- */
     async function lookupRank(rank) {
       var urls = [
@@ -4291,6 +4999,592 @@
       throw lastError || new Error('Rank lookup unavailable.');
     }
 
+    /* ---------- trait search ---------- */
+    function hideTraitSuggest() {
+      if (!traitSuggestEl) return;
+      traitSuggestEl.classList.remove('open');
+      traitSuggestEl.hidden = true;
+      traitSuggestEl.innerHTML = '';
+      traitSuggestItems = [];
+      traitSuggestActive = -1;
+    }
+
+    function ensureTraitCatalog() {
+      if (traitCatalog) return Promise.resolve(traitCatalog);
+      if (traitCatalogPromise) return traitCatalogPromise;
+      traitCatalogPromise = (async function() {
+        // Prefer explicit PHP action first on hybrid hosts; Node path second.
+        var urls = [
+          API_BASE + '/api/dd-evaluator.php?action=trait-catalog',
+          API_BASE + '/api/dd-evaluator/trait-catalog'
+        ];
+        var lastError = null;
+        for (var i = 0; i < urls.length; i++) {
+          try {
+            var res = await fetch(urls[i], { headers: { accept: 'application/json' } });
+            if (!res.ok) {
+              lastError = new Error(await readApiError(res));
+              continue;
+            }
+            var body = await res.json();
+            if (body && Array.isArray(body.traits)) {
+              traitCatalog = body.traits;
+              return traitCatalog;
+            }
+            lastError = new Error('Trait catalog response was invalid.');
+          } catch (err) {
+            lastError = err;
+          }
+        }
+        traitCatalogPromise = null;
+        throw lastError || new Error('Trait catalog unavailable.');
+      })();
+      return traitCatalogPromise;
+    }
+
+    function splitTraitInput(raw) {
+      return String(raw || '').split(',').map(function(part) { return part.trim(); });
+    }
+
+    function getActiveTraitSegment(raw) {
+      var parts = String(raw || '').split(',');
+      return String(parts[parts.length - 1] || '').replace(/^\s+/, '');
+    }
+
+    function traitsToInputValue(traits, trailingComma) {
+      var values = (traits || []).map(function(t) { return t.value; }).filter(Boolean);
+      if (!values.length) return trailingComma ? '' : '';
+      return values.join(', ') + (trailingComma ? ', ' : '');
+    }
+
+    function traitsToParam(traits) {
+      return (traits || []).map(function(t) {
+        return String(t.traitKey) + ':' + String(t.value);
+      }).join(',');
+    }
+
+    function traitAlreadySelected(row) {
+      return selectedTraits.some(function(t) {
+        return t.traitKey === row.traitKey && String(t.value).toLowerCase() === String(row.value).toLowerCase();
+      });
+    }
+
+    function syncInputFromSelectedTraits(trailingComma) {
+      input.value = traitsToInputValue(selectedTraits, !!trailingComma);
+    }
+
+    function renderTraitChips() {
+      if (!traitChipsEl) return;
+      if (!selectedTraits.length) {
+        traitChipsEl.innerHTML = '';
+        traitChipsEl.classList.remove('has-chips');
+        return;
+      }
+      traitChipsEl.classList.add('has-chips');
+      traitChipsEl.innerHTML = selectedTraits.map(function(t, idx) {
+        return (
+          '<span class="eval-trait-chip-sel">' +
+            esc(t.value) + ' <span>' + esc(t.traitLabel || t.traitKey) + '</span>' +
+            '<button type="button" class="eval-trait-chip-x" data-idx="' + idx + '" aria-label="Remove ' + esc(t.value) + '">&times;</button>' +
+          '</span>'
+        );
+      }).join('');
+      traitChipsEl.querySelectorAll('.eval-trait-chip-x').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = Number(btn.getAttribute('data-idx'));
+          if (!Number.isFinite(idx)) return;
+          selectedTraits.splice(idx, 1);
+          pendingTraitDisambiguation = null;
+          syncInputFromSelectedTraits(false);
+          renderTraitChips();
+          if (selectedTraits.length) evaluateTraitSearch();
+          else {
+            resultEl.innerHTML = '';
+            clearStatus();
+          }
+        });
+      });
+    }
+
+    function beginAddAnotherTrait() {
+      if (searchMode !== 'trait') return;
+      // If the input has a resolvable unfinished segment, keep chips as source of truth.
+      if (selectedTraits.length) {
+        syncInputFromSelectedTraits(true);
+      } else {
+        var typed = String(input.value || '').trim();
+        if (typed && !/,\s*$/.test(typed)) input.value = typed + ', ';
+        else if (!typed) input.value = '';
+      }
+      hideTraitSuggest();
+      try { input.focus({ preventScroll: true }); } catch (_) { input.focus(); }
+      updateTraitSuggestFromInput();
+    }
+
+    function filterTraitCatalog(query) {
+      var q = String(query || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      var rows = traitCatalog || [];
+      var selectedKeys = {};
+      selectedTraits.forEach(function(t) {
+        selectedKeys[t.traitKey + '\0' + String(t.value).toLowerCase()] = true;
+      });
+      if (!q) {
+        return rows.filter(function(row) {
+          return !selectedKeys[row.traitKey + '\0' + String(row.value).toLowerCase()];
+        }).slice(0, 12);
+      }
+      var scored = [];
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (selectedKeys[row.traitKey + '\0' + String(row.value).toLowerCase()]) continue;
+        var value = String(row.value || '').toLowerCase();
+        var label = String(row.traitLabel || '').toLowerCase();
+        var hay = label + ' ' + value;
+        var score = -1;
+        if (value === q) score = 300;
+        else if (value.startsWith(q)) score = 200;
+        else if (value.includes(q)) score = 100;
+        else if (hay.includes(q)) score = 50;
+        if (score < 0) continue;
+        scored.push({ row: row, score: score, count: Number(row.count) || 0 });
+      }
+      scored.sort(function(a, b) {
+        if (a.score !== b.score) return b.score - a.score;
+        if (a.count !== b.count) return a.count - b.count;
+        return String(a.row.value).localeCompare(String(b.row.value));
+      });
+      return scored.slice(0, 12).map(function(entry) { return entry.row; });
+    }
+
+    function renderTraitSuggest(rows) {
+      if (!traitSuggestEl) return;
+      traitSuggestItems = rows || [];
+      traitSuggestActive = traitSuggestItems.length ? 0 : -1;
+      if (!traitSuggestItems.length) {
+        hideTraitSuggest();
+        return;
+      }
+      traitSuggestEl.hidden = false;
+      traitSuggestEl.classList.add('open');
+      traitSuggestEl.innerHTML = traitSuggestItems.map(function(row, idx) {
+        return (
+          '<button type="button" class="eval-trait-suggest-item' + (idx === traitSuggestActive ? ' active' : '') + '" role="option" data-idx="' + idx + '">' +
+            '<span class="eval-trait-suggest-main">' +
+              '<span class="eval-trait-suggest-value">' + esc(row.value) + '</span>' +
+              '<span class="eval-trait-suggest-meta">' + esc(row.traitLabel || row.traitKey) + '</span>' +
+            '</span>' +
+            '<span class="eval-trait-suggest-count">' + fmt(row.count) + '/10k</span>' +
+          '</button>'
+        );
+      }).join('');
+      traitSuggestEl.querySelectorAll('.eval-trait-suggest-item').forEach(function(btn) {
+        btn.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          var idx = Number(btn.getAttribute('data-idx'));
+          if (!Number.isFinite(idx) || !traitSuggestItems[idx]) return;
+          pickTraitSuggestion(traitSuggestItems[idx]);
+        });
+      });
+    }
+
+    function syncTraitSuggestActive() {
+      if (!traitSuggestEl) return;
+      var buttons = traitSuggestEl.querySelectorAll('.eval-trait-suggest-item');
+      buttons.forEach(function(btn, idx) {
+        btn.classList.toggle('active', idx === traitSuggestActive);
+      });
+      if (traitSuggestActive >= 0 && buttons[traitSuggestActive]) {
+        try { buttons[traitSuggestActive].scrollIntoView({ block: 'nearest' }); } catch (_) {}
+      }
+    }
+
+    function pickTraitSuggestion(row) {
+      if (!row) return;
+      if (pendingTraitDisambiguation && pendingTraitDisambiguation.length) {
+        selectedTraits = pendingTraitDisambiguation.slice();
+        pendingTraitDisambiguation = null;
+      }
+      if (!traitAlreadySelected(row)) {
+        selectedTraits.push({
+          traitKey: row.traitKey,
+          traitLabel: row.traitLabel,
+          value: row.value,
+          count: row.count
+        });
+      }
+      syncInputFromSelectedTraits(false);
+      renderTraitChips();
+      hideTraitSuggest();
+      evaluateTraitSearch();
+    }
+
+    function updateTraitSuggestFromInput() {
+      if (searchMode !== 'trait') {
+        hideTraitSuggest();
+        return;
+      }
+      var active = getActiveTraitSegment(input.value);
+      ensureTraitCatalog()
+        .then(function() {
+          if (searchMode !== 'trait') return;
+          renderTraitSuggest(filterTraitCatalog(active));
+        })
+        .catch(function() {
+          hideTraitSuggest();
+        });
+    }
+
+    async function fetchTraitSearch(params) {
+      var qs = new URLSearchParams();
+      var traitsParam = params.traits ? String(params.traits).trim() : '';
+      var qParam = params.q ? String(params.q).trim() : '';
+      var traitKey = params.traitKey ? String(params.traitKey).trim() : '';
+      var traitValue = params.value ? String(params.value).trim() : '';
+
+      // Always send the richest params we can so older backends still work:
+      // - traits=head:Cowboy,eyes:Yellow (new multi)
+      // - trait+value for single (oldest path)
+      // - q= as comma-separated values (text fallback)
+      if (traitsParam) qs.set('traits', traitsParam);
+      if (traitKey && traitValue) {
+        qs.set('trait', traitKey);
+        qs.set('value', traitValue);
+      }
+      if (!qParam && traitsParam) {
+        qParam = traitsParam.split(',').map(function(part) {
+          var chunk = String(part || '').trim();
+          var colon = chunk.indexOf(':');
+          return colon > 0 ? chunk.slice(colon + 1).trim() : chunk;
+        }).filter(Boolean).join(', ');
+      }
+      if (qParam) qs.set('q', qParam);
+      if (params.limit != null) qs.set('limit', String(params.limit));
+      if (params.offset != null) qs.set('offset', String(params.offset));
+
+      if (!qs.has('traits') && !qs.has('q') && !(qs.has('trait') && qs.has('value'))) {
+        throw new Error('Type a trait value to search (e.g. Cowboy, or Cowboy, Yellow).');
+      }
+
+      var query = qs.toString();
+      // Node first (Passenger), then PHP fallback.
+      var urls = [
+        API_BASE + '/api/dd-evaluator/trait-search?' + query,
+        API_BASE + '/api/dd-evaluator.php?action=trait-search&' + query
+      ];
+      var lastError = null;
+      for (var i = 0; i < urls.length; i++) {
+        try {
+          var res = await fetch(urls[i], { headers: { accept: 'application/json' } });
+          var body = await res.json().catch(function() { return null; });
+          if (!res.ok) {
+            lastError = new Error((body && (body.error || body.message)) || ('Server returned ' + res.status));
+            continue;
+          }
+          if (!body || typeof body !== 'object') {
+            lastError = new Error('Trait search returned an invalid response.');
+            continue;
+          }
+          return body;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      var msg = (lastError && lastError.message) || 'Trait search unavailable.';
+      if (/unknown action/i.test(msg)) {
+        throw new Error('Trait search is not live on the server yet. Deploy api/dd-evaluator.php (and api/.htaccess), then retry.');
+      }
+      throw lastError || new Error('Trait search unavailable.');
+    }
+
+    if (traitAddBtn) {
+      traitAddBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        beginAddAnotherTrait();
+      });
+    }
+
+    function showTraitLoading() {
+      evalBtn.disabled = true;
+      statusEl.innerHTML = '<div class="eval-spinner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg><span>Searching traits\u2026</span></div>';
+      resultEl.innerHTML = '';
+      scrollToEvalOutput(false);
+    }
+
+    function renderTraitDisambiguation(matches, query, resolvedTraits) {
+      clearStatus();
+      var rows = Array.isArray(matches) ? matches : [];
+      pendingTraitDisambiguation = Array.isArray(resolvedTraits) ? resolvedTraits.slice() : selectedTraits.slice();
+      if (!rows.length) {
+        showError('No traits matched "' + query + '". Try another trait name.');
+        return;
+      }
+      var resolvedNote = pendingTraitDisambiguation.length
+        ? '<div class="eval-dog-id">Already selected: ' + esc(pendingTraitDisambiguation.map(function(t) { return t.value; }).join(', ')) + '</div>'
+        : '';
+      resultEl.innerHTML =
+        '<div class="eval-card">' +
+          '<div class="eval-banner">' +
+            '<div class="eval-dog-info">' +
+              '<div class="eval-dog-name">Choose a trait</div>' +
+              '<div class="eval-dog-id">Multiple traits matched "' + esc(query) + '"</div>' +
+              resolvedNote +
+            '</div>' +
+          '</div>' +
+          '<div class="eval-trait-disambiguation">' +
+            rows.map(function(row, idx) {
+              return (
+                '<button type="button" class="eval-trait-disambiguation-btn" data-idx="' + idx + '">' +
+                  '<span><strong>' + esc(row.value) + '</strong> · ' + esc(row.traitLabel || row.traitKey) + '</span>' +
+                  '<span class="eval-trait-suggest-count">' + fmt(row.count) + '/10k</span>' +
+                '</button>'
+              );
+            }).join('') +
+          '</div>' +
+        '</div>';
+      resultEl.querySelectorAll('.eval-trait-disambiguation-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = Number(btn.getAttribute('data-idx'));
+          if (!Number.isFinite(idx) || !rows[idx]) return;
+          pickTraitSuggestion(rows[idx]);
+        });
+      });
+      scrollToEvalOutput(true);
+    }
+
+    function traitResultTileHtml(dog) {
+      var n = Number(dog.dogNumber);
+      if (!Number.isFinite(n) || n < 1) return '';
+      var rank = dog.rarityRank != null ? Number(dog.rarityRank) : null;
+      var img = 'https://market.doginaldogs.com/dogs/' + encodeURIComponent(n) + '.png';
+      return (
+        '<button type="button" class="eval-trait-result-tile" data-dog="' + n + '">' +
+          '<img src="' + esc(img) + '" alt="Dog #' + n + '" loading="lazy" />' +
+          '<span class="eval-trait-result-num">#' + fmt(n) + '</span>' +
+          '<span class="eval-trait-result-rank">' + (rank != null ? 'Rank ' + fmt(rank) : 'Unranked') + '</span>' +
+        '</button>'
+      );
+    }
+
+    function bindTraitResultTiles(root) {
+      (root || resultEl).querySelectorAll('.eval-trait-result-tile[data-dog]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var n = Number(btn.getAttribute('data-dog'));
+          if (!Number.isFinite(n)) return;
+          // Switch to inscription mode and evaluate the selected dog.
+          searchMode = 'inscription';
+          modeBtns.forEach(function(b) {
+            b.classList.toggle('active', b.dataset.mode === 'inscription');
+          });
+          applySearchMode();
+          syncModeTabs();
+          input.value = String(n);
+          evaluate();
+        });
+      });
+    }
+
+    function renderTraitSearchResult(payload, append) {
+      clearStatus();
+      if (!payload) return;
+
+      if (payload.needsDisambiguation) {
+        renderTraitDisambiguation(
+          payload.matches,
+          payload.query || getActiveTraitSegment(input.value),
+          payload.resolvedTraits || selectedTraits
+        );
+        return;
+      }
+
+      var dogs = Array.isArray(payload.dogs) ? payload.dogs : [];
+      var total = Number(payload.total) || dogs.length;
+      var shown = append && traitSearchState
+        ? (traitSearchState.dogs.length + dogs.length)
+        : dogs.length;
+      var traits = Array.isArray(payload.traits) && payload.traits.length
+        ? payload.traits
+        : (payload.traitKey && payload.value
+          ? [{ traitKey: payload.traitKey, traitLabel: payload.traitLabel, value: payload.value, count: payload.count }]
+          : selectedTraits.slice());
+
+      if (!append) {
+        traitSearchState = {
+          traits: traits,
+          traitKey: payload.traitKey,
+          traitLabel: payload.traitLabel,
+          value: payload.value,
+          count: payload.count,
+          total: total,
+          dogs: dogs.slice(),
+          offset: Number(payload.offset) || 0,
+          limit: Number(payload.limit) || 120
+        };
+        selectedTraits = traits.map(function(t) {
+          return {
+            traitKey: t.traitKey,
+            traitLabel: t.traitLabel,
+            value: t.value,
+            count: t.count
+          };
+        });
+        syncInputFromSelectedTraits(false);
+        renderTraitChips();
+      } else if (traitSearchState) {
+        traitSearchState.dogs = traitSearchState.dogs.concat(dogs);
+        traitSearchState.offset = Number(payload.offset) || traitSearchState.offset;
+        shown = traitSearchState.dogs.length;
+      }
+
+      var state = traitSearchState;
+      var multi = (state.traits || []).length > 1;
+      var gridHtml = (state.dogs || []).map(traitResultTileHtml).join('');
+      var remaining = Math.max(0, (state.total || 0) - (state.dogs || []).length);
+      var loadMoreHtml = remaining > 0
+        ? '<div class="eval-trait-load-more"><button type="button" class="eval-btn" id="traitLoadMoreBtn">Show more (' + fmt(remaining) + ' left)</button></div>'
+        : '';
+      var supplyBadge = multi
+        ? '<span class="eval-badge eval-badge-rarity">' + fmt(state.total) + ' match' + (state.total === 1 ? '' : 'es') + '</span>'
+        : '<span class="eval-badge eval-badge-rarity">' + fmt(state.count != null ? state.count : state.total) + '/10k</span>';
+
+      resultEl.innerHTML =
+        '<div class="eval-card">' +
+          '<div class="eval-banner">' +
+            '<div class="eval-dog-info">' +
+              '<div class="eval-dog-name">' + esc(state.value) + '</div>' +
+              '<div class="eval-dog-id">' + esc(state.traitLabel || state.traitKey) + (multi ? ' (AND)' : ' trait') + '</div>' +
+              '<div class="eval-badges">' +
+                supplyBadge +
+                '<span class="eval-badge eval-badge-special">Sorted by rarity</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="eval-trait-results-meta">' +
+            '<span>Showing ' + fmt(shown) + ' of ' + fmt(state.total) + ' dogs</span>' +
+            '<span>' + (multi ? 'Must match all selected traits · ' : '') + 'Ordered by rarity rank (1 = rarest)</span>' +
+          '</div>' +
+          (gridHtml
+            ? '<div class="eval-trait-results-grid" id="traitResultsGrid">' + gridHtml + '</div>'
+            : '<div class="eval-wallet-empty">No dogs found for this trait combination.</div>') +
+          loadMoreHtml +
+        '</div>';
+
+      bindTraitResultTiles(resultEl);
+      var moreBtn = document.getElementById('traitLoadMoreBtn');
+      if (moreBtn) {
+        moreBtn.addEventListener('click', function() {
+          loadMoreTraitResults();
+        });
+      }
+      if (!append) scrollToEvalOutput(true);
+    }
+
+    async function loadMoreTraitResults() {
+      if (!traitSearchState || !(traitSearchState.traits || []).length) return;
+      var nextOffset = (traitSearchState.dogs || []).length;
+      if (nextOffset >= (traitSearchState.total || 0)) return;
+      var moreBtn = document.getElementById('traitLoadMoreBtn');
+      if (moreBtn) {
+        moreBtn.disabled = true;
+        moreBtn.textContent = 'Loading…';
+      }
+      try {
+        var moreTraits = traitSearchState.traits || [];
+        var payload = await fetchTraitSearch({
+          traits: traitsToParam(moreTraits),
+          traitKey: moreTraits.length === 1 ? moreTraits[0].traitKey : '',
+          value: moreTraits.length === 1 ? moreTraits[0].value : '',
+          q: moreTraits.map(function(t) { return t.value; }).join(', '),
+          limit: traitSearchState.limit || 120,
+          offset: nextOffset
+        });
+        renderTraitSearchResult(payload, true);
+      } catch (err) {
+        if (moreBtn) {
+          moreBtn.disabled = false;
+          moreBtn.textContent = 'Show more';
+        }
+        showError(err.message || 'Could not load more trait results.');
+      }
+    }
+
+    async function evaluateTraitSearch() {
+      hideTraitSuggest();
+      var typed = String(input.value || '').trim().replace(/,\s*$/, '');
+      if (!selectedTraits.length && !typed) {
+        showError('Type a trait value to search (e.g. Cowboy, or Cowboy, Yellow).');
+        return;
+      }
+
+      showTraitLoading();
+      try {
+        var payload;
+        if (selectedTraits.length && (!typed || typed === traitsToInputValue(selectedTraits, false))) {
+          payload = await fetchTraitSearch({
+            traits: traitsToParam(selectedTraits),
+            traitKey: selectedTraits.length === 1 ? selectedTraits[0].traitKey : '',
+            value: selectedTraits.length === 1 ? selectedTraits[0].value : '',
+            q: selectedTraits.map(function(t) { return t.value; }).join(', '),
+            limit: 120,
+            offset: 0
+          });
+        } else if (selectedTraits.length && typed) {
+          // Chips + extra typed segments (comma query), prefer explicit chips + free text remainder
+          var chipValues = selectedTraits.map(function(t) { return String(t.value).toLowerCase(); });
+          var typedParts = splitTraitInput(typed).filter(Boolean);
+          var extra = typedParts.filter(function(part) {
+            return chipValues.indexOf(part.toLowerCase()) === -1;
+          });
+          var traitsParam = traitsToParam(selectedTraits);
+          if (extra.length) traitsParam = traitsParam + ',' + extra.join(',');
+          payload = await fetchTraitSearch({
+            traits: traitsParam,
+            traitKey: selectedTraits.length === 1 && !extra.length ? selectedTraits[0].traitKey : '',
+            value: selectedTraits.length === 1 && !extra.length ? selectedTraits[0].value : '',
+            q: selectedTraits.map(function(t) { return t.value; }).concat(extra).join(', '),
+            limit: 120,
+            offset: 0
+          });
+        } else {
+          payload = await fetchTraitSearch({ q: typed, limit: 120, offset: 0 });
+        }
+
+        renderTraitSearchResult(payload, false);
+      } catch (err) {
+        showError(err.message || 'Trait search failed. Please try again.');
+      }
+    }
+
+    if (input) {
+      input.addEventListener('input', function() {
+        if (searchMode === 'trait') updateTraitSuggestFromInput();
+      });
+      input.addEventListener('focus', function() {
+        if (searchMode === 'trait') updateTraitSuggestFromInput();
+      });
+      input.addEventListener('keydown', function(e) {
+        if (searchMode !== 'trait' || !traitSuggestEl || traitSuggestEl.hidden) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!traitSuggestItems.length) return;
+          traitSuggestActive = (traitSuggestActive + 1) % traitSuggestItems.length;
+          syncTraitSuggestActive();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!traitSuggestItems.length) return;
+          traitSuggestActive = (traitSuggestActive - 1 + traitSuggestItems.length) % traitSuggestItems.length;
+          syncTraitSuggestActive();
+        } else if (e.key === 'Enter' && traitSuggestActive >= 0 && traitSuggestItems[traitSuggestActive]) {
+          e.preventDefault();
+          pickTraitSuggestion(traitSuggestItems[traitSuggestActive]);
+        } else if (e.key === 'Escape') {
+          hideTraitSuggest();
+        }
+      });
+      input.addEventListener('blur', function() {
+        setTimeout(hideTraitSuggest, 120);
+      });
+    }
+
     /* ---------- main ---------- */
     async function evaluate() {
       if (searchMode === 'wallet') {
@@ -4307,6 +5601,11 @@
         } catch (err) {
           showError(err.message || 'Something went wrong. Please try again.');
         }
+        return;
+      }
+
+      if (searchMode === 'trait') {
+        await evaluateTraitSearch();
         return;
       }
 
@@ -4530,6 +5829,8 @@
 
     /* ---------- Request community lore ---------- */
     var loreForm = document.getElementById('evalLoreForm');
+    var loreBody = document.getElementById('evalLoreBody');
+    var loreToggle = document.getElementById('evalLoreToggle');
     var loreDogInput = document.getElementById('evalLoreDog');
     var loreByInput = document.getElementById('evalLoreBy');
     var loreTextInput = document.getElementById('evalLoreText');
@@ -4537,6 +5838,19 @@
     var lorePwInput = document.getElementById('evalLorePw');
     var loreSubmitBtn = document.getElementById('evalLoreSubmit');
     var loreMsg = document.getElementById('evalLoreMsg');
+    var loreExpanded = false;
+
+    if (loreToggle && loreBody) {
+      loreToggle.addEventListener('click', function() {
+        loreExpanded = !loreExpanded;
+        loreBody.hidden = !loreExpanded;
+        loreToggle.setAttribute('aria-expanded', loreExpanded ? 'true' : 'false');
+        loreToggle.textContent = loreExpanded ? 'Collapse Form' : 'Expand Form';
+        if (loreExpanded && loreDogInput) {
+          try { loreDogInput.focus({ preventScroll: true }); } catch (_) { loreDogInput.focus(); }
+        }
+      });
+    }
     var lorePwRequired = false;
 
     function loreSetMsg(text, kind) {
@@ -4927,7 +6241,29 @@
       }
     })();
 
+    async function searchOwner() {
+      var query = sanitizeAddress(ownerInput && ownerInput.value);
+      query = String(query || '').replace(/^@+/, '').trim();
+      if (!query) {
+        showError('Enter a wallet address, X handle, or listed dog number.');
+        return;
+      }
+      showLoading('Looking up owner\u2026');
+      try {
+        var ownerData = await getOwnerSearch(query);
+        renderOwnerResult(ownerData);
+      } catch (err) {
+        showError(err.message || 'Owner search failed. Please try again.');
+      }
+    }
+
     form.addEventListener('submit', function(e) { e.preventDefault(); evaluate(); });
+    if (ownerSearchForm) {
+      ownerSearchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        searchOwner();
+      });
+    }
     /* Mobile: avoid autofocus — focused inputs trigger repeated scroll-into-view and fight swipe-up toward the hero */
     function evalShouldAutofocusSearch() {
       try {

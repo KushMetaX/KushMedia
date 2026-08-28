@@ -1,0 +1,39 @@
+# =============================================================================
+# /tourney/.htaccess — Legends Bracket (Apache layer)
+#
+# WHY THIS EXISTS:
+#   This folder still holds the unused Vite source tree. Apache must not
+#   serve it. Every /tourney/* request is rewritten to /__tourney_gate/*
+#   so Passenger (Node) serves the static app from /bracket and the JSON
+#   API at /tourney-api. No second Node process and no port 8080.
+# =============================================================================
+
+Options -Indexes -MultiViews
+DirectoryIndex disabled
+
+<IfModule mod_headers.c>
+  # Do not noindex this path. X/Twitter skips card unfurls on noindex/nosnippet
+  # pages, and every /tourney/* request is rewritten to the live app anyway.
+  Header always set Cache-Control "no-store, private"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /tourney/
+
+  RewriteRule ^t/([^/]+)/?$ /tourney/?t=$1 [R=302,L,QSA]
+  RewriteCond %{ENV:REDIRECT_TOURNEY_GATED} !=1
+  RewriteRule ^(.*)$ /__tourney_gate/$1 [E=TOURNEY_GATED:1,L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+  <FilesMatch "\.(html?|js|mjs|css|map|json|ts|tsx)$">
+    <IfModule mod_authz_core.c>
+      Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+      Order allow,deny
+      Deny from all
+    </IfModule>
+  </FilesMatch>
+</IfModule>

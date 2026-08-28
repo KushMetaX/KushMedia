@@ -244,6 +244,34 @@ async function searchWallet(address) {
 }
 
 /**
+ * Marketplace owner/profile search (wallet address or X/Twitter handle).
+ * Returns the raw search payload plus the best wallet hit when present.
+ */
+async function searchOwners(query, limit = 10) {
+  const q = String(query || '').trim().replace(/^@+/, '');
+  if (!q) {
+    return { searchType: null, results: [], wallet: null };
+  }
+  const data = await trpcFetch('search.search', { query: q, limit });
+  const results = Array.isArray(data?.results) ? data.results : [];
+  const needle = q.toLowerCase();
+  const wallet = results.find(result => result?.type === 'wallet' && String(result?.address || '') === q)
+    ?? results.find(result => {
+      const username = String(result?.twitterUsername || '').trim().toLowerCase();
+      return result?.type === 'wallet' && username && username === needle;
+    })
+    ?? results.find(result => result?.type === 'wallet' && result?.address)
+    ?? results.find(result => result?.address)
+    ?? null;
+  return {
+    searchType: data?.searchType || null,
+    total: data?.total != null ? Number(data.total) : results.length,
+    results,
+    wallet,
+  };
+}
+
+/**
  * Fetch the public Top 100 leaderboard entries.
  */
 async function getOwnersLeaderboard(twitterOnly = false) {
@@ -433,6 +461,7 @@ export {
   getTraitValues,
   getWalletData,
   searchWallet,
+  searchOwners,
   getOwnersLeaderboard,
   getListings,
   getAllListings,

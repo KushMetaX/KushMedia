@@ -133,7 +133,135 @@ function normalizeCatalogTraits(traits) {
   };
 }
 
+const TRAIT_KEYS = Object.freeze([
+  'background', 'furColor', 'furPattern', 'head',
+  'clothes', 'mouth', 'eyes', 'accessory'
+]);
+
+function traitCategoryLabel(key) {
+  if (key === 'furColor') return 'Fur Color';
+  if (key === 'furPattern') return 'Fur Pattern';
+  return key ? key.charAt(0).toUpperCase() + key.slice(1) : '';
+}
+
 let catalogRarityOrderPromise = null;
+let catalogTraitIndexPromise = null;
+
+function normalizeTraitQuery(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+async function buildCatalogTraitIndex() {
+  const catalog = await loadDogCatalog();
+  if (!catalog || !catalog.dogs || typeof catalog.dogs !== 'object') {
+    return null;
+  }
+
+  const byKey = new Map();
+  const dogsMap = catalog.dogs;
+
+  for (let d = 1; d <= 10000; d++) {
+    const entry = dogsMap[String(d)] || dogsMap[d];
+    if (!entry || entry.ok === false || !entry.traits || typeof entry.traits !== 'object') {
+      continue;
+    }
+    const traits = entry.traits;
+    const rankRaw = Number(traits.rarityRank);
+    const rarityRank = Number.isFinite(rankRaw) && rankRaw > 0 ? rankRaw : null;
+
+    for (const traitKey of TRAIT_KEYS) {
+      const value = traits[traitKey];
+      if (value == null || value === '') continue;
+      const valueStr = String(value);
+      const id = traitKey + '\0' + valueStr;
+      let bucket = byKey.get(id);
+      if (!bucket) {
+        bucket = {
+          traitKey,
+          traitLabel: traitCategoryLabel(traitKey),
+          value: valueStr,
+          count: 0,
+          dogs: []
+        };
+        byKey.set(id, bucket);
+      }
+      bucket.count += 1;
+      bucket.dogs.push({ dogNumber: d, rarityRank });
+    }
+  }
+
+  const traits = Array.from(byKey.values()).map((bucket) => {
+    bucket.dogs.sort((a, b) => {
+      const ar = a.rarityRank == null ? 999999 : a.rarityRank;
+      const br = b.rarityRank == null ? 999999 : b.rarityRank;
+      if (ar !== br) return ar - br;
+      return a.dogNumber - b.dogNumber;
+    });
+    return {
+      traitKey: bucket.traitKey,
+      traitLabel: bucket.traitLabel,
+      value: bucket.value,
+      count: bucket.count,
+      dogs: bucket.dogs
+    };
+  });
+
+  traits.sort((a, b) => {
+    const labelCmp = a.traitLabel.localeCompare(b.traitLabel);
+    if (labelCmp !== 0) return labelCmp;
+    return a.value.localeCompare(b.value);
+  });
+
+  return traits;
+}
+
+async function getCatalogTraitIndex() {
+  if (!catalogTraitIndexPromise) {
+    catalogTraitIndexPromise = buildCatalogTraitIndex().catch((err) => {
+      catalogTraitIndexPromise = null;
+      throw err;
+    });
+  }
+  return catalogTraitIndexPromise;
+}
+
+/** Lightweight catalog of unique trait values for autocomplete. */
+async function getCatalogTraitValues() {
+  // Prefer the standalone multi-trait module (keeps Passenger deploys in sync).
+  try {
+    const ddTraitCatalog = require('./dd-trait-catalog');
+    if (ddTraitCatalog && typeof ddTraitCatalog.getCatalogTraitValues === 'function') {
+      return ddTraitCatalog.getCatalogTraitValues();
+    }
+  } catch (_err) {}
+
+  const index = await getCatalogTraitIndex();
+  if (!index) return null;
+  return index.map((entry) => ({
+    traitKey: entry.traitKey,
+    traitLabel: entry.traitLabel,
+    value: entry.value,
+    count: entry.count
+  }));
+}
+
+/**
+ * Search dogs by one or more traits. Delegates to dd-trait-catalog when available
+ * so `traits=` multi-search works even if an older route still calls this service.
+ */
+async function searchCatalogByTrait(options = {}) {
+  try {
+    const ddTraitCatalog = require('./dd-trait-catalog');
+    if (ddTraitCatalog && typeof ddTraitCatalog.searchCatalogByTrait === 'function') {
+      return ddTraitCatalog.searchCatalogByTrait(options);
+    }
+  } catch (_err) {}
+
+  return { ok: false, error: 'Provide a trait query (q), traits, or trait+value.', matches: [] };
+}
 
 async function buildCatalogRarityDogOrder() {
   const catalog = await loadDogCatalog();
@@ -774,5 +902,9 @@ module.exports = {
   getBrandAsset,
   getDogImage,
   getInscriptionRecord,
-  getCatalogRarityDogOrder
+  getCatalogRarityDogOrder,
+  getCatalogTraitValues,
+  searchCatalogByTrait,
+  traitCategoryLabel,
+  TRAIT_KEYS
 };

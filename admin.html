@@ -122,6 +122,10 @@
     .dd-settings-table.dd-angel-table{min-width:380px}
     .dd-angel-num{font-variant-numeric:tabular-nums;font-weight:600;color:#e8e8e8}
     .dd-lore-mult{width:100%;max-width:6rem;padding:.55rem .65rem;border-radius:.75rem;border:1px solid rgba(255,255,255,.12);background:#111;color:#fff}
+    .dd-lore-media-actions{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}
+    .dd-lore-media-actions button{padding:.3rem .5rem;font-size:.7rem}
+    .dd-lore-media-hint{display:block;margin-top:.3rem;font-size:.68rem;color:#777;line-height:1.35}
+    .dd-official-lore-thumb{max-height:72px;width:auto;border-radius:.5rem;background:#0a0a0a}
   </style>
 </head>
 <body>
@@ -146,6 +150,7 @@
       <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
       <li><a href="../services.html" class="nav-link">Services</a></li>
       <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="../ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
       <li><a href="../voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="../contact.html" class="nav-link">Connect</a></li>
     </ul>
@@ -156,63 +161,17 @@
     <section class="section">
       <div class="container">
 
-        <!-- LOGIN -->
-        <div id="loginPanel" class="admin-login">
-          <h1 class="page-title">Admin</h1>
-          <form id="loginForm" autocomplete="off">
-            <div class="form-group">
-              <label for="adminPw">Password</label>
-              <input type="password" id="adminPw" name="password" required placeholder="Enter admin password">
-            </div>
-            <div id="loginError" class="form-error" hidden></div>
-            <button type="submit" class="btn-primary form-submit" id="loginBtn">Log In &#8594;</button>
-          </form>
-        </div>
-
-        <!-- DASHBOARD (hidden until auth) -->
-        <div id="dashboard" class="admin-dashboard" hidden>
-          <div class="admin-header-row">
-            <h1 class="page-title">Orders</h1>
-            <button type="button" class="btn-outline admin-logout-btn" id="logoutBtn">Log Out</button>
-          </div>
-
-          <!-- Filters -->
-          <div class="admin-filters">
-            <button type="button" class="admin-filter-btn active" data-filter="all">All</button>
-            <button type="button" class="admin-filter-btn" data-filter="Pending">Pending</button>
-            <button type="button" class="admin-filter-btn" data-filter="In Progress">In Progress</button>
-            <button type="button" class="admin-filter-btn" data-filter="Complete">Complete</button>
-          </div>
-
-          <div id="ordersLoading" class="admin-loading" hidden>Loading orders&#8230;</div>
-          <div id="ordersEmpty" class="admin-empty" hidden>No orders found.</div>
-          <div id="ordersTable" hidden>
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Order ID</th>
-                  <th>Date</th>
-                  <th>Customer</th>
-                  <th>Service</th>
-                  <th>Payment</th>
-                  <th>Status</th>
-                  <th>Paid</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="ordersTbody"></tbody>
-            </table>
-          </div>
-
+        <div id="dashboard" class="admin-dashboard">
           <section class="dd-settings" aria-labelledby="ddSettingsTitle">
             <div class="admin-header-row">
               <div>
-                <h2 id="ddSettingsTitle" class="page-title">DD Evaluator Dashboard</h2>
-                <p class="dd-settings-copy">Browse every trait variant in one sortable table (filter to trending and overrides only). Edit manual multipliers, save rows, and use Ignore Auto to tune falsely hot traits. Switching DD tabs keeps draft edits until you save or refresh.</p>
+                <h1 id="ddSettingsTitle" class="page-title">DD Evaluator Dashboard</h1>
+                <p class="dd-settings-copy">This page is gated by Node HTTP Basic Auth (<code>DD_ADMIN_PASSWORD</code>). Browse every trait variant in one sortable table (filter to trending and overrides only). Edit manual multipliers, save rows, and use Ignore Auto to tune falsely hot traits. Switching DD tabs keeps draft edits until you save or refresh.</p>
               </div>
               <div class="dd-settings-actions">
                 <button type="button" class="btn-outline" id="ddReloadBtn">Refresh DD Data</button>
                 <button type="button" class="btn-primary" id="ddSaveBtn">Save DD Settings</button>
+                <button type="button" class="btn-outline admin-logout-btn" id="logoutBtn">Log Out</button>
               </div>
             </div>
 
@@ -222,6 +181,8 @@
               <button type="button" class="dd-settings-tab active" data-dd-panel-target="controls" aria-pressed="true">Trait Controls</button>
               <button type="button" class="dd-settings-tab" data-dd-panel-target="base" aria-pressed="false">Base Prices</button>
               <button type="button" class="dd-settings-tab" data-dd-panel-target="offers" aria-pressed="false">Refused Offers</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="official-lore" aria-pressed="false">Official Lore</button>
+              <button type="button" class="dd-settings-tab" data-dd-panel-target="tcg-cards" aria-pressed="false">DDL TCG Cards</button>
               <button type="button" class="dd-settings-tab" data-dd-panel-target="imports" aria-pressed="false">Imported Evals</button>
               <button type="button" class="dd-settings-tab" data-dd-panel-target="multipliers" aria-pressed="false">Multipliers</button>
               <button type="button" class="dd-settings-tab" data-dd-panel-target="suggestions" aria-pressed="false">Suggestions queue</button>
@@ -251,6 +212,89 @@
                   </thead>
                   <tbody id="ddCommunityOfferTbody">
                     <tr><td colspan="6" class="dd-settings-small">No refused offers saved yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="official-lore" hidden aria-labelledby="ddOfficialLoreTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddOfficialLoreTitle" class="dd-settings-subtitle">Official Lore Floors</h3>
+                  <p class="dd-settings-copy">Same floor format as refused community offers — use for official project lore (mascots, canon history). Upload a GIF or image per entry for the evaluator banner (otherwise the dog preview is used). The live DOGE equivalent becomes a minimum estimate floor for that inscription.</p>
+                </div>
+                <button type="button" class="btn-outline" id="ddAddOfficialLoreBtn">Add Official Lore</button>
+              </div>
+
+              <div class="dd-settings-table-wrap">
+                <table class="dd-settings-table">
+                  <thead>
+                    <tr>
+                      <th>Preview</th>
+                      <th>Inscription</th>
+                      <th>Min Floor USD</th>
+                      <th>Live DOGE Floor</th>
+                      <th>Official Lore</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ddOfficialLoreTbody">
+                    <tr><td colspan="6" class="dd-settings-small">No official lore floors saved yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dd-settings-panel dd-settings-subsection" data-dd-panel="tcg-cards" hidden aria-labelledby="ddTcgCardsTitle">
+              <div class="dd-settings-subhead">
+                <div>
+                  <h3 id="ddTcgCardsTitle" class="dd-settings-subtitle">DDL TCG Official Inspirations</h3>
+                  <p class="dd-settings-copy">Map a Doginal Dogs inscription to the TCG card it inspired. If the card is branded around someone (e.g. @web3smb &rarr; Web), set their handle and/or wallet. Wallet estimates then stack: subject + dog + PSA 10 is the top multi; inspiration dog + card (not the subject) is a bit lower; dog without the card is lower still. PSA 1&ndash;10 scales the card half.</p>
+                </div>
+                <button type="button" class="btn-outline" id="ddAddTcgInspirationBtn">Add Inspiration</button>
+              </div>
+              <div class="dd-settings-table-wrap">
+                <table class="dd-settings-table">
+                  <thead>
+                    <tr>
+                      <th>Preview</th>
+                      <th>Inscription</th>
+                      <th>Card name</th>
+                      <th>Card ID</th>
+                      <th>Branded handle</th>
+                      <th>Branded wallet</th>
+                      <th>Notes</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ddTcgInspirationTbody">
+                    <tr><td colspan="8" class="dd-settings-small">No TCG inspirations saved yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="dd-settings-subhead" style="margin-top:1.5rem">
+                <div>
+                  <h3 class="dd-settings-subtitle">Graded card holdings (PSA 1&ndash;10)</h3>
+                  <p class="dd-settings-copy">Physical cards are not on-chain. Record a wallet or X handle plus PSA grade so portfolio estimates can apply the matching-card bonus. Example: @web3smb holds Web PSA 10.</p>
+                </div>
+                <button type="button" class="btn-outline" id="ddAddTcgHoldingBtn">Add Graded Card</button>
+              </div>
+              <div class="dd-settings-table-wrap">
+                <table class="dd-settings-table">
+                  <thead>
+                    <tr>
+                      <th>Handle</th>
+                      <th>Wallet</th>
+                      <th>Card name</th>
+                      <th>Card ID</th>
+                      <th>PSA</th>
+                      <th>Notes</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ddTcgHoldingTbody">
+                    <tr><td colspan="7" class="dd-settings-small">No graded card holdings saved yet.</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -426,9 +470,9 @@
                   <p class="dd-settings-copy">Approve or reject pending community submissions for trending and lore.</p>
                 </div>
               </div>
-              <p class="cs-queue-hint">Enter the DD admin password (same as <strong>Save DD Settings</strong>). You can also set it via the DD password prompt elsewhere on this dashboard.</p>
-              <label class="dd-settings-label" for="traitPw">DD admin password</label>
-              <input id="traitPw" type="password" autocomplete="current-password" placeholder="Admin API password"
+              <p class="cs-queue-hint">Saves use the same Node password as the browser prompt. Fill this only if <code>DD_ADMIN_UI_PASSWORD</code> is set to a different value than <code>DD_ADMIN_PASSWORD</code>.</p>
+              <label class="dd-settings-label" for="traitPw">DD admin password (optional override)</label>
+              <input id="traitPw" type="password" autocomplete="current-password" placeholder="Leave blank if it matches the page login"
                 style="max-width:28rem;width:100%;padding:.7rem .85rem;border-radius:.8rem;border:1px solid rgba(212,175,55,.35);background:#111;color:#fff">
               <div class="dd-settings-actions" style="margin-top:1rem">
                 <button type="button" class="btn-primary" id="csLoadPending">Load pending queue</button>
@@ -455,10 +499,10 @@
               <div class="dd-settings-subhead">
                 <div>
                   <h3 id="ddCommunityLoreTitle" class="dd-settings-subtitle">Published community lore</h3>
-                  <p class="dd-settings-copy">View and edit notes stored in <code>dd-community-notes.json</code> (same text shown on DD Evaluator). Uses the DD admin password from the <strong>Suggestions queue</strong> tab.</p>
+                  <p class="dd-settings-copy">View and edit notes stored in <code>dd-community-notes.json</code> (same text shown on DD Evaluator). Uses the browser Basic Auth password, or the optional override on the <strong>Suggestions queue</strong> tab.</p>
                 </div>
               </div>
-              <p class="cs-queue-hint">Enter the DD admin password in <strong>Suggestions queue</strong> (field above), or set it via the DD save password prompt elsewhere on this dashboard.</p>
+              <p class="cs-queue-hint">The page login is enough when both admin passwords match. Use the Suggestions queue field only if they differ.</p>
               <div class="dd-settings-actions" style="margin-top:.75rem;flex-wrap:wrap;gap:.75rem;align-items:center">
                 <button type="button" class="btn-primary" id="clLoreLoadBtn">Load all lore</button>
                 <button type="button" class="btn-outline" id="clLoreAddBtn">Add entry</button>
@@ -594,15 +638,6 @@
     </section>
   </main>
 
-  <!-- ===== DETAIL MODAL ===== -->
-  <div class="modal-backdrop" id="detailBackdrop" aria-hidden="true">
-    <div class="modal-card admin-detail-modal">
-      <button type="button" class="modal-close" id="detailClose" aria-label="Close">&times;</button>
-      <h2 class="modal-title" id="detailTitle">Order Details</h2>
-      <div id="detailContent"></div>
-    </div>
-  </div>
-
   <!-- ===== FOOTER ===== -->
   <footer class="site-footer">
     <div class="footer-inner">
@@ -622,27 +657,10 @@
      KushMetaX — Admin Dashboard
      ================================================== */
   (function(){
-    var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAkUTenNWA0-gO6RU9w6cLqlXtmQn4yGkIkMsfDnbPqX_8czMQVeEHFJ-Kd5VX2-ndBw/exec';
-    var password   = '';
     var ddAdminPassword = '';
-    var allOrders  = [];
-    var currentFilter = 'all';
 
     /* ---- DOM refs ---- */
-    var loginPanel   = document.getElementById('loginPanel');
-    var loginForm    = document.getElementById('loginForm');
-    var loginError   = document.getElementById('loginError');
-    var loginBtn     = document.getElementById('loginBtn');
-    var dashboard    = document.getElementById('dashboard');
     var logoutBtn    = document.getElementById('logoutBtn');
-    var ordersLoading= document.getElementById('ordersLoading');
-    var ordersEmpty  = document.getElementById('ordersEmpty');
-    var ordersTable  = document.getElementById('ordersTable');
-    var ordersTbody  = document.getElementById('ordersTbody');
-    var detailBg     = document.getElementById('detailBackdrop');
-    var detailClose  = document.getElementById('detailClose');
-    var detailTitle  = document.getElementById('detailTitle');
-    var detailContent= document.getElementById('detailContent');
     var ddReloadBtn  = document.getElementById('ddReloadBtn');
     var ddSaveBtn    = document.getElementById('ddSaveBtn');
     var ddSettingsStatus = document.getElementById('ddSettingsStatus');
@@ -654,6 +672,12 @@
     var ddBasePriceTraitTbody = document.getElementById('ddBasePriceTraitTbody');
     var ddAddCommunityOfferBtn = document.getElementById('ddAddCommunityOfferBtn');
     var ddCommunityOfferTbody = document.getElementById('ddCommunityOfferTbody');
+    var ddAddOfficialLoreBtn = document.getElementById('ddAddOfficialLoreBtn');
+    var ddOfficialLoreTbody = document.getElementById('ddOfficialLoreTbody');
+    var ddAddTcgInspirationBtn = document.getElementById('ddAddTcgInspirationBtn');
+    var ddTcgInspirationTbody = document.getElementById('ddTcgInspirationTbody');
+    var ddAddTcgHoldingBtn = document.getElementById('ddAddTcgHoldingBtn');
+    var ddTcgHoldingTbody = document.getElementById('ddTcgHoldingTbody');
     var ddEvaluationLogTbody = document.getElementById('ddEvaluationLogTbody');
     var ddEvaluationImportInput = document.getElementById('ddEvaluationImportInput');
     var ddEvaluationImportHours = document.getElementById('ddEvaluationImportHours');
@@ -708,14 +732,6 @@
       return d.toLocaleDateString('en-CA') + ' ' + d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'});
     }
 
-    function badgeClass(status){
-      if(!status) return 'pending';
-      var s = status.toLowerCase();
-      if(s.indexOf('progress')!==-1||s.indexOf('working')!==-1) return 'in-progress';
-      if(s.indexOf('complete')!==-1||s.indexOf('done')!==-1||s.indexOf('delivered')!==-1) return 'complete';
-      return 'pending';
-    }
-
     function fmt(n, d){
       if(n === null || n === undefined || n === '') return '-';
       return Number(n).toLocaleString(undefined, { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
@@ -740,6 +756,10 @@
 
     function ddDogImageUrl(dogNumber){
       return dogNumber ? ('/api/doginal-proxy.php?action=image&dogNumber=' + encodeURIComponent(dogNumber)) : '../assets/collection-logo.png';
+    }
+
+    function loreMediaUploadUrl(){
+      return window.location.origin + '/api/dd-evaluator/admin/lore-media';
     }
 
     function getDdLiveDogeUsd(){
@@ -772,7 +792,7 @@
         var active = String(panel.getAttribute('data-dd-panel') || '') === target;
         panel.hidden = !active;
       });
-      if (target === 'community-lore' && typeof loadCommunityLoreTable === 'function' && typeof getCsAdminPassword === 'function' && getCsAdminPassword()) {
+      if (target === 'community-lore' && typeof loadCommunityLoreTable === 'function') {
         loadCommunityLoreTable();
       }
     }
@@ -791,7 +811,16 @@
     }
 
     function getDdRequestPassword(){
-      return ddAdminPassword || '';
+      var tp = document.getElementById('traitPw');
+      var fromField = tp ? String(tp.value || '').trim() : '';
+      return fromField || ddAdminPassword || '';
+    }
+
+    function ddAuthHeaders(extra){
+      var headers = Object.assign({ Accept: 'application/json' }, extra || {});
+      var pw = getDdRequestPassword();
+      if(pw) headers['x-dd-admin-password'] = pw;
+      return headers;
     }
 
     function isInvalidDdPasswordError(message){
@@ -800,8 +829,8 @@
 
     function promptForDdAdminPassword(){
       var next = window.prompt(
-        'DD save/import uses a separate password. Enter the DD admin password stored in server/data/.dd-admin-password.',
-        ddAdminPassword || password || ''
+        'Enter DD_ADMIN_PASSWORD. Needed when it differs from the browser page login, or when the API did not accept Basic Auth.',
+        getDdRequestPassword()
       );
       if(next === null) return false;
       ddAdminPassword = String(next || '').trim();
@@ -811,8 +840,9 @@
     }
 
     function ensureDdAdminPassword(){
-      if(ddAdminPassword) return true;
-      return promptForDdAdminPassword();
+      if(getDdRequestPassword()) return true;
+      // Browser Basic Auth is sent on same-origin fetches; try the request first.
+      return true;
     }
 
     function setDdDashboardData(payload, saveEnabled){
@@ -1030,6 +1060,25 @@
       return map;
     }
 
+    function formatDdComboDogNumbers(list){
+      if(!Array.isArray(list) || !list.length) return '';
+      return list.map(function(n){ return String(n); }).join(', ');
+    }
+
+    function parseDdComboDogNumbers(raw){
+      if(!raw) return [];
+      var parts = String(raw).split(/[\s,;]+/);
+      var out = [];
+      var seen = Object.create(null);
+      parts.forEach(function(part){
+        var n = parseInt(String(part).trim(), 10);
+        if(!Number.isInteger(n) || n < 1 || n > 10000 || seen[n]) return;
+        seen[n] = true;
+        out.push(n);
+      });
+      return out;
+    }
+
     function addDdComboRow(comboData){
       if(!ddCombosContainer) return;
       var combo = comboData || {};
@@ -1051,6 +1100,10 @@
           '</div>' +
           '<label class="dd-mult-toggle-wrap"><input type="checkbox" class="dd-combo-enabled"' + (combo.enabled !== false ? ' checked' : '') + '> On</label>' +
           '<button type="button" class="dd-mult-remove-btn dd-combo-remove" title="Remove combo">&times;</button>' +
+        '</div>' +
+        '<div class="dd-combo-ddm-field" style="margin:.55rem 0 .15rem">' +
+          '<label>Dog # allowlist (optional)</label>' +
+          '<input type="text" class="dd-combo-dogs dd-mult-input" placeholder="e.g. 1764, 4502, 5530" value="' + esc(formatDdComboDogNumbers(combo.dogNumbers)) + '" title="If set, only these dog numbers can match this combo" style="width:100%">' +
         '</div>' +
         '<div class="dd-combo-ddm-grid">' + grid + '</div>';
       ddCombosContainer.appendChild(row);
@@ -1082,6 +1135,7 @@
         var labelInput = row.querySelector('.dd-combo-label');
         var multInput  = row.querySelector('.dd-combo-mult');
         var enabledInput = row.querySelector('.dd-combo-enabled');
+        var dogsInput = row.querySelector('.dd-combo-dogs');
         var label = labelInput ? labelInput.value.trim() : '';
         if(!label) return;
         var conditions = [];
@@ -1089,14 +1143,16 @@
           var sel = row.querySelector('.dd-combo-trait-val[data-trait="' + tk + '"]');
           var value = sel ? String(sel.value || '').trim() : '';
           var low = value.toLowerCase();
+          // "Any" means no constraint — skip it so combos don't match every dog.
+          if(!value || low === 'any') return;
           if(low === 'none'){
             conditions.push({ trait: tk, op: 'eq', value: 'None' });
-          } else if(!value || low === 'any'){
-            conditions.push({ trait: tk, op: 'eq', value: 'Any' });
           } else {
             conditions.push({ trait: tk, op: 'eq', value: value });
           }
         });
+        var dogNumbers = parseDdComboDogNumbers(dogsInput ? dogsInput.value : '');
+        if(!conditions.length && !dogNumbers.length) return;
         var multRaw = Number(multInput ? multInput.value : NaN);
         if(!Number.isFinite(multRaw) || multRaw === 0) return;
         combos.push({
@@ -1105,10 +1161,21 @@
           multiplier: multRaw,
           enabled:    enabledInput ? enabledInput.checked : true,
           conditions: conditions,
+          dogNumbers: dogNumbers,
         });
       });
 
-      return { colorMatch: colorMatch, minimalTiers: minimalTiers, combos: combos, angelNumbers: collectAngelNumbers() };
+      var preserved = (ddDashboardData && ddDashboardData.config && ddDashboardData.config.specialMultipliers)
+        ? ddDashboardData.config.specialMultipliers
+        : {};
+      return {
+        colorMatch: colorMatch,
+        minimalTiers: minimalTiers,
+        combos: combos,
+        angelNumbers: collectAngelNumbers(),
+        // Preserve DDL TCG set config (not edited in this panel UI).
+        tcgSet: preserved.tcgSet || undefined,
+      };
     }
 
     function saveSpecialMultipliers(){
@@ -1127,10 +1194,12 @@
       function runSave(allowPrompt){
         fetch(settingsUrl(), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-dd-admin-password': getDdRequestPassword() },
+          credentials: 'same-origin',
+          headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             manualMultipliers: (ddDashboardData.config && ddDashboardData.config.manualMultipliers) || {},
             refusedOffers:     (ddDashboardData.config && ddDashboardData.config.refusedOffers)     || {},
+            officialLore:      (ddDashboardData.config && ddDashboardData.config.officialLore)      || {},
             autoTrend:         (ddDashboardData.config && ddDashboardData.config.autoTrend)         || buildDdSavedAutoTrend(),
             specialMultipliers: collectSpecialMultipliers(),
             updatedBy: 'admin.html:multipliers',
@@ -1398,6 +1467,297 @@
       return result;
     }
 
+    function renderDdOfficialLore(rows){
+      var entries = Array.isArray(rows) ? rows : [];
+      var liveDogeUsd = getDdLiveDogeUsd();
+      if(!ddOfficialLoreTbody) return;
+      if(entries.length === 0){
+        ddOfficialLoreTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">No official lore floors saved yet.</td></tr>';
+        return;
+      }
+
+      ddOfficialLoreTbody.innerHTML = entries.map(function(entry, index){
+        var dogNumber = entry.dogNumber != null ? entry.dogNumber : '';
+        var minOfferUsd = entry.minOfferUsd != null
+          ? entry.minOfferUsd
+          : (entry.minOfferDoge != null && liveDogeUsd != null ? +(Number(entry.minOfferDoge) * liveDogeUsd).toFixed(2) : '');
+        var note = entry.note || '';
+        var customImageUrl = entry.customImageUrl || (entry.imageUrl && String(entry.imageUrl).indexOf('/dogs/') === -1 && String(entry.imageUrl).indexOf('doginal-proxy') === -1 ? entry.imageUrl : '') || '';
+        var previewUrl = customImageUrl || ddDogImageUrl(dogNumber);
+        var savedMeta = entry.updatedAt
+          ? 'Saved ' + formatDate(entry.updatedAt) + (entry.updatedBy ? ' · ' + entry.updatedBy : '')
+          : 'Not saved yet';
+
+        return '<tr data-official-lore-index="' + index + '" data-updated-at="' + esc(entry.updatedAt || '') + '" data-updated-by="' + esc(entry.updatedBy || '') + '" data-image-url="' + esc(customImageUrl) + '">' +
+          '<td>' +
+            '<div class="dd-community-stack">' +
+              '<img class="dd-community-thumb dd-official-lore-thumb" src="' + esc(previewUrl) + '" alt="Lore media preview" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+              '<div>' +
+                '<div class="dd-community-name">' + esc(dogNumber ? ('Doginal Dog #' + dogNumber) : 'New official lore') + '</div>' +
+                '<div class="dd-settings-small dd-community-meta">Official lore floor</div>' +
+                '<div class="dd-lore-media-actions">' +
+                  '<button type="button" class="btn-outline dd-official-lore-upload">Upload GIF/image</button>' +
+                  '<button type="button" class="btn-outline dd-official-lore-clear-media"' + (customImageUrl ? '' : ' hidden') + '>Clear media</button>' +
+                  '<input class="dd-official-lore-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp" hidden>' +
+                '</div>' +
+                '<span class="dd-lore-media-hint">Per-entry banner art. Save DD settings after uploading.</span>' +
+              '</div>' +
+            '</div>' +
+          '</td>' +
+          '<td><input class="dd-official-lore-inscription" type="number" min="1" max="10000" step="1" value="' + esc(dogNumber) + '" placeholder="3381"></td>' +
+          '<td><input class="dd-official-lore-offer" type="number" min="1" step="0.01" value="' + esc(minOfferUsd) + '" placeholder="25000"></td>' +
+          '<td class="dd-official-lore-doge">-</td>' +
+          '<td><input class="dd-official-lore-note" type="text" value="' + esc(note) + '" placeholder="Official DDL TCG mascot…"><span class="dd-settings-inline-note">' + esc(savedMeta) + '</span></td>' +
+          '<td><button type="button" class="btn-outline dd-settings-remove" data-remove-official-lore-index="' + index + '">Remove</button></td>' +
+        '</tr>';
+      }).join('');
+
+      ddOfficialLoreTbody.querySelectorAll('tr[data-official-lore-index]').forEach(updateDdOfficialLoreRow);
+    }
+
+    function updateDdOfficialLoreRow(row){
+      if(!row) return;
+      var dogInput = row.querySelector('.dd-official-lore-inscription');
+      var offerInput = row.querySelector('.dd-official-lore-offer');
+      var thumb = row.querySelector('.dd-community-thumb');
+      var nameEl = row.querySelector('.dd-community-name');
+      var dogeEl = row.querySelector('.dd-official-lore-doge');
+      var clearBtn = row.querySelector('.dd-official-lore-clear-media');
+      var dogNumber = Number(dogInput && dogInput.value);
+      var minOfferUsd = Number(offerInput && offerInput.value);
+      var liveDogeUsd = getDdLiveDogeUsd();
+      var customImageUrl = String(row.getAttribute('data-image-url') || '').trim();
+
+      if(thumb){
+        thumb.src = customImageUrl || ddDogImageUrl(Number.isInteger(dogNumber) && dogNumber > 0 ? dogNumber : null);
+        thumb.alt = customImageUrl
+          ? 'Custom lore media'
+          : (Number.isInteger(dogNumber) && dogNumber > 0 ? ('Doginal Dog #' + dogNumber) : 'Dog preview');
+      }
+      if(nameEl) nameEl.textContent = Number.isInteger(dogNumber) && dogNumber > 0 ? ('Doginal Dog #' + dogNumber) : 'New official lore';
+      if(clearBtn) clearBtn.hidden = !customImageUrl;
+      if(dogeEl){
+        dogeEl.textContent = Number.isFinite(minOfferUsd) && minOfferUsd > 0 && liveDogeUsd != null && liveDogeUsd > 0
+          ? (fmt(Math.round(minOfferUsd / liveDogeUsd)) + ' DOGE')
+          : '-';
+      }
+    }
+
+    function collectDdOfficialLoreRows(includeDrafts){
+      var rows = [];
+      if(!ddOfficialLoreTbody) return rows;
+      ddOfficialLoreTbody.querySelectorAll('tr[data-official-lore-index]').forEach(function(row){
+        var dogValue = String((row.querySelector('.dd-official-lore-inscription') || {}).value || '').trim();
+        var offerValue = String((row.querySelector('.dd-official-lore-offer') || {}).value || '').trim();
+        var noteValue = String((row.querySelector('.dd-official-lore-note') || {}).value || '').trim();
+        var imageUrl = String(row.getAttribute('data-image-url') || '').trim() || null;
+        var dogNumber = Number(dogValue);
+        var minOfferUsd = Number(offerValue);
+
+        if(includeDrafts){
+          rows.push({
+            dogNumber: Number.isInteger(dogNumber) && dogNumber > 0 ? dogNumber : null,
+            minOfferUsd: Number.isFinite(minOfferUsd) && minOfferUsd > 0 ? +minOfferUsd.toFixed(2) : null,
+            note: noteValue,
+            imageUrl: imageUrl,
+            customImageUrl: imageUrl,
+            updatedAt: row.getAttribute('data-updated-at') || null,
+            updatedBy: row.getAttribute('data-updated-by') || null
+          });
+          return;
+        }
+
+        if(Number.isInteger(dogNumber) && dogNumber > 0 && Number.isFinite(minOfferUsd) && minOfferUsd > 0){
+          rows.push({
+            dogNumber: dogNumber,
+            minOfferUsd: +minOfferUsd.toFixed(2),
+            note: noteValue || null,
+            imageUrl: imageUrl
+          });
+        }
+      });
+      return rows;
+    }
+
+    function collectDdOfficialLore(){
+      var result = {};
+      collectDdOfficialLoreRows(false).forEach(function(entry){
+        result[String(entry.dogNumber)] = {
+          minOfferUsd: entry.minOfferUsd,
+          note: entry.note || null,
+          imageUrl: entry.imageUrl || null
+        };
+      });
+      return result;
+    }
+
+    function renderDdTcgInspirations(rows){
+      var entries = Array.isArray(rows) ? rows : [];
+      if(!ddTcgInspirationTbody) return;
+      if(entries.length === 0){
+        ddTcgInspirationTbody.innerHTML = '<tr><td colspan="8" class="dd-settings-small">No TCG inspirations saved yet. Example: map an inscription to Web and brand it to @web3smb.</td></tr>';
+        return;
+      }
+      ddTcgInspirationTbody.innerHTML = entries.map(function(entry, index){
+        var dogNumber = entry.dogNumber != null ? entry.dogNumber : '';
+        var wallets = Array.isArray(entry.brandedWallets) ? entry.brandedWallets.join(', ') : (entry.brandedWallet || '');
+        return '<tr data-tcg-inspiration-index="' + index + '">' +
+          '<td><img class="dd-community-thumb" src="' + esc(ddDogImageUrl(dogNumber)) + '" alt="" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'"></td>' +
+          '<td><input class="dd-tcg-insp-dog" type="number" min="1" max="10000" step="1" value="' + esc(dogNumber) + '" placeholder="1234"></td>' +
+          '<td><input class="dd-tcg-insp-card" type="text" value="' + esc(entry.cardName || '') + '" placeholder="Web"></td>' +
+          '<td><input class="dd-tcg-insp-id" type="text" value="' + esc(entry.cardId || '') + '" placeholder="V034"></td>' +
+          '<td><input class="dd-tcg-insp-handle" type="text" value="' + esc(entry.brandedHandle || '') + '" placeholder="web3smb"></td>' +
+          '<td><input class="dd-tcg-insp-wallet" type="text" value="' + esc(wallets) + '" placeholder="D..."></td>' +
+          '<td><input class="dd-tcg-insp-note" type="text" value="' + esc(entry.note || '') + '" placeholder="Official artist inspiration"></td>' +
+          '<td><button type="button" class="btn-outline dd-settings-remove" data-remove-tcg-inspiration-index="' + index + '">Remove</button></td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function collectDdTcgInspirations(includeDrafts){
+      var rows = [];
+      if(!ddTcgInspirationTbody) return rows;
+      ddTcgInspirationTbody.querySelectorAll('tr[data-tcg-inspiration-index]').forEach(function(row){
+        var dogNumber = Number((row.querySelector('.dd-tcg-insp-dog') || {}).value || '');
+        var cardName = String((row.querySelector('.dd-tcg-insp-card') || {}).value || '').trim();
+        var cardId = String((row.querySelector('.dd-tcg-insp-id') || {}).value || '').trim();
+        var handle = String((row.querySelector('.dd-tcg-insp-handle') || {}).value || '').trim().replace(/^@+/, '');
+        var walletRaw = String((row.querySelector('.dd-tcg-insp-wallet') || {}).value || '').trim();
+        var brandedWallets = walletRaw ? walletRaw.split(/[\s,;]+/).map(function(w){ return w.trim(); }).filter(Boolean) : [];
+        var entry = {
+          dogNumber: Number.isInteger(dogNumber) && dogNumber > 0 ? dogNumber : null,
+          cardName: cardName,
+          cardId: cardId,
+          brandedHandle: handle || null,
+          brandedWallets: brandedWallets,
+          note: String((row.querySelector('.dd-tcg-insp-note') || {}).value || '').trim() || null
+        };
+        if(includeDrafts || (entry.dogNumber && (cardName || cardId))) rows.push(entry);
+      });
+      return rows;
+    }
+
+    function renderDdTcgHoldings(rows){
+      var entries = Array.isArray(rows) ? rows : [];
+      if(!ddTcgHoldingTbody) return;
+      if(entries.length === 0){
+        ddTcgHoldingTbody.innerHTML = '<tr><td colspan="7" class="dd-settings-small">No graded card holdings saved yet.</td></tr>';
+        return;
+      }
+      ddTcgHoldingTbody.innerHTML = entries.map(function(entry, index){
+        return '<tr data-tcg-holding-index="' + index + '">' +
+          '<td><input class="dd-tcg-hold-handle" type="text" value="' + esc(entry.handle || '') + '" placeholder="web3smb"></td>' +
+          '<td><input class="dd-tcg-hold-wallet" type="text" value="' + esc(entry.wallet || '') + '" placeholder="D..."></td>' +
+          '<td><input class="dd-tcg-hold-card" type="text" value="' + esc(entry.cardName || '') + '" placeholder="Web"></td>' +
+          '<td><input class="dd-tcg-hold-id" type="text" value="' + esc(entry.cardId || '') + '" placeholder="V034"></td>' +
+          '<td><input class="dd-tcg-hold-psa" type="number" min="1" max="10" step="1" value="' + esc(entry.psaGrade != null ? entry.psaGrade : '') + '" placeholder="10"></td>' +
+          '<td><input class="dd-tcg-hold-note" type="text" value="' + esc(entry.note || '') + '" placeholder="PSA 10 Web"></td>' +
+          '<td><button type="button" class="btn-outline dd-settings-remove" data-remove-tcg-holding-index="' + index + '">Remove</button></td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function collectDdTcgHoldings(includeDrafts){
+      var rows = [];
+      if(!ddTcgHoldingTbody) return rows;
+      ddTcgHoldingTbody.querySelectorAll('tr[data-tcg-holding-index]').forEach(function(row){
+        var cardName = String((row.querySelector('.dd-tcg-hold-card') || {}).value || '').trim();
+        var cardId = String((row.querySelector('.dd-tcg-hold-id') || {}).value || '').trim();
+        var handle = String((row.querySelector('.dd-tcg-hold-handle') || {}).value || '').trim().replace(/^@+/, '');
+        var wallet = String((row.querySelector('.dd-tcg-hold-wallet') || {}).value || '').trim();
+        var psa = Number((row.querySelector('.dd-tcg-hold-psa') || {}).value || '');
+        var entry = {
+          handle: handle || null,
+          wallet: wallet || null,
+          cardName: cardName,
+          cardId: cardId,
+          psaGrade: Number.isInteger(psa) && psa >= 1 && psa <= 10 ? psa : null,
+          note: String((row.querySelector('.dd-tcg-hold-note') || {}).value || '').trim() || null
+        };
+        if(includeDrafts || ((cardName || cardId) && (handle || wallet))) rows.push(entry);
+      });
+      return rows;
+    }
+
+    function renderDdTcgFromDashboard(data){
+      var src = data || ddDashboardData || {};
+      var cfg = src.config || {};
+      renderDdTcgInspirations(src.tcgInspirationEntries || cfg.tcgInspirations || []);
+      renderDdTcgHoldings(src.tcgCardHoldingEntries || cfg.tcgCardHoldings || []);
+    }
+
+    function uploadOfficialLoreMedia(row, file){
+      if(!row || !file) return;
+      if(!ensureDdAdminPassword()){
+        showDdStatus('DD admin password is required to upload lore media.', 'error');
+        return;
+      }
+      var dogInput = row.querySelector('.dd-official-lore-inscription');
+      var dogNumber = Number(dogInput && dogInput.value);
+      if(!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000){
+        showDdStatus('Set a valid inscription number before uploading media.', 'error');
+        return;
+      }
+      if(file.size > 2.5 * 1024 * 1024){
+        showDdStatus('Image must be 2.5 MB or smaller.', 'error');
+        return;
+      }
+      showDdStatus('Uploading lore media…');
+      var reader = new FileReader();
+      reader.onload = function(){
+        var result = String(reader.result || '');
+        var comma = result.indexOf(',');
+        var dataBase64 = comma >= 0 ? result.slice(comma + 1) : result;
+        var contentType = file.type || 'image/png';
+        var payload = JSON.stringify({
+          dogNumber: dogNumber,
+          contentType: contentType,
+          dataBase64: dataBase64
+        });
+        function handleUploadResponse(res, text){
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch(eParse){}
+          if(!res.ok || !data.imageUrl){
+            showDdStatus((data && data.error) ? data.error : 'Failed to upload lore media.', 'error');
+            return false;
+          }
+          row.setAttribute('data-image-url', String(data.imageUrl));
+          updateDdOfficialLoreRow(row);
+          showDdStatus('Lore media uploaded. Click Save DD Settings to persist it on this floor.', 'success');
+          return true;
+        }
+        fetch(loreMediaUploadUrl(), {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: payload
+        })
+          .then(function(res){
+            return res.text().then(function(text){ return { res: res, text: text }; });
+          })
+          .then(function(o){
+            if(handleUploadResponse(o.res, o.text)) return null;
+            return fetch(window.location.origin + '/api/dd-evaluator.php?action=admin-lore-media-upload', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
+              body: payload
+            }).then(function(res2){
+              return res2.text().then(function(text2){
+                handleUploadResponse(res2, text2);
+              });
+            });
+          })
+          .catch(function(){
+            showDdStatus('Failed to upload lore media.', 'error');
+          });
+      };
+      reader.onerror = function(){
+        showDdStatus('Could not read the selected file.', 'error');
+      };
+      reader.readAsDataURL(file);
+    }
+
     function renderDdEvaluationLog(rows){
       var entries = Array.isArray(rows) ? rows : [];
       if(entries.length === 0){
@@ -1572,10 +1932,8 @@
       function runDdImport(allowPrompt){
         fetch(evaluationImportUrl(), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-dd-admin-password': getDdRequestPassword()
-          },
+          credentials: 'same-origin',
+          headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             rawText: rawText,
             lookbackHours: lookbackHours,
@@ -1605,6 +1963,8 @@
             if(ddEvaluationClearBtn) ddEvaluationClearBtn.disabled = false;
             setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
             renderDdCommunityOffers((ddDashboardData && ddDashboardData.communityOffers) || []);
+            renderDdOfficialLore((ddDashboardData && ddDashboardData.officialLoreEntries) || []);
+            renderDdTcgFromDashboard(ddDashboardData);
             renderDdEvaluationLog((ddDashboardData && ddDashboardData.recentEvaluations) || []);
             renderDdTraits();
 
@@ -1651,10 +2011,8 @@
       function runDdClear(allowPrompt){
         fetch(evaluationClearUrl(), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-dd-admin-password': getDdRequestPassword()
-          },
+          credentials: 'same-origin',
+          headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             source: 'kushmedia-backfill'
           })
@@ -1683,6 +2041,8 @@
             if(ddEvaluationImportInput) ddEvaluationImportInput.value = '';
             setDdDashboardData((data && data.dashboard) || ddDashboardData, data && data.saveEnabled);
             renderDdCommunityOffers((ddDashboardData && ddDashboardData.communityOffers) || []);
+            renderDdOfficialLore((ddDashboardData && ddDashboardData.officialLoreEntries) || []);
+            renderDdTcgFromDashboard(ddDashboardData);
             renderDdEvaluationLog((ddDashboardData && ddDashboardData.recentEvaluations) || []);
             renderDdTraits();
 
@@ -1798,10 +2158,11 @@
       var snapshot = ddDashboardData && ddDashboardData.snapshot ? ddDashboardData.snapshot : {};
       var updatedAt = ddDashboardData && ddDashboardData.config ? ddDashboardData.config.updatedAt : null;
       var communityCount = ddDashboardData && Array.isArray(ddDashboardData.communityOffers) ? ddDashboardData.communityOffers.length : 0;
+      var officialLoreCount = ddDashboardData && Array.isArray(ddDashboardData.officialLoreEntries) ? ddDashboardData.officialLoreEntries.length : 0;
       var evaluationCount = ddDashboardData && Array.isArray(ddDashboardData.recentEvaluations) ? ddDashboardData.recentEvaluations.length : 0;
       var trendingCount = ddDashboardData && Array.isArray(ddDashboardData.trendingTraits) ? ddDashboardData.trendingTraits.length : 0;
       var baseSignalCount = ddDashboardData && Array.isArray(ddDashboardData.basePriceTraits) ? ddDashboardData.basePriceTraits.length : 0;
-      ddSettingsMeta.textContent = 'Traits: ' + fmt(sorted.length) + ' shown of ' + fmt(rows.length) + ' · Trending subset ' + fmt(trendingCount) + ' · Base signals ' + fmt(baseSignalCount) + ' · Refused offers ' + fmt(communityCount) + ' · Imported evals ' + fmt(evaluationCount) + ' · Snapshot ' + (snapshot.builtAt ? formatDate(snapshot.builtAt) : 'pending') + ' · DOGE/USD ' + (snapshot.dogeUsd != null ? '$' + Number(snapshot.dogeUsd).toFixed(4) : 'pending') + (updatedAt ? ' · Last saved ' + formatDate(updatedAt) : '');
+      ddSettingsMeta.textContent = 'Traits: ' + fmt(sorted.length) + ' shown of ' + fmt(rows.length) + ' · Trending subset ' + fmt(trendingCount) + ' · Base signals ' + fmt(baseSignalCount) + ' · Refused offers ' + fmt(communityCount) + ' · Official lore ' + fmt(officialLoreCount) + ' · Imported evals ' + fmt(evaluationCount) + ' · Snapshot ' + (snapshot.builtAt ? formatDate(snapshot.builtAt) : 'pending') + ' · DOGE/USD ' + (snapshot.dogeUsd != null ? '$' + Number(snapshot.dogeUsd).toFixed(4) : 'pending') + (updatedAt ? ' · Last saved ' + formatDate(updatedAt) : '');
       ddSaveBtn.disabled = !saveEnabled;
       if(ddEvaluationImportBtn) ddEvaluationImportBtn.disabled = !saveEnabled;
       if(ddEvaluationImportFileBtn) ddEvaluationImportFileBtn.disabled = !saveEnabled;
@@ -1858,13 +2219,12 @@
       function runDdTraitSave(allowPrompt){
         fetch(settingsUrl(), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-dd-admin-password': getDdRequestPassword()
-          },
+          credentials: 'same-origin',
+          headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             manualMultipliers: nextManualMultipliers,
             refusedOffers: ddDashboardData && ddDashboardData.config && ddDashboardData.config.refusedOffers ? ddDashboardData.config.refusedOffers : {},
+            officialLore: ddDashboardData && ddDashboardData.config && ddDashboardData.config.officialLore ? ddDashboardData.config.officialLore : {},
             autoTrend: ddDashboardData && ddDashboardData.config && ddDashboardData.config.autoTrend ? ddDashboardData.config.autoTrend : collectDdAutoTrend(),
             updatedBy: 'admin.html:trait-row'
           })
@@ -1930,13 +2290,12 @@
       function runDdAutoTrendSave(allowPrompt){
         fetch(settingsUrl(), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-dd-admin-password': getDdRequestPassword()
-          },
+          credentials: 'same-origin',
+          headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             manualMultipliers: buildDdSavedManualMultipliers(),
             refusedOffers: ddDashboardData && ddDashboardData.config && ddDashboardData.config.refusedOffers ? ddDashboardData.config.refusedOffers : {},
+            officialLore: ddDashboardData && ddDashboardData.config && ddDashboardData.config.officialLore ? ddDashboardData.config.officialLore : {},
             autoTrend: nextAutoTrend,
             updatedBy: 'admin.html:auto-trend'
           })
@@ -1987,32 +2346,55 @@
     function loadDdSettings(){
       showDdStatus('Loading DD evaluator dashboard…');
       ddReloadBtn.disabled = true;
-      fetch(settingsUrl())
-        .then(function(r){ return r.json(); })
-        .then(function(data){
-          ddReloadBtn.disabled = false;
-          if(data.error){
-            showDdStatus(data.error, 'error');
-            ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">DD dashboard is unavailable.</td></tr>';
-            if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Base price signals are unavailable.</td></tr>';
-            return;
-          }
-          setDdDashboardData(data, data.saveEnabled);
-          syncDdManualMultiplierDrafts();
-          applyDdConfigToForm(data.config || {});
-          renderDdCommunityOffers(Array.isArray(data.communityOffers) ? data.communityOffers : []);
-          renderDdEvaluationLog(Array.isArray(data.recentEvaluations) ? data.recentEvaluations : []);
-          showDdStatus(data.saveEnabled ? 'DD dashboard ready. Edit a trait row to reveal its Save button, or use Ignore Auto to suppress a falsely trending trait.' : 'DD dashboard ready in read-only mode. Configure DD_ADMIN_PASSWORD to enable saving.', data.saveEnabled ? 'success' : 'error');
-          renderDdTraits();
+
+      function runLoad(allowPrompt){
+        fetch(settingsUrl(), {
+          credentials: 'same-origin',
+          headers: ddAuthHeaders()
         })
-        .catch(function(){
-          ddReloadBtn.disabled = false;
-          showDdStatus('Failed to load DD evaluator dashboard.', 'error');
-          ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">DD dashboard failed to load.</td></tr>';
-          if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Base price signals failed to load.</td></tr>';
-          ddCommunityOfferTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Community offer data failed to load.</td></tr>';
-          ddEvaluationLogTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Evaluation log failed to load.</td></tr>';
-        });
+          .then(function(r){ return r.json().then(function(data){ return { ok: r.ok, status: r.status, data: data || {} }; }); })
+          .then(function(result){
+            var data = result.data;
+            if(!result.ok || data.error){
+              if(allowPrompt && (result.status === 401 || isInvalidDdPasswordError(data.error))){
+                ddAdminPassword = '';
+                if(promptForDdAdminPassword()){
+                  showDdStatus('Retrying DD dashboard load with the DD admin password…');
+                  runLoad(false);
+                  return;
+                }
+              }
+              ddReloadBtn.disabled = false;
+              showDdStatus(data.error || 'DD dashboard is unavailable.', 'error');
+              ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">DD dashboard is unavailable.</td></tr>';
+              if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Base price signals are unavailable.</td></tr>';
+              return;
+            }
+            ddReloadBtn.disabled = false;
+            setDdDashboardData(data, data.saveEnabled);
+            syncDdManualMultiplierDrafts();
+            applyDdConfigToForm(data.config || {});
+            renderDdCommunityOffers(Array.isArray(data.communityOffers) ? data.communityOffers : []);
+            renderDdOfficialLore(Array.isArray(data.officialLoreEntries) ? data.officialLoreEntries : []);
+            renderDdTcgFromDashboard(data);
+            renderDdEvaluationLog(Array.isArray(data.recentEvaluations) ? data.recentEvaluations : []);
+            showDdStatus(data.saveEnabled ? 'DD dashboard ready. Edit a trait row to reveal its Save button, or use Ignore Auto to suppress a falsely trending trait.' : 'DD dashboard ready in read-only mode. Configure DD_ADMIN_PASSWORD to enable saving.', data.saveEnabled ? 'success' : 'error');
+            renderDdTraits();
+          })
+          .catch(function(){
+            ddReloadBtn.disabled = false;
+            showDdStatus('Failed to load DD evaluator dashboard.', 'error');
+            ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">DD dashboard failed to load.</td></tr>';
+            if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Base price signals failed to load.</td></tr>';
+            ddCommunityOfferTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Community offer data failed to load.</td></tr>';
+            if(ddOfficialLoreTbody) ddOfficialLoreTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Official lore data failed to load.</td></tr>';
+            if(ddTcgInspirationTbody) ddTcgInspirationTbody.innerHTML = '<tr><td colspan="8" class="dd-settings-small">TCG inspiration data failed to load.</td></tr>';
+            if(ddTcgHoldingTbody) ddTcgHoldingTbody.innerHTML = '<tr><td colspan="7" class="dd-settings-small">TCG holding data failed to load.</td></tr>';
+            ddEvaluationLogTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Evaluation log failed to load.</td></tr>';
+          });
+      }
+
+      runLoad(true);
     }
 
     function saveDdSettings(){
@@ -2031,13 +2413,14 @@
       function runDdSave(allowPrompt){
         fetch(settingsUrl(), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-dd-admin-password': getDdRequestPassword()
-          },
+          credentials: 'same-origin',
+          headers: ddAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             manualMultipliers: collectDdManualMultipliers(),
             refusedOffers: collectDdRefusedOffers(),
+            officialLore: collectDdOfficialLore(),
+            tcgInspirations: collectDdTcgInspirations(),
+            tcgCardHoldings: collectDdTcgHoldings(),
             autoTrend: collectDdAutoTrend(),
             specialMultipliers: collectSpecialMultipliers(),
             updatedBy: 'admin.html'
@@ -2063,6 +2446,8 @@
             syncDdManualMultiplierDrafts();
             applyDdConfigToForm((data.dashboard && data.dashboard.config) || {});
             renderDdCommunityOffers((data.dashboard && data.dashboard.communityOffers) || []);
+            renderDdOfficialLore((data.dashboard && data.dashboard.officialLoreEntries) || []);
+            renderDdTcgFromDashboard(data.dashboard);
             renderDdEvaluationLog((data.dashboard && data.dashboard.recentEvaluations) || []);
             renderDdTraits();
             showDdStatus('DD evaluator settings saved. New evaluations will use the updated multipliers.', 'success');
@@ -2076,259 +2461,12 @@
       runDdSave(true);
     }
 
-    function openModal(b){b.setAttribute('aria-hidden','false');document.body.classList.add('modal-open');}
-    function closeModalEl(b){b.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open');}
-
-    /* ---- Login ---- */
-    loginForm.addEventListener('submit', function(e){
-      e.preventDefault();
-      loginError.hidden = true;
-      loginBtn.disabled = true;
-      loginBtn.textContent = 'Logging in\u2026';
-
-      var pw = document.getElementById('adminPw').value;
-      var url = SCRIPT_URL + '?action=admin-login&password=' + encodeURIComponent(pw);
-
-      fetch(url)
-        .then(function(r){ return r.json(); })
-        .then(function(data){
-          loginBtn.disabled = false;
-          loginBtn.textContent = 'Log In \u2192';
-          if(data.error){
-            loginError.textContent = data.error;
-            loginError.hidden = false;
-            return;
-          }
-          password = pw;
-          loginPanel.hidden = true;
-          dashboard.hidden = false;
-          loadOrders();
-          loadDdSettings();
-        })
-        .catch(function(){
-          loginBtn.disabled = false;
-          loginBtn.textContent = 'Log In \u2192';
-          loginError.textContent = 'Could not reach server. Try again later.';
-          loginError.hidden = false;
-        });
-    });
-
     /* ---- Logout ---- */
-    logoutBtn.addEventListener('click', function(){
-      password = '';
+    if(logoutBtn) logoutBtn.addEventListener('click', function(){
       ddAdminPassword = '';
-      ddDashboardData = null;
-      setDdActivePanel('controls');
-      ddActiveCategoryFilter = 'all';
-      ddTraitViewFilter = 'all';
-      ddActiveBaseCategoryFilter = 'all';
-      document.querySelectorAll('#ddTraitCatFilters .dd-cat-chip').forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-dd-cat') === 'all'); });
-      document.querySelectorAll('#ddTraitViewFilters .dd-cat-chip').forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-dd-trait-view') === 'all'); });
-      dashboard.hidden = true;
-      loginPanel.hidden = false;
-      document.getElementById('adminPw').value = '';
-      if(ddEvaluationImportInput) ddEvaluationImportInput.value = '';
-      if(ddEvaluationImportHours) ddEvaluationImportHours.value = 48;
-      if(ddEvaluationImportFile) ddEvaluationImportFile.value = '';
-      ddTraitTbody.innerHTML = '<tr><td colspan="11" class="dd-settings-small">Log in to view DD evaluator settings.</td></tr>';
-      if(ddBasePriceTraitTbody) ddBasePriceTraitTbody.innerHTML = '<tr><td colspan="10" class="dd-settings-small">Log in to view base price signals.</td></tr>';
-      ddCommunityOfferTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Log in to manage refused community offers.</td></tr>';
-      ddEvaluationLogTbody.innerHTML = '<tr><td colspan="6" class="dd-settings-small">Log in to view recent inscription evaluations.</td></tr>';
-      ddSettingsMeta.textContent = 'Sign in to load live trend and sales data.';
-      if(ddBasePriceTraitMeta) ddBasePriceTraitMeta.textContent = 'Sign in to load base price signals.';
-      showDdStatus('', '');
-      showDdEvaluationImportStatus('', '');
-    });
-
-    /* ---- Load orders ---- */
-    function loadOrders(){
-      ordersLoading.hidden = false;
-      ordersEmpty.hidden = true;
-      ordersTable.hidden = true;
-
-      var url = SCRIPT_URL + '?action=admin-list&password=' + encodeURIComponent(password);
-      fetch(url)
-        .then(function(r){ return r.json(); })
-        .then(function(data){
-          ordersLoading.hidden = true;
-          if(data.error){
-            ordersEmpty.textContent = data.error;
-            ordersEmpty.hidden = false;
-            return;
-          }
-          allOrders = data.orders || [];
-          renderOrders();
-        })
-        .catch(function(){
-          ordersLoading.hidden = true;
-          ordersEmpty.textContent = 'Failed to load orders.';
-          ordersEmpty.hidden = false;
-        });
-    }
-
-    /* ---- Render orders ---- */
-    function renderOrders(){
-      var filtered = allOrders;
-      if(currentFilter !== 'all'){
-        filtered = allOrders.filter(function(o){
-          return (o.status || 'Pending') === currentFilter;
-        });
-      }
-
-      if(filtered.length === 0){
-        ordersTable.hidden = true;
-        ordersEmpty.textContent = 'No orders found.';
-        ordersEmpty.hidden = false;
-        return;
-      }
-
-      ordersEmpty.hidden = true;
-      ordersTable.hidden = false;
-
-      // Sort newest first
-      filtered.sort(function(a,b){
-        return new Date(b.timestamp) - new Date(a.timestamp);
-      });
-
-      var html = '';
-      filtered.forEach(function(o){
-        var status = o.status || 'Pending';
-        var paid = (o.paymentConfirmed || 'No').toLowerCase() === 'yes';
-        html += '<tr data-orderid="' + esc(o.orderId) + '">';
-        html += '<td class="admin-cell-id" data-label="Order ID">' + esc(o.orderId) + '</td>';
-        html += '<td data-label="Date">' + esc(formatDate(o.timestamp)) + '</td>';
-        html += '<td data-label="Customer">' + esc(o.name) + '</td>';
-        html += '<td data-label="Service">' + esc(formatService(o.service)) + '</td>';
-        html += '<td data-label="Payment">' + esc(o.payment || '') + '</td>';
-        html += '<td data-label="Status">';
-        html += '<select class="admin-status-select" data-orderid="' + esc(o.orderId) + '">';
-        ['Pending','In Progress','Complete'].forEach(function(s){
-          html += '<option value="' + s + '"' + (s === status ? ' selected' : '') + '>' + s + '</option>';
-        });
-        html += '</select>';
-        html += '</td>';
-        html += '<td data-label="Paid">';
-        html += '<label class="admin-paid-label">';
-        html += '<input type="checkbox" class="admin-paid-check" data-orderid="' + esc(o.orderId) + '"' + (paid ? ' checked' : '') + '>';
-        html += '<span class="admin-paid-indicator ' + (paid ? 'paid-yes' : '') + '">' + (paid ? '\u2713' : '\u2717') + '</span>';
-        html += '</label>';
-        html += '</td>';
-        html += '<td data-label=""><button type="button" class="btn-outline admin-detail-btn" data-orderid="' + esc(o.orderId) + '">Details</button></td>';
-        html += '</tr>';
-      });
-
-      ordersTbody.innerHTML = html;
-
-      // Attach status change listeners
-      ordersTbody.querySelectorAll('.admin-status-select').forEach(function(sel){
-        sel.addEventListener('change', function(){
-          updateOrder(sel.getAttribute('data-orderid'), 'status', sel.value);
-        });
-      });
-
-      // Attach payment confirmed listeners
-      ordersTbody.querySelectorAll('.admin-paid-check').forEach(function(chk){
-        chk.addEventListener('change', function(){
-          var val = chk.checked ? 'Yes' : 'No';
-          var indicator = chk.nextElementSibling;
-          indicator.textContent = chk.checked ? '\u2713' : '\u2717';
-          indicator.classList.toggle('paid-yes', chk.checked);
-          updateOrder(chk.getAttribute('data-orderid'), 'paymentConfirmed', val);
-        });
-      });
-
-      // Attach detail buttons
-      ordersTbody.querySelectorAll('.admin-detail-btn').forEach(function(btn){
-        btn.addEventListener('click', function(){
-          showDetail(btn.getAttribute('data-orderid'));
-        });
-      });
-    }
-
-    /* ---- Update order ---- */
-    function updateOrder(orderId, field, value){
-      var url = SCRIPT_URL + '?action=admin-update&password=' + encodeURIComponent(password)
-        + '&orderId=' + encodeURIComponent(orderId)
-        + '&' + field + '=' + encodeURIComponent(value);
-
-      fetch(url)
-        .then(function(r){ return r.json(); })
-        .then(function(data){
-          if(data.error){
-            alert('Update failed: ' + data.error);
-            loadOrders();
-            return;
-          }
-          // Update local cache
-          allOrders.forEach(function(o){
-            if(o.orderId === orderId){
-              o[field] = value;
-            }
-          });
-        })
-        .catch(function(){
-          alert('Could not reach server. Try again.');
-          loadOrders();
-        });
-    }
-
-    /* ---- Show detail modal ---- */
-    function showDetail(orderId){
-      var order = null;
-      for(var i = 0; i < allOrders.length; i++){
-        if(allOrders[i].orderId === orderId){ order = allOrders[i]; break; }
-      }
-      if(!order) return;
-
-      detailTitle.textContent = 'Order: ' + order.orderId;
-
-      var html = '';
-      html += '<div class="order-result">';
-      html += row('Order ID', order.orderId);
-      html += row('Date', formatDate(order.timestamp));
-      html += row('Customer', order.name);
-      html += row('Email', order.email);
-      html += row('Service', formatService(order.service));
-      html += row('Payment Method', order.payment || '');
-      html += row('Status', '<span class="status-badge ' + badgeClass(order.status) + '">' + esc(order.status || 'Pending') + '</span>');
-      html += row('Payment Confirmed', (order.paymentConfirmed || 'No').toLowerCase() === 'yes'
-        ? '<span class="status-badge complete">Confirmed</span>'
-        : '<span class="status-badge pending">Awaiting</span>');
-
-      if(order.notes){
-        html += row('Notes', order.notes);
-      }
-
-      // Parse details
-      var details = {};
-      try { details = typeof order.details === 'string' ? JSON.parse(order.details) : (order.details || {}); } catch(e){}
-      for(var key in details){
-        if(details.hasOwnProperty(key)){
-          var label = key.replace(/_/g,' ').replace(/\b\w/g, function(c){return c.toUpperCase();});
-          html += row(label, details[key]);
-        }
-      }
-
-      html += '</div>';
-      detailContent.innerHTML = html;
-      openModal(detailBg);
-    }
-
-    function row(label, value){
-      return '<div class="order-result-row"><span>' + esc(label) + '</span><span>' + (
-        // If value contains HTML tags (badges), use as-is; otherwise escape
-        (typeof value === 'string' && value.indexOf('<span') === 0) ? value : esc(value)
-      ) + '</span></div>';
-    }
-
-    /* ---- Filters ---- */
-    document.querySelectorAll('.admin-filter-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        document.querySelectorAll('.admin-filter-btn').forEach(function(b){ b.classList.remove('active'); });
-        btn.classList.add('active');
-        currentFilter = btn.getAttribute('data-filter');
-        renderOrders();
-      });
+      var tp = document.getElementById('traitPw');
+      if(tp) tp.value = '';
+      window.location.replace('/');
     });
 
     ddPanelButtons.forEach(function(button){
@@ -2457,12 +2595,69 @@
         return index >= 0;
       }));
     });
+    if(ddAddOfficialLoreBtn) ddAddOfficialLoreBtn.addEventListener('click', function(){
+      var rows = collectDdOfficialLoreRows(true);
+      rows.push({ dogNumber: null, minOfferUsd: null, note: '', imageUrl: null, customImageUrl: null, updatedAt: null, updatedBy: null });
+      renderDdOfficialLore(rows);
+    });
+    if(ddOfficialLoreTbody) ddOfficialLoreTbody.addEventListener('input', function(event){
+      updateDdOfficialLoreRow(event.target.closest('tr[data-official-lore-index]'));
+    });
+    if(ddOfficialLoreTbody) ddOfficialLoreTbody.addEventListener('change', function(event){
+      var fileInput = event.target.closest('.dd-official-lore-file');
+      if(!fileInput || !fileInput.files || !fileInput.files[0]) return;
+      var row = fileInput.closest('tr[data-official-lore-index]');
+      uploadOfficialLoreMedia(row, fileInput.files[0]);
+      fileInput.value = '';
+    });
+    if(ddOfficialLoreTbody) ddOfficialLoreTbody.addEventListener('click', function(event){
+      var uploadBtn = event.target.closest('.dd-official-lore-upload');
+      if(uploadBtn){
+        var uploadRow = uploadBtn.closest('tr[data-official-lore-index]');
+        var fileInput = uploadRow && uploadRow.querySelector('.dd-official-lore-file');
+        if(fileInput) fileInput.click();
+        return;
+      }
+      var clearBtn = event.target.closest('.dd-official-lore-clear-media');
+      if(clearBtn){
+        var clearRow = clearBtn.closest('tr[data-official-lore-index]');
+        if(clearRow){
+          clearRow.setAttribute('data-image-url', '');
+          updateDdOfficialLoreRow(clearRow);
+          showDdStatus('Cleared custom lore media for this row. Save DD Settings to persist.', 'success');
+        }
+        return;
+      }
+      var removeBtn = event.target.closest('[data-remove-official-lore-index]');
+      if(!removeBtn) return;
+      var rows = collectDdOfficialLoreRows(true);
+      rows.splice(Number(removeBtn.getAttribute('data-remove-official-lore-index')), 1);
+      renderDdOfficialLore(rows);
+    });
 
-    /* ---- Modal close ---- */
-    if(detailClose) detailClose.addEventListener('click', function(){ closeModalEl(detailBg); });
-    if(detailBg) detailBg.addEventListener('click', function(e){ if(e.target===detailBg) closeModalEl(detailBg); });
-    document.addEventListener('keydown', function(e){
-      if(e.key==='Escape' && detailBg.getAttribute('aria-hidden')==='false') closeModalEl(detailBg);
+    if(ddAddTcgInspirationBtn) ddAddTcgInspirationBtn.addEventListener('click', function(){
+      var rows = collectDdTcgInspirations(true);
+      rows.push({ dogNumber: null, cardName: '', cardId: '', brandedHandle: '', brandedWallets: [], note: '' });
+      renderDdTcgInspirations(rows);
+    });
+    if(ddTcgInspirationTbody) ddTcgInspirationTbody.addEventListener('click', function(event){
+      var removeBtn = event.target.closest('[data-remove-tcg-inspiration-index]');
+      if(!removeBtn) return;
+      var rows = collectDdTcgInspirations(true);
+      rows.splice(Number(removeBtn.getAttribute('data-remove-tcg-inspiration-index')), 1);
+      renderDdTcgInspirations(rows);
+    });
+    if(ddAddTcgHoldingBtn) ddAddTcgHoldingBtn.addEventListener('click', function(){
+      var rows = collectDdTcgHoldings(true);
+      rows.push({ handle: '', wallet: '', cardName: '', cardId: '', psaGrade: 10, note: '' });
+      renderDdTcgHoldings(rows);
+    });
+    if(ddTcgHoldingTbody) ddTcgHoldingTbody.addEventListener('click', function(event){
+      var removeBtn = event.target.closest('[data-remove-tcg-holding-index]');
+      if(!removeBtn) return;
+      var rows = collectDdTcgHoldings(true);
+      rows.splice(Number(removeBtn.getAttribute('data-remove-tcg-holding-index')), 1);
+      renderDdTcgHoldings(rows);
     });
 
     /* ---- Community suggestions queue (DD admin API) ---- */
@@ -2483,9 +2678,7 @@
     var clLorePendingTbody = document.getElementById('clLorePendingTbody');
 
     function getCsAdminPassword(){
-      var a = traitPwEl ? String(traitPwEl.value || '').trim() : '';
-      if(a) return a;
-      return String(ddAdminPassword || '').trim();
+      return getDdRequestPassword();
     }
 
     if(traitPwEl){
@@ -2496,11 +2689,9 @@
     }
 
     function csAuthHeaders(){
-      return {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'x-dd-admin-password': getCsAdminPassword()
-      };
+      return ddAuthHeaders({
+        'Content-Type': 'application/json'
+      });
     }
 
     function appendClLoreRow(dog, lore, isDraft, loreMultiplier){
@@ -2613,10 +2804,6 @@
 
     function clReviewPending(id, actionName){
       if(clLoreMsg){ clLoreMsg.textContent = ''; clLoreMsg.className = 'cs-queue-msg'; }
-      if(!getCsAdminPassword()){
-        if(clLoreMsg){ clLoreMsg.textContent = 'Enter the DD admin password (Suggestions queue field or DD save prompt).'; clLoreMsg.classList.add('err'); }
-        return;
-      }
       fetch(suggestionApiBase + '/admin/suggestions/' + encodeURIComponent(id) + '/review', {
         method: 'POST',
         headers: csAuthHeaders(),
@@ -2667,12 +2854,6 @@
 
     function loadCommunityLoreTable(){
       if(clLoreMsg){ clLoreMsg.textContent = ''; clLoreMsg.className = 'cs-queue-msg'; }
-      if(!getCsAdminPassword()){
-        if(clLoreMsg){ clLoreMsg.textContent = 'Enter the DD admin password (Suggestions queue field or DD save prompt).'; clLoreMsg.classList.add('err'); }
-        if(clLoreTableWrap) clLoreTableWrap.hidden = true;
-        if(clLorePendingWrap) clLorePendingWrap.hidden = true;
-        return;
-      }
       fetch(suggestionApiBase + '/admin/community-notes/list', {
         method: 'GET',
         headers: csAuthHeaders(),
@@ -2737,11 +2918,6 @@
       if(!tr || !clLoreMsg) return;
       clLoreMsg.textContent = '';
       clLoreMsg.className = 'cs-queue-msg';
-      if(!getCsAdminPassword()){
-        clLoreMsg.textContent = 'Enter the DD admin password.';
-        clLoreMsg.classList.add('err');
-        return;
-      }
       var inp = tr.querySelector('.dd-lore-dog');
       var ta = tr.querySelector('.dd-lore-textarea');
       var n = parseInt(String(inp && inp.value || '').replace(/[^0-9]/g, ''), 10);
@@ -2811,11 +2987,6 @@
       if(!window.confirm('Remove published lore for dog #' + n + '?')) return;
       clLoreMsg.textContent = '';
       clLoreMsg.className = 'cs-queue-msg';
-      if(!getCsAdminPassword()){
-        clLoreMsg.textContent = 'Enter the DD admin password.';
-        clLoreMsg.classList.add('err');
-        return;
-      }
       fetch(suggestionApiBase + '/admin/community-notes/delete', {
         method: 'POST',
         headers: csAuthHeaders(),
@@ -2844,14 +3015,6 @@
 
     if(clLoreLoadBtn) clLoreLoadBtn.addEventListener('click', loadCommunityLoreTable);
     if(clLoreAddBtn) clLoreAddBtn.addEventListener('click', function(){
-      if(!getCsAdminPassword()){
-        if(clLoreMsg){
-          clLoreMsg.textContent = 'Enter the DD admin password first.';
-          clLoreMsg.className = 'cs-queue-msg';
-          clLoreMsg.classList.add('err');
-        }
-        return;
-      }
       if(clLoreTableWrap) clLoreTableWrap.hidden = false;
       appendClLoreRow(0, '', true);
       if(clLoreMsg){ clLoreMsg.textContent = ''; clLoreMsg.className = 'cs-queue-msg'; }
@@ -2873,11 +3036,6 @@
     function csReview(id, actionName){
       queueMsg.textContent = '';
       queueMsg.className = 'cs-queue-msg';
-      if(!getCsAdminPassword()){
-        queueMsg.textContent = 'Enter the DD admin password (field above or DD save prompt).';
-        queueMsg.classList.add('err');
-        return;
-      }
       fetch(suggestionApiBase + '/admin/suggestions/' + encodeURIComponent(id) + '/review', {
         method: 'POST',
         headers: csAuthHeaders(),
@@ -2906,13 +3064,7 @@
         queueMsg.textContent = '';
         queueMsg.className = 'cs-queue-msg';
         if(queueMeta) queueMeta.textContent = '';
-        if(!getCsAdminPassword()){
-          queueMsg.textContent = 'Enter the DD admin password.';
-          queueMsg.classList.add('err');
-          if(queueTableWrap) queueTableWrap.hidden = true;
-          return;
-        }
-        fetch(suggestionApiBase + '/admin/suggestions?status=pending', { headers: csAuthHeaders() })
+        fetch(suggestionApiBase + '/admin/suggestions?status=pending', { credentials: 'same-origin', headers: csAuthHeaders() })
           .then(function(res){
             return res.text().then(function(text){
               var data = {};
@@ -2970,6 +3122,7 @@
     }
 
     setDdActivePanel(ddActivePanel);
+    loadDdSettings();
 
   })();
   </script>

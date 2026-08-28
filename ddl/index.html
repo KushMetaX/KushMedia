@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <title>DDL Companion — Rise of the Pack</title>
+  <link rel="icon" href="mascot.png" type="image/png">
+  <link rel="apple-touch-icon" href="mascot.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=peek4">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="brand">
+      <img class="mascot" src="mascot.png" alt="" width="64" height="64">
+      <div>
+        <p class="eyebrow">Rise of the Pack · 111 cards · Play V13</p>
+        <h1>DDL Companion</h1>
+        <p class="tagline">Look up a card, learn class matchups, then build a 40-card list with answers — not just a clock.</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Companion sections">
+      <button type="button" data-tab="cards" class="active">Cards</button>
+      <button type="button" data-tab="mechanics">How to play</button>
+      <button type="button" data-tab="decks">Decks</button>
+      <button type="button" data-tab="builder">My decks</button>
+      <button type="button" data-tab="prices">Prices</button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section id="view-cards" class="view active">
+      <header class="view-intro">
+        <h2>Find a card</h2>
+        <p>Search by name, rules text, or serial (like V034). Tap a card for the full picture and where it shows up.</p>
+      </header>
+      <div class="toolbar">
+        <label class="field grow">
+          <span>Search</span>
+          <input id="q" type="search" placeholder="Try Mary, Haunt, or V004">
+        </label>
+        <label class="field">
+          <span>Class</span>
+          <select id="f-class"></select>
+        </label>
+        <label class="field">
+          <span>Type</span>
+          <select id="f-type">
+            <option value="">Any type</option>
+            <option>Creature</option>
+            <option>Spell</option>
+            <option>Trap</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>When it fires</span>
+          <select id="f-pill">
+            <option value="">Any trigger</option>
+            <option>Play</option>
+            <option>Passive</option>
+            <option>Haunt</option>
+            <option>Trap</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Sort</span>
+          <select id="f-sort">
+            <option value="mana">Mana, then name</option>
+            <option value="name">Name</option>
+            <option value="class">Class</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="f-revealed">
+          <span>Only cards shown in the official gallery</span>
+        </label>
+      </div>
+      <div class="filter-row">
+        <div id="class-chips" class="chip-row" aria-label="Filter by class"></div>
+        <p class="meta" id="card-meta"></p>
+      </div>
+      <div id="card-grid" class="grid"></div>
+    </section>
+
+    <section id="view-mechanics" class="view"></section>
+
+    <section id="view-decks" class="view">
+      <header class="view-intro">
+        <h2>Ready-made 40-card lists</h2>
+        <p>Five one-class lists and ten two-class mixes, ranked by strength. Each list packs 4–7 traps unless it is a dedicated trap wall. Counters matter as much as the clock — live players hold Ambush, Frost Lock, and Typhoon. Paste your own on the <a href="#builder">My decks</a> tab.</p>
+      </header>
+      <div id="rank-table"></div>
+      <div class="toolbar">
+        <div class="kind-row" role="group" aria-label="List type">
+          <button type="button" class="kind-btn active" data-kind="all">All lists</button>
+          <button type="button" class="kind-btn" data-kind="mono">One class</button>
+          <button type="button" class="kind-btn" data-kind="mix">Two classes</button>
+        </div>
+        <label class="field">
+          <span>First class</span>
+          <select id="mix-a"></select>
+        </label>
+        <label class="field">
+          <span>Second class</span>
+          <select id="mix-b"></select>
+        </label>
+        <button type="button" id="mix-go" class="btn">Show this list</button>
+      </div>
+      <div class="build-shell">
+        <aside id="build-nav" class="build-nav"></aside>
+        <div>
+          <div id="build-panel"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-builder" class="view">
+      <header class="view-intro">
+        <h2>Build and rank your own 40</h2>
+        <p>Paste a list, pick cards, or generate a 40. Strength uses the same scoring as the featured decks — trap density, answers, engines, and finishers. Saved in this browser only.</p>
+      </header>
+      <div class="builder-tabs" role="tablist" aria-label="Builder mode">
+        <button type="button" class="kind-btn active" data-builder="edit">Input a list</button>
+        <button type="button" class="kind-btn" data-builder="cook">Generate a 40</button>
+      </div>
+      <div id="builder-edit" class="builder-mode">
+        <div class="build-shell builder-shell">
+          <aside class="build-nav">
+            <p class="nav-label">Saved lists</p>
+            <div id="custom-nav"></div>
+            <button type="button" class="btn" id="custom-new" style="margin-top:0.6rem">New list</button>
+          </aside>
+          <div>
+            <div class="cook-bar">
+              <label class="field grow">
+                <span>List name</span>
+                <input id="custom-name" type="text" maxlength="48" placeholder="My Haunt">
+              </label>
+              <label class="field">
+                <span>Hero class</span>
+                <select id="custom-class"></select>
+              </label>
+              <label class="field">
+                <span>Optional second class</span>
+                <select id="custom-class-2"></select>
+              </label>
+            </div>
+            <div id="custom-rank"></div>
+            <div class="btn-row">
+              <button type="button" class="btn" id="custom-save">Save list</button>
+              <button type="button" data-copy="custom-list">Copy decklist</button>
+              <button type="button" class="ghost" data-copy="custom-serials">Copy serials</button>
+              <button type="button" class="ghost" id="custom-delete">Delete</button>
+            </div>
+            <label class="field grow">
+              <span>Paste a list</span>
+              <textarea id="custom-paste" rows="3" placeholder="3x V004 Gary&#10;2 Ambush&#10;V106"></textarea>
+            </label>
+            <div class="btn-row">
+              <button type="button" class="btn" id="custom-parse">Add pasted cards</button>
+              <button type="button" class="ghost" id="custom-clear">Clear list</button>
+            </div>
+            <div class="builder-grid">
+              <div>
+                <label class="field grow">
+                  <span>Find a card</span>
+                  <input id="custom-q" type="search" placeholder="Ambush, V034, Haunt…">
+                </label>
+                <div id="custom-pool" class="pool"></div>
+              </div>
+              <div>
+                <h3 class="type-h" style="margin-top:0">Your 40</h3>
+                <div id="custom-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="builder-cook" class="builder-mode" hidden>
+        <div class="cook-bar">
+          <label class="field">
+            <span>Hero class</span>
+            <select id="cook-class"></select>
+          </label>
+          <label class="field">
+            <span>Optional second class</span>
+            <select id="cook-class-2"></select>
+          </label>
+          <label class="field">
+            <span>Playstyle</span>
+            <select id="cook-arch">
+              <option value="aggro">Fast — Haunt and tempo</option>
+              <option value="control">Slow — start-of-turn and answers</option>
+              <option value="midrange">Middle — Play-value creatures</option>
+              <option value="combo">Combo — traps and burn</option>
+            </select>
+          </label>
+          <button id="cook-btn" type="button" class="btn">Build 40</button>
+        </div>
+        <div id="cooked"></div>
+      </div>
+    </section>
+
+    <section id="view-prices" class="view"></section>
+  </main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" id="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div>
+  </div>
+
+  <footer>
+    <p>Public data from the official <a href="https://ddltcg.com/gallery">gallery</a> and <a href="https://ddltcg.com/play">Play client</a>. Fan tool — not affiliated with Doginal Dogs.</p>
+    <p id="scraped-at"></p>
+  </footer>
+
+  <script src="data/ddl.js"></script>
+  <script src="data/builds.js"></script>
+  <script src="data/classes.js"></script>
+  <script src="manual.js?v=peek4"></script>
+  <script src="app.js?v=peek4"></script>
+</body>
+</html>

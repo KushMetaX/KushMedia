@@ -1,11 +1,10 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const argon2 = require('argon2');
-const Database = require('better-sqlite3');
 const nodemailer = require('nodemailer');
 const { resolveSessionSecret: cookieSecret } = require('../session-secret');
 const cryptoPay = require('../lib/crypto-pay-provider');
@@ -25,21 +24,106 @@ function getDbPath() {
 }
 
 let dbInstance = null;
+let lastDbError = null;
+let openingDb = null;
+
+function loadArgon2() {
+	return require('argon2');
+}
+
+function openNativeDatabase(dbPath) {
+	let Database;
+	try {
+		Database = require('better-sqlite3');
+	} catch (err) {
+		throw new Error('load better-sqlite3: ' + (err && err.message ? err.message : err));
+	}
+	const database = new Database(dbPath, { timeout: 8000 });
+	database._engine = 'better-sqlite3';
+	try {
+		database.pragma('journal_mode = WAL');
+	} catch (_wal) {
+		database.pragma('journal_mode = DELETE');
+	}
+	return database;
+}
 
 function getDb() {
 	if (dbInstance) return dbInstance;
-	const secret = cookieSecret();
-	if (!secret) {
-		throw new Error('SESSION_SECRET');
+	lastDbError = null;
+	try {
+		const dbPath = getDbPath();
+		try {
+			fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+		} catch (err) {
+			throw new Error('data dir: ' + (err && err.message ? err.message : err));
+		}
+		let database;
+		try {
+			database = openNativeDatabase(dbPath);
+		} catch (err) {
+			throw new Error('open: ' + (err && err.message ? err.message : err));
+		}
+		try {
+			initSchema(database);
+		} catch (err) {
+			try { database.close(); } catch (_e) {}
+			throw new Error('schema: ' + (err && err.message ? err.message : err));
+		}
+		dbInstance = database;
+		return dbInstance;
+	} catch (err) {
+		lastDbError = String(err && err.message ? err.message : err);
+		throw err;
 	}
-	dbInstance = new Database(getDbPath());
-	dbInstance.pragma('journal_mode = WAL');
-	initSchema(dbInstance);
-	return dbInstance;
+}
+
+/** Native addon when it works; sql.js (no compiler) on CloudLinux/shared hosts. */
+function openAuthDatabase() {
+	if (dbInstance) return Promise.resolve(dbInstance);
+	if (openingDb) return openingDb;
+	openingDb = (async () => {
+		try {
+			return getDb();
+		} catch (nativeErr) {
+			const dbPath = getDbPath();
+			try {
+				fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+			} catch (err) {
+				throw new Error('data dir: ' + (err && err.message ? err.message : err));
+			}
+			let database;
+			try {
+				const { openSqlJsDatabase } = require('../lib/sqljs-database');
+				database = await openSqlJsDatabase(dbPath);
+			} catch (sqlErr) {
+				lastDbError = 'native: ' + (nativeErr && nativeErr.message ? nativeErr.message : nativeErr)
+					+ '; sql.js: ' + (sqlErr && sqlErr.message ? sqlErr.message : sqlErr);
+				throw new Error(lastDbError);
+			}
+			try {
+				initSchema(database);
+			} catch (err) {
+				try { database.close(); } catch (_e) {}
+				lastDbError = 'schema: ' + (err && err.message ? err.message : err);
+				throw new Error(lastDbError);
+			}
+			console.warn('[auth-dex] better-sqlite3 unavailable; using sql.js');
+			dbInstance = database;
+			lastDbError = null;
+			return dbInstance;
+		}
+	})().catch((err) => {
+		openingDb = null;
+		throw err;
+	});
+	return openingDb;
 }
 
 function initSchema(database) {
-	database.exec(`
+	recoverUsersV2IfNeeded(database);
+	try {
+		database.exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			email TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -70,7 +154,44 @@ function initSchema(database) {
 		);
 		CREATE INDEX IF NOT EXISTS idx_dex_user_time ON dex_entries(user_id, indexed_at DESC);
 	`);
+	} catch (err) {
+		console.error('[auth-dex] core schema:', err && err.message ? err.message : err);
+		throw err;
+	}
 	migrateDdSubscriptionSchema(database);
+	migrateOauthIdentity(database);
+	try {
+		require('../lib/tourney-records').ensureSchema(database);
+	} catch (err) {
+		console.error('[auth-dex] tourney schema:', err && err.message ? err.message : err);
+	}
+}
+
+/** If a previous nullable-email rebuild left `users_v2` behind, put the data back. */
+function recoverUsersV2IfNeeded(database) {
+	let names = [];
+	try {
+		names = database.prepare(
+			`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'users_v2')`
+		).all().map((row) => row.name);
+	} catch (_e) {
+		return;
+	}
+	try {
+		if (names.includes('users_v2') && !names.includes('users')) {
+			database.exec('ALTER TABLE users_v2 RENAME TO users');
+			return;
+		}
+		if (names.includes('users_v2') && names.includes('users')) {
+			const count = database.prepare('SELECT COUNT(*) AS n FROM users').get();
+			if (Number(count && count.n) === 0) {
+				database.exec('DROP TABLE users');
+				database.exec('ALTER TABLE users_v2 RENAME TO users');
+			}
+		}
+	} catch (err) {
+		console.error('[auth-dex] users_v2 recover:', err && err.message ? err.message : err);
+	}
 }
 
 /** Better-SQLite ALTER IF NOT EXISTS (SQLite has no ADD COLUMN IF NOT EXISTS). */
@@ -89,6 +210,7 @@ function migrateDdSubscriptionSchema(database) {
 			database.exec(`ALTER TABLE users ADD COLUMN ${paddleCols[i]} ${paddleTypes[i]};`);
 		} catch (_ePc) {}
 	}
+	try {
 	database.exec(`
 		CREATE TABLE IF NOT EXISTS stripe_subscriptions_by_email (
 			email TEXT PRIMARY KEY COLLATE NOCASE,
@@ -131,6 +253,189 @@ function migrateDdSubscriptionSchema(database) {
 		);
 	`);
 	database.exec(`CREATE INDEX IF NOT EXISTS idx_dd_crypto_email_ent ON dd_crypto_payments(email, entitlement_applied_at);`);
+	} catch (err) {
+		console.error('[auth-dex] billing schema:', err && err.message ? err.message : err);
+	}
+}
+
+/**
+ * Discord-only accounts cannot leave email/password NULL on the existing users
+ * table (those columns are NOT NULL). Do not rebuild that table on a live
+ * SQLite file — add columns and use placeholders instead.
+ */
+function migrateOauthIdentity(database) {
+	const extra = [
+		['discord_id', 'TEXT'],
+		['discord_username', 'TEXT'],
+		['avatar_url', 'TEXT'],
+		['tourney_handle', 'TEXT'],
+	];
+	for (const [name, type] of extra) {
+		try {
+			database.exec(`ALTER TABLE users ADD COLUMN ${name} ${type};`);
+		} catch (_e) {}
+	}
+	try {
+		database.exec(`
+			CREATE TABLE IF NOT EXISTS oauth_states (
+				id TEXT PRIMARY KEY,
+				created_at INTEGER NOT NULL,
+				return_to TEXT NOT NULL
+			);
+		`);
+	} catch (err) {
+		console.error('[auth-dex] oauth_states:', err && err.message ? err.message : err);
+	}
+	try {
+		database.exec('CREATE INDEX IF NOT EXISTS idx_oauth_states_created ON oauth_states(created_at);');
+	} catch (_eSt) {}
+	try {
+		database.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_discord_id ON users(discord_id) WHERE discord_id IS NOT NULL;');
+	} catch (_eIdx) {}
+	try {
+		database.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tourney_handle ON users(tourney_handle COLLATE NOCASE) WHERE tourney_handle IS NOT NULL AND tourney_handle != \'\';');
+	} catch (_eH) {}
+}
+
+function discordPlaceholderEmail(discordId) {
+	return `discord-${String(discordId)}@oauth.invalid`;
+}
+
+function isPlaceholderEmail(email) {
+	return /@oauth\.invalid$/i.test(String(email || ''));
+}
+
+function discordOAuthConfigured() {
+	return Boolean(String(process.env.DISCORD_CLIENT_ID || '').trim() && String(process.env.DISCORD_CLIENT_SECRET || '').trim());
+}
+
+function requestOrigin(req) {
+	const xfProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
+	const proto = xfProto || (req.secure ? 'https' : 'http');
+	const host = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
+	if (!host) return publicSiteOriginForBilling();
+	return `${proto}://${host}`;
+}
+
+function discordRedirectUri(req) {
+	const env = String(process.env.DISCORD_REDIRECT_URI || '').trim();
+	if (env) return env;
+	return `${requestOrigin(req)}/kmx-auth/discord/callback`;
+}
+
+function stripAuthErrorFromReturn(raw) {
+	let s = String(raw || '');
+	const hashIdx = s.indexOf('#');
+	if (hashIdx < 0) {
+		return s.replace(/([?&])auth_error=[^&]*/g, '$1').replace(/[?&]$/, '').replace(/\?&/, '?');
+	}
+	const pathOnly = s.slice(0, hashIdx);
+	let hash = s.slice(hashIdx);
+	const qIdx = hash.indexOf('?');
+	if (qIdx < 0) return s;
+	const hashPath = hash.slice(0, qIdx);
+	const params = new URLSearchParams(hash.slice(qIdx + 1));
+	params.delete('auth_error');
+	const qs = params.toString();
+	return pathOnly + hashPath + (qs ? `?${qs}` : '');
+}
+
+function safeReturnTo(raw) {
+	let s = stripAuthErrorFromReturn(String(raw || '/tourney/').trim());
+	if (!s.startsWith('/') || s.startsWith('//') || s.includes('://')) return '/tourney/';
+	if (s.length > 240) s = s.slice(0, 240);
+	return s;
+}
+
+function normalizeTourneyHandle(raw) {
+	const handle = String(raw || '').trim().replace(/\s+/g, ' ');
+	if (handle.length < 2 || handle.length > 24) return '';
+	return handle;
+}
+
+function suggestTourneyHandle(globalName, username) {
+	const cleaned = String(globalName || username || 'Player')
+		.trim()
+		.replace(/\s+/g, ' ')
+		.replace(/[^\w\s.\-]/g, '')
+		.slice(0, 24);
+	return normalizeTourneyHandle(cleaned) || normalizeTourneyHandle(String(username || 'Player').slice(0, 24)) || 'Player';
+}
+
+function defaultDiscordAvatarUrl(discordId, discriminator) {
+	const disc = String(discriminator == null ? '0' : discriminator);
+	let idx = 0;
+	if (disc && disc !== '0') {
+		idx = Number(disc) % 5;
+	} else {
+		try {
+			idx = Number((BigInt(String(discordId)) >> 22n) % 6n);
+		} catch (_e) {
+			idx = 0;
+		}
+	}
+	if (!Number.isFinite(idx) || idx < 0) idx = 0;
+	return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+}
+
+function discordAvatarUrl(discordUser) {
+	if (!discordUser || !discordUser.id) return '';
+	if (discordUser.avatar) {
+		const hash = String(discordUser.avatar);
+		const ext = hash.startsWith('a_') ? 'gif' : 'png';
+		return `https://cdn.discordapp.com/avatars/${discordUser.id}/${hash}.${ext}?size=64`;
+	}
+	return defaultDiscordAvatarUrl(discordUser.id, discordUser.discriminator);
+}
+
+function authUserPayload(row) {
+	if (!row) return null;
+	const email = String(row.email || '').trim();
+	let avatarUrl = String(row.avatar_url || '').trim() || null;
+	if (!avatarUrl && row.discord_id) {
+		avatarUrl = defaultDiscordAvatarUrl(row.discord_id, '0');
+	}
+	return {
+		id: Number(row.user_id != null ? row.user_id : row.id),
+		email: email && !isPlaceholderEmail(email) ? email : null,
+		discordId: row.discord_id || null,
+		discordUsername: row.discord_username || null,
+		tourneyHandle: row.tourney_handle || null,
+		avatarUrl,
+	};
+}
+
+function issueSession(database, res, userId) {
+	const sid = newSessionId();
+	const exp = Date.now() + SESSION_MAX_AGE_MS;
+	database.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)').run(sid, userId, exp);
+	setSessionCookie(res, sid);
+}
+
+function loadUserRow(database, userId) {
+	return database.prepare(
+		`SELECT id AS user_id, email, discord_id, discord_username, avatar_url, tourney_handle
+		 FROM users WHERE id = ?`
+	).get(userId);
+}
+
+function uniqueHandleOrNull(database, candidate, exceptUserId) {
+	let handle = normalizeTourneyHandle(candidate);
+	if (!handle) return null;
+	const taken = database.prepare(
+		'SELECT id FROM users WHERE tourney_handle = ? COLLATE NOCASE AND id != ?'
+	).get(handle, exceptUserId || 0);
+	if (!taken) return handle;
+	for (let i = 0; i < 8; i += 1) {
+		const suffix = String(Math.floor(10 + Math.random() * 90));
+		const next = normalizeTourneyHandle((handle.slice(0, 21) + suffix));
+		if (!next) continue;
+		const hit = database.prepare(
+			'SELECT id FROM users WHERE tourney_handle = ? COLLATE NOCASE AND id != ?'
+		).get(next, exceptUserId || 0);
+		if (!hit) return next;
+	}
+	return null;
 }
 
 function fiatMonthlyUsd() {
@@ -458,7 +763,9 @@ function getUserForSession(database, signedCookies) {
 	if (!sid || typeof sid !== 'string') return null;
 	cleanupExpiredSessions(database);
 	const row = database.prepare(
-		`SELECT u.id AS user_id, u.email AS email
+		`SELECT u.id AS user_id, u.email AS email,
+		        u.discord_id AS discord_id, u.discord_username AS discord_username,
+		        u.avatar_url AS avatar_url, u.tourney_handle AS tourney_handle
 		 FROM sessions s JOIN users u ON u.id = s.user_id
 		 WHERE s.id = ? AND s.expires_at > ?`
 	).get(sid, Date.now());
@@ -520,42 +827,235 @@ function authReady(req, res, next) {
 		res.status(503).json({ error: 'Authentication is not configured. Set SESSION_SECRET (16+ chars).' });
 		return;
 	}
-	let db;
-	try {
-		db = getDb();
-	} catch (err) {
+	Promise.resolve(openAuthDatabase()).then((db) => {
+		req._authDb = db;
+		next();
+	}).catch((err) => {
 		console.error('[auth-dex] SQLite:', err && err.message ? err.message : err);
+		if (String(req.path || '').includes('discord')) {
+			discordAuthErrorRedirect(req, res, 'Could not open the login database. Restart Node after uploading the latest server files.');
+			return;
+		}
 		res.status(503).json({ error: 'Authentication database unavailable.' });
-		return;
-	}
-	req._authDb = db;
-	next();
+	});
 }
 
 /**
  * Public probe: avoids clients hitting /me (503) on every page load when auth is misconfigured.
  */
-function authBackendProbe() {
+async function authBackendProbe() {
 	const sessionConfigured = Boolean(cookieSecret());
-	if (!sessionConfigured) {
-		return { sessionConfigured: false, dbOk: false };
-	}
+	const dbPath = getDbPath();
+	const extra = {
+		discordOAuth: discordOAuthConfigured(),
+		dbFile: path.basename(dbPath),
+		dbFileExists: false,
+		engine: null,
+	};
 	try {
-		getDb();
-		return { sessionConfigured: true, dbOk: true };
-	} catch (_err) {
-		return { sessionConfigured: true, dbOk: false };
+		extra.dbFileExists = fs.existsSync(dbPath);
+	} catch (_e) {}
+	try {
+		const db = await openAuthDatabase();
+		extra.engine = db && db._engine ? db._engine : 'better-sqlite3';
+		return { sessionConfigured, dbOk: true, dbError: null, ...extra };
+	} catch (err) {
+		return {
+			sessionConfigured,
+			dbOk: false,
+			dbError: String(err && err.message ? err.message : err).slice(0, 400),
+			...extra,
+		};
 	}
 }
 
 router.use(apiLimiter);
 
-router.get('/status', (req, res) => {
-	const p = authBackendProbe();
-	res.json({ ok: true, ...p });
+router.get('/status', async (req, res) => {
+	const p = await authBackendProbe();
+	res.json({ ok: true, discordOAuth: discordOAuthConfigured(), ...p });
+});
+
+router.post('/logout', (req, res) => {
+	try {
+		const db = getDb();
+		const sid = req.signedCookies && req.signedCookies[SESSION_COOKIE];
+		if (sid) {
+			db.prepare('DELETE FROM sessions WHERE id = ?').run(sid);
+		}
+	} catch (_e) {}
+	clearSessionCookie(res);
+	res.json({ ok: true });
 });
 
 router.use(authReady);
+
+function discordAuthErrorRedirect(req, res, message) {
+	const dest = safeReturnTo(req.query && req.query.return);
+	const hashIdx = dest.indexOf('#');
+	const pathOnly = hashIdx >= 0 ? dest.slice(0, hashIdx) : dest;
+	const hash = hashIdx >= 0 ? dest.slice(hashIdx) : '#/';
+	const joiner = hash.includes('?') ? '&' : '?';
+	res.redirect(`${pathOnly || '/tourney/'}${hash}${joiner}auth_error=${encodeURIComponent(message)}`);
+}
+
+function upsertDiscordUser(database, discordUser) {
+	const discordId = String(discordUser.id);
+	const username = String(discordUser.global_name || discordUser.username || '').slice(0, 80);
+	const avatarUrl = discordAvatarUrl(discordUser).slice(0, 240);
+	const verifiedEmail = discordUser.verified && discordUser.email
+		? normalizeEmail(discordUser.email)
+		: '';
+
+	const byDiscord = database.prepare('SELECT id FROM users WHERE discord_id = ?').get(discordId);
+	if (byDiscord) {
+		database.prepare(
+			`UPDATE users SET discord_username = ?, avatar_url = ?
+			 WHERE id = ?`
+		).run(username, avatarUrl, byDiscord.id);
+		if (verifiedEmail) {
+			const taken = database.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(verifiedEmail, byDiscord.id);
+			if (!taken) {
+				database.prepare('UPDATE users SET email = COALESCE(email, ?) WHERE id = ?').run(verifiedEmail, byDiscord.id);
+			}
+		}
+		return Number(byDiscord.id);
+	}
+
+	if (verifiedEmail) {
+		const byEmail = database.prepare('SELECT id, discord_id FROM users WHERE email = ?').get(verifiedEmail);
+		if (byEmail && !byEmail.discord_id) {
+			database.prepare(
+				`UPDATE users SET discord_id = ?, discord_username = ?, avatar_url = ?
+				 WHERE id = ?`
+			).run(discordId, username, avatarUrl, byEmail.id);
+			return Number(byEmail.id);
+		}
+	}
+
+	const suggested = uniqueHandleOrNull(database, suggestTourneyHandle(discordUser.global_name, discordUser.username), 0);
+	const emailTaken = verifiedEmail
+		? database.prepare('SELECT id FROM users WHERE email = ?').get(verifiedEmail)
+		: null;
+	const email = (!emailTaken && verifiedEmail) ? verifiedEmail : discordPlaceholderEmail(discordId);
+	const info = database.prepare(
+		`INSERT INTO users (email, password_hash, created_at, discord_id, discord_username, avatar_url, tourney_handle)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`
+	).run(email, 'oauth:discord', Date.now(), discordId, username, avatarUrl, suggested);
+	return Number(info.lastInsertRowid);
+}
+
+router.get('/discord/start', strictLimiter, (req, res) => {
+	if (!discordOAuthConfigured()) {
+		discordAuthErrorRedirect(req, res, 'Discord login is not configured on this server.');
+		return;
+	}
+	const db = req._authDb;
+	db.prepare('DELETE FROM oauth_states WHERE created_at < ?').run(Date.now() - 10 * 60 * 1000);
+	const state = crypto.randomBytes(24).toString('hex');
+	const returnTo = safeReturnTo(req.query && req.query.return);
+	db.prepare('INSERT INTO oauth_states (id, created_at, return_to) VALUES (?, ?, ?)').run(state, Date.now(), returnTo);
+	const params = new URLSearchParams({
+		client_id: String(process.env.DISCORD_CLIENT_ID).trim(),
+		redirect_uri: discordRedirectUri(req),
+		response_type: 'code',
+		scope: 'identify email',
+		state,
+	});
+	res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
+});
+
+router.get('/discord/callback', strictLimiter, async (req, res) => {
+	const db = req._authDb;
+	const errCode = String(req.query.error || '').trim();
+	const state = String(req.query.state || '').trim();
+	const code = String(req.query.code || '').trim();
+	const row = state ? db.prepare('SELECT id, return_to, created_at FROM oauth_states WHERE id = ?').get(state) : null;
+	if (row) db.prepare('DELETE FROM oauth_states WHERE id = ?').run(state);
+	const returnTo = row ? row.return_to : '/tourney/';
+	req.query.return = returnTo;
+	if (errCode) {
+		discordAuthErrorRedirect(req, res, 'Discord sign-in was cancelled.');
+		return;
+	}
+	if (!row || row.created_at < Date.now() - 10 * 60 * 1000 || !code) {
+		discordAuthErrorRedirect(req, res, 'Discord sign-in expired. Try again.');
+		return;
+	}
+	if (!discordOAuthConfigured()) {
+		discordAuthErrorRedirect(req, res, 'Discord login is not configured on this server.');
+		return;
+	}
+	let discordUser;
+	try {
+		const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams({
+				client_id: String(process.env.DISCORD_CLIENT_ID).trim(),
+				client_secret: String(process.env.DISCORD_CLIENT_SECRET).trim(),
+				grant_type: 'authorization_code',
+				code,
+				redirect_uri: discordRedirectUri(req),
+			}),
+		});
+		const tokenJson = await tokenRes.json().catch(() => ({}));
+		if (!tokenRes.ok || !tokenJson.access_token) {
+			throw new Error((tokenJson && tokenJson.error_description) || 'token exchange failed');
+		}
+		const userRes = await fetch('https://discord.com/api/users/@me', {
+			headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+		});
+		discordUser = await userRes.json().catch(() => ({}));
+		if (!userRes.ok || !discordUser.id) {
+			throw new Error('could not read Discord profile');
+		}
+	} catch (err) {
+		console.error('[auth-dex] discord oauth:', err && err.message ? err.message : err);
+		discordAuthErrorRedirect(req, res, 'Discord sign-in failed. Try again.');
+		return;
+	}
+	let userId;
+	try {
+		userId = upsertDiscordUser(db, discordUser);
+	} catch (err) {
+		console.error('[auth-dex] discord upsert:', err && err.message ? err.message : err);
+		discordAuthErrorRedirect(req, res, 'Could not create your account.');
+		return;
+	}
+	issueSession(db, res, userId);
+	const dest = safeReturnTo(returnTo);
+	res.redirect(dest);
+});
+
+router.post('/me/handle', strictLimiter, (req, res) => {
+	const db = req._authDb;
+	const sess = getUserForSession(db, req.signedCookies);
+	if (!sess) {
+		res.status(401).json({ error: 'Not authenticated.' });
+		return;
+	}
+	const handle = normalizeTourneyHandle(req.body && req.body.handle);
+	if (!handle) {
+		res.status(400).json({ error: 'Handle must be 2–24 characters.' });
+		return;
+	}
+	const taken = db.prepare(
+		'SELECT id FROM users WHERE tourney_handle = ? COLLATE NOCASE AND id != ?'
+	).get(handle, sess.user_id);
+	if (taken) {
+		res.status(409).json({ error: 'That handle is already taken.' });
+		return;
+	}
+	try {
+		db.prepare('UPDATE users SET tourney_handle = ? WHERE id = ?').run(handle, sess.user_id);
+	} catch (_err) {
+		res.status(409).json({ error: 'That handle is already taken.' });
+		return;
+	}
+	const user = loadUserRow(db, sess.user_id);
+	res.json({ ok: true, user: authUserPayload(user) });
+});
 
 /** Passwords stored as Argon2id hashes only (no plaintext). Dex entries remain per user_id for subscription / paywall hooks later. */
 
@@ -591,6 +1091,13 @@ router.post('/register', strictLimiter, async (req, res) => {
 		res.status(409).json({ error: 'An account with this email already exists.' });
 		return;
 	}
+	let argon2;
+	try {
+		argon2 = loadArgon2();
+	} catch (_err) {
+		res.status(500).json({ error: 'Password accounts are unavailable on this server. Use Discord sign-in.' });
+		return;
+	}
 	let hash;
 	try {
 		hash = await argon2.hash(password, { type: argon2.argon2id });
@@ -611,16 +1118,13 @@ router.post('/register', strictLimiter, async (req, res) => {
 		res.status(500).json({ error: 'Registration failed.' });
 		return;
 	}
-	const sid = newSessionId();
-	const exp = Date.now() + SESSION_MAX_AGE_MS;
-	db.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)').run(sid, userId, exp);
-	setSessionCookie(res, sid);
+	issueSession(db, res, userId);
 	syncPendingCryptoEntitlementsForUser(db, email, Number(userId));
 	const dex = dexStatsForUser(db, userId);
 	const subscription = subscriptionJsonForUser(db, userId);
 	res.status(201).json({
 		ok: true,
-		user: { id: userId, email },
+		user: authUserPayload(loadUserRow(db, userId)),
 		dex,
 		subscription,
 	});
@@ -647,25 +1151,26 @@ router.post('/login', strictLimiter, async (req, res) => {
 	let valid = false;
 	if (stored.startsWith('argon2id:')) {
 		try {
+			const argon2 = loadArgon2();
 			valid = await argon2.verify(stored.slice('argon2id:'.length), password);
 		} catch (_err) {
 			valid = false;
 		}
+	} else if (!stored || stored.startsWith('oauth:')) {
+		res.status(401).json({ error: 'This account uses Discord sign-in.' });
+		return;
 	}
 	if (!valid) {
 		res.status(401).json({ error: 'Invalid email or password.' });
 		return;
 	}
-	const sid = newSessionId();
-	const exp = Date.now() + SESSION_MAX_AGE_MS;
-	db.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)').run(sid, row.id, exp);
-	setSessionCookie(res, sid);
+	issueSession(db, res, row.id);
 	syncPendingCryptoEntitlementsForUser(db, email, Number(row.id));
 	const dex = dexStatsForUser(db, row.id);
 	const subscription = subscriptionJsonForUser(db, row.id);
 	res.json({
 		ok: true,
-		user: { id: row.id, email },
+		user: authUserPayload(loadUserRow(db, row.id)),
 		dex,
 		subscription,
 	});
@@ -746,16 +1251,6 @@ router.post('/bridge-supabase-token', strictLimiter, async (req, res) => {
 	});
 });
 
-router.post('/logout', (req, res) => {
-	const db = req._authDb;
-	const sid = req.signedCookies && req.signedCookies[SESSION_COOKIE];
-	if (sid) {
-		db.prepare('DELETE FROM sessions WHERE id = ?').run(sid);
-	}
-	clearSessionCookie(res);
-	res.json({ ok: true });
-});
-
 router.get('/me', (req, res) => {
 	const db = req._authDb;
 	const user = getUserForSession(db, req.signedCookies);
@@ -763,12 +1258,12 @@ router.get('/me', (req, res) => {
 		res.status(401).json({ error: 'Not authenticated.' });
 		return;
 	}
-	syncPendingCryptoEntitlementsForUser(db, normalizeEmail(user.email), user.user_id);
+	if (user.email) syncPendingCryptoEntitlementsForUser(db, normalizeEmail(user.email), user.user_id);
 	const dex = dexStatsForUser(db, user.user_id);
 	const subscription = subscriptionJsonForUser(db, user.user_id);
 	res.json({
 		ok: true,
-		user: { id: user.user_id, email: user.email },
+		user: authUserPayload(user),
 		dex,
 		subscription,
 	});
@@ -1030,6 +1525,13 @@ router.post('/reset-password', strictLimiter, async (req, res) => {
 		res.status(400).json({ error: 'Invalid or expired reset code.' });
 		return;
 	}
+	let argon2;
+	try {
+		argon2 = loadArgon2();
+	} catch (_err) {
+		res.status(500).json({ error: 'Password reset is unavailable on this server. Use Discord sign-in.' });
+		return;
+	}
 	let hash;
 	try {
 		hash = await argon2.hash(newPassword, { type: argon2.argon2id });
@@ -1113,15 +1615,37 @@ router.get('/dex', requireDdDexSession, (req, res) => {
 	});
 });
 
+openAuthDatabase().catch((err) => {
+	console.error('[auth-dex] database:', err && err.message ? err.message : err);
+});
+
 module.exports = router;
+module.exports.openAuthDatabase = openAuthDatabase;
 module.exports.tierFromUniqueCount = tierFromUniqueCount;
 module.exports.handleCryptoPayIpn = handleCryptoPayIpn;
 module.exports.tryGetDdDatabaseForPaywall = function tryGetDdDatabaseForPaywall() {
+	if (dbInstance) return dbInstance;
 	try {
 		return getDb();
-	} catch (_e4) {
+	} catch (err) {
+		lastDbError = String(err && err.message ? err.message : err);
+		if (!openingDb) {
+			console.error('[auth-dex] SQLite:', lastDbError);
+		}
 		return null;
 	}
 };
+module.exports.lastDdDatabaseError = function lastDdDatabaseError() {
+	return lastDbError;
+};
 module.exports.ddSessionRow = getUserForSession;
 module.exports.userHasDdPlus = userHasActiveDdSubscription;
+module.exports.discordOAuthConfigured = discordOAuthConfigured;
+module.exports.getTourneySession = function getTourneySession(signedCookies) {
+	try {
+		return getUserForSession(getDb(), signedCookies);
+	} catch (_e) {
+		return null;
+	}
+};
+module.exports.normalizeTourneyHandle = normalizeTourneyHandle;

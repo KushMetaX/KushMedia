@@ -21,6 +21,7 @@ import {
   getDogecoinPrice,
   getTraitValues,
   getWalletData,
+  searchWallet,
   getAllListings,
   getGlobalActivity,
   getAllGlobalActivity,
@@ -58,13 +59,41 @@ function buildDefaultAngelTrendNumberMap() {
 
 const DEFAULT_ANGEL_TREND_NUMBERS = buildDefaultAngelTrendNumberMap();
 
+/** DDL TCG spotlight traits (manual 2× trending + stack tag/boost). */
+const DEFAULT_TCG_SET_TRAITS = Object.freeze([
+  Object.freeze({ trait: 'head', value: 'Pirate' }),
+  Object.freeze({ trait: 'head', value: 'Wizard' }),
+  Object.freeze({ trait: 'head', value: 'Crown' }),
+  Object.freeze({ trait: 'accessory', value: 'Bow' }),
+  Object.freeze({ trait: 'furPattern', value: 'Zombie' }),
+]);
+
+/** Wallet/dog multipliers for official TCG inspiration inscriptions + graded cards. */
+const DEFAULT_TCG_INSPIRATION_MULTIPLIERS = Object.freeze({
+  dogOnly: 1.08,
+  subjectDogOnly: 1.18,
+  holderDogAndCardPsa10: 1.40,
+  subjectDogAndCardPsa10: 1.75,
+  holderDogAndCardPsa1: 1.12,
+  subjectDogAndCardPsa1: 1.22,
+  cardOnlyOfDogEval: 0.12,
+});
+
 const DEFAULT_TRENDING_CONFIG = Object.freeze({
   manualMultipliers: Object.freeze({
-    'head:Wizard': 1.5,
+    'head:Wizard': 2,
+    'head:Pirate': 2,
+    'head:Crown': 2,
+    'accessory:Bow': 2,
+    'furPattern:Zombie': 2,
     'head:Beret': 1.25,
     'clothes:Suit': 1.5,
   }),
   refusedOffers: Object.freeze({}),
+  officialLore: Object.freeze({}),
+  tcgInspirations: Object.freeze([]),
+  tcgCardHoldings: Object.freeze([]),
+  tcgInspirationMultipliers: DEFAULT_TCG_INSPIRATION_MULTIPLIERS,
   autoTrend: Object.freeze({
     enabled: true,
     maxTraitCount: 800,
@@ -91,6 +120,14 @@ const DEFAULT_TRENDING_CONFIG = Object.freeze({
       quadRepeater: Object.freeze({ enabled: true, multiplier: 1.25 }),
       tripleRepeater: Object.freeze({ enabled: true, multiplier: 1.15 }),
       trendNumbers: DEFAULT_ANGEL_TREND_NUMBERS,
+    }),
+    /** Stack boost is additive to trending (does not compound the 2× itself). */
+    tcgSet: Object.freeze({
+      enabled: true,
+      label: 'DDL TCG',
+      traits: DEFAULT_TCG_SET_TRAITS,
+      dualMultiplier: 1.08,
+      tripleMultiplier: 1.18,
     }),
   }),
   updatedAt: null,
@@ -148,6 +185,42 @@ function normalizeSaleActivityState(sale) {
     date: saleDate,
     isConfirmed: true,
   };
+}
+
+function normalizeActivitySales(activities) {
+  return (Array.isArray(activities) ? activities : [])
+    .filter(a => a?.activityType === 'sale')
+    .map(a => {
+      const saleState = normalizeSaleActivityState(a);
+      return {
+        dogNumber: dogNumberFromName(a.dogName),
+        name: a.dogName,
+        priceDoge: Number(a.priceDoge),
+        status: saleState.status,
+        date: saleState.date,
+        confirmedAt: saleState.confirmedAt,
+        isConfirmed: saleState.isConfirmed,
+        otc: !!a.otc,
+        txid: a.txid,
+      };
+    })
+    .filter(s => s.dogNumber != null && Number.isFinite(s.priceDoge) && s.priceDoge > 0);
+}
+
+function mergeUniqueSales(...lists) {
+  const seen = new Set();
+  const out = [];
+  for (const list of lists) {
+    for (const sale of list || []) {
+      const key = sale.txid
+        ? `tx:${sale.txid}`
+        : `k:${sale.dogNumber}|${sale.priceDoge}|${sale.date || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(sale);
+    }
+  }
+  return out;
 }
 
 function selectTopSales(sales, limit = 5) {
@@ -227,6 +300,31 @@ function normalizeTrendKeyList(input) {
   return trendKeys;
 }
 
+const DEFAULT_TR8_GANG_COMBO = Object.freeze({
+  id: 'tr8-gang-2558b920efed',
+  label: 'Tr8 Gang',
+  conditions: Object.freeze([]),
+  dogNumbers: Object.freeze([1764, 4502, 5530, 5583, 6397, 7028, 7733, 7774]),
+  multiplier: 1.15,
+  enabled: true,
+});
+
+/** Optional dog allowlist on custom combos (e.g. Tr8 Gang). */
+function normalizeComboDogNumbers(raw) {
+  const source = Array.isArray(raw)
+    ? raw
+    : (typeof raw === 'string' ? raw.split(/[\s,;]+/) : []);
+  const out = [];
+  const seen = new Set();
+  for (const entry of source) {
+    const n = Number.parseInt(String(entry).trim(), 10);
+    if (!Number.isInteger(n) || n < 1 || n > 10000 || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
 function normalizeSpecialMultipliers(raw = {}) {
   const TIER_DEFAULTS = {
     black_classic_visor: 1.20,
@@ -261,22 +359,53 @@ function normalizeSpecialMultipliers(raw = {}) {
       ? combo.conditions.filter(c => {
           if (!c || typeof c !== 'object' || !c.trait) return false;
           const v = String(c.value ?? '').trim();
-          return v.length > 0;
+          // "Any" is a UI wildcard (no constraint) — do not persist as a matcher.
+          if (!v || v.toLowerCase() === 'any') return false;
+          return true;
         })
       : [];
-    if (conditions.length === 0) continue;
+    let dogNumbers = normalizeComboDogNumbers(combo.dogNumbers);
+    const comboLabel = String(combo.label || '');
+    const comboId = String(combo.id || '');
+    let finalConditions = conditions;
+    // Safety net: legacy Tr8 Gang used Any-trait conditions and matched everyone.
+    if (
+      dogNumbers.length === 0
+      && (/tr8 gang/i.test(comboLabel) || /tr8-gang/i.test(comboId))
+    ) {
+      dogNumbers = [1764, 4502, 5530, 5583, 6397, 7028, 7733, 7774];
+      finalConditions = [];
+    }
+    // Trait conditions and/or an explicit dog allowlist are required.
+    if (finalConditions.length === 0 && dogNumbers.length === 0) continue;
     const multiplier = Number(combo.multiplier);
     if (!Number.isFinite(multiplier) || multiplier === 0) continue;
     combos.push({
-      id: String(combo.id || ''),
-      label: String(combo.label || ''),
-      conditions: conditions.map(c => ({
+      id: comboId,
+      label: comboLabel,
+      conditions: finalConditions.map(c => ({
         trait: String(c.trait),
         op: c.op === 'contains' ? 'contains' : 'eq',
         value: String(c.value).trim(),
       })),
+      dogNumbers,
       multiplier,
       enabled: combo.enabled !== false,
+    });
+  }
+
+  // Always keep Tr8 Gang present — admin saves with blank Any slots used to drop it.
+  const hasTr8 = combos.some(c =>
+    /tr8-gang/i.test(String(c.id || '')) || /tr8 gang/i.test(String(c.label || ''))
+  );
+  if (!hasTr8) {
+    combos.push({
+      id: DEFAULT_TR8_GANG_COMBO.id,
+      label: DEFAULT_TR8_GANG_COMBO.label,
+      conditions: [],
+      dogNumbers: [...DEFAULT_TR8_GANG_COMBO.dogNumbers],
+      multiplier: DEFAULT_TR8_GANG_COMBO.multiplier,
+      enabled: true,
     });
   }
 
@@ -308,7 +437,455 @@ function normalizeSpecialMultipliers(raw = {}) {
     trendNumbers,
   };
 
-  return { colorMatch, minimalTiers, combos, angelNumbers };
+  const tcgRaw = raw?.tcgSet && typeof raw.tcgSet === 'object' ? raw.tcgSet : {};
+  const tcgTraitsSource = Array.isArray(tcgRaw.traits) && tcgRaw.traits.length > 0
+    ? tcgRaw.traits
+    : DEFAULT_TCG_SET_TRAITS;
+  const tcgTraits = [];
+  for (const entry of tcgTraitsSource) {
+    if (!entry || typeof entry !== 'object') continue;
+    const trait = String(entry.trait || '').trim();
+    const value = String(entry.value || '').trim();
+    if (!trait || !value) continue;
+    tcgTraits.push({ trait, value });
+  }
+  const tcgSet = {
+    enabled: tcgRaw.enabled !== false,
+    label: String(tcgRaw.label || 'DDL TCG').trim() || 'DDL TCG',
+    traits: tcgTraits.length > 0 ? tcgTraits : [...DEFAULT_TCG_SET_TRAITS],
+    dualMultiplier: Math.max(1.0, Number(tcgRaw.dualMultiplier) || 1.08),
+    tripleMultiplier: Math.max(1.0, Number(tcgRaw.tripleMultiplier) || 1.18),
+  };
+
+  return { colorMatch, minimalTiers, combos, angelNumbers, tcgSet };
+}
+
+/** Match dog traits against the DDL TCG spotlight set. */
+function resolveTcgSetHits(traits, tcgConfig) {
+  const cfg = tcgConfig && typeof tcgConfig === 'object' ? tcgConfig : {};
+  if (cfg.enabled === false) {
+    return { enabled: false, hits: [], count: 0, multiplier: 1.0, label: null, tier: null };
+  }
+  const label = String(cfg.label || 'DDL TCG').trim() || 'DDL TCG';
+  const list = Array.isArray(cfg.traits) && cfg.traits.length > 0 ? cfg.traits : DEFAULT_TCG_SET_TRAITS;
+  const hits = [];
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object') continue;
+    const trait = String(entry.trait || '').trim();
+    const value = String(entry.value || '').trim();
+    if (!trait || !value) continue;
+    const dogVal = traits?.[trait];
+    if (dogVal == null || String(dogVal).trim() === '') continue;
+    if (String(dogVal).toLowerCase().trim() !== value.toLowerCase()) continue;
+    hits.push({ trait, value: String(dogVal).trim() });
+  }
+  const count = hits.length;
+  let multiplier = 1.0;
+  let tier = null;
+  if (count >= 3) {
+    multiplier = Math.max(1.0, Number(cfg.tripleMultiplier) || 1.18);
+    tier = 'triple';
+  } else if (count === 2) {
+    multiplier = Math.max(1.0, Number(cfg.dualMultiplier) || 1.08);
+    tier = 'dual';
+  } else if (count === 1) {
+    tier = 'single';
+  }
+  return { enabled: true, hits, count, multiplier, label, tier };
+}
+
+/** Manual/TCG/always-rare traits that should not leak their ask/sale into other trait books. */
+const DOMINANT_COMP_TREND_THRESHOLD = 1.5;
+const ALWAYS_DOMINANT_TRAIT_VALUES = new Set(['diamond', 'shiny']);
+
+function isAlwaysDominantTraitValue(value) {
+  return ALWAYS_DOMINANT_TRAIT_VALUES.has(String(value || '').toLowerCase().trim());
+}
+
+function collectDominantTraitSlots(traits, trendingConfig) {
+  const slots = [];
+  const seen = new Set();
+  if (!traits || typeof traits !== 'object') {
+    return slots;
+  }
+
+  const pushSlot = (trait, value) => {
+    const t = String(trait || '').trim();
+    const v = value == null ? '' : String(value).trim();
+    if (!t || !v) return;
+    const id = `${t}:${v.toLowerCase()}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    slots.push({ trait: t, value: v });
+  };
+
+  const tcg = resolveTcgSetHits(traits, trendingConfig?.specialMultipliers?.tcgSet);
+  for (const hit of tcg.hits || []) {
+    pushSlot(hit.trait, hit.value);
+  }
+
+  const manuals = trendingConfig?.manualMultipliers && typeof trendingConfig.manualMultipliers === 'object'
+    ? trendingConfig.manualMultipliers
+    : {};
+  for (const key of TRAIT_KEYS) {
+    const val = traits[key];
+    if (val == null || String(val).trim() === '') continue;
+    if (isAlwaysDominantTraitValue(val)) {
+      pushSlot(key, val);
+      continue;
+    }
+    const m = Number(manuals[`${key}:${val}`]);
+    if (Number.isFinite(m) && m >= DOMINANT_COMP_TREND_THRESHOLD) {
+      pushSlot(key, val);
+    }
+  }
+
+  return slots;
+}
+
+/** Traits that should receive this dog's listing/sale price. Dominant dogs only feed those slots. */
+function traitAttributionSlots(traits, trendingConfig) {
+  const dominant = collectDominantTraitSlots(traits, trendingConfig);
+  if (dominant.length > 0) {
+    return dominant;
+  }
+  const slots = [];
+  if (!traits || typeof traits !== 'object') {
+    return slots;
+  }
+  for (const key of TRAIT_KEYS) {
+    const val = traits[key];
+    if (val == null || String(val).trim() === '') continue;
+    slots.push({ trait: key, value: String(val).trim() });
+  }
+  return slots;
+}
+
+function saleAttributesToTrait(traits, traitKey, traitValue, trendingConfig) {
+  const want = String(traitValue || '').trim().toLowerCase();
+  return traitAttributionSlots(traits, trendingConfig).some(slot => (
+    slot.trait === traitKey && String(slot.value).trim().toLowerCase() === want
+  ));
+}
+
+function isDominantCompTrait(trait, value, trendingConfig) {
+  if (isAlwaysDominantTraitValue(value)) return true;
+  const manuals = trendingConfig?.manualMultipliers && typeof trendingConfig.manualMultipliers === 'object'
+    ? trendingConfig.manualMultipliers
+    : DEFAULT_TRENDING_CONFIG.manualMultipliers;
+  const m = Number(manuals[`${trait}:${value}`]);
+  if (Number.isFinite(m) && m >= DOMINANT_COMP_TREND_THRESHOLD) return true;
+  const tcgTraits = trendingConfig?.specialMultipliers?.tcgSet?.traits?.length
+    ? trendingConfig.specialMultipliers.tcgSet.traits
+    : DEFAULT_TCG_SET_TRAITS;
+  const want = String(value || '').trim().toLowerCase();
+  return tcgTraits.some(entry => (
+    entry && entry.trait === trait && String(entry.value || '').trim().toLowerCase() === want
+  ));
+}
+
+/**
+ * Listing floor used in the blend. Non-dominant singleton asks stay ignored
+ * (Wizard+Poncho @ 1M must not price Poncho). Dominant TCG traits (Wizard, Crown,
+ * …) may use a singleton floor. A vanity book far above sales — singleton or a
+ * cluster of matching asks — is clipped so it lifts the book without becoming it.
+ */
+function vanityFloorLift(listed) {
+  const n = Math.max(1, Math.floor(Number(listed) || 1));
+  return 1.65 + Math.min(Math.max(n - 1, 0), 6) * 0.08;
+}
+
+function resolveBlendListingFloor(tb, saleSignal, trendingConfig) {
+  const listed = Math.max(0, Math.floor(Number(tb?.listed) || 0));
+  const raw = tb?.floor != null && Number.isFinite(Number(tb.floor)) ? Number(tb.floor) : null;
+  if (raw == null || raw <= 0) return null;
+  const dominant = isDominantCompTrait(tb.trait, tb.value, trendingConfig);
+  if (listed === 1 && !dominant) return null;
+  if (listed === 1 && dominant && (saleSignal == null || saleSignal <= 0)) return null;
+  if (saleSignal != null && saleSignal > 0 && raw > saleSignal * 3) {
+    return saleSignal * vanityFloorLift(listed);
+  }
+  return raw;
+}
+
+function traitHasUsableMarketComps(tb) {
+  if (!tb) return false;
+  const listed = Math.max(0, Math.floor(Number(tb.listed) || 0));
+  const saleCount = Math.max(0, Math.floor(Number(tb.saleCount) || 0));
+  return listed >= 2 || saleCount > 0;
+}
+
+function normalizeTcgHandle(raw) {
+  return String(raw || '').trim().replace(/^@+/, '').toLowerCase();
+}
+
+function tcgWalletsMatch(left, right) {
+  const a = String(left || '').trim();
+  const b = String(right || '').trim();
+  return a !== '' && b !== '' && a.toLowerCase() === b.toLowerCase();
+}
+
+function tcgCardsMatch(left, right) {
+  const idA = String(left?.cardId || '').trim().toLowerCase();
+  const idB = String(right?.cardId || '').trim().toLowerCase();
+  if (idA && idB && idA === idB) return true;
+  const nA = String(left?.cardName || '').trim().toLowerCase();
+  const nB = String(right?.cardName || '').trim().toLowerCase();
+  return nA !== '' && nB !== '' && nA === nB;
+}
+
+function normalizePsaGrade(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  const g = Math.round(n);
+  if (g < 1 || g > 10) return null;
+  return g;
+}
+
+function psaScale(grade) {
+  const g = normalizePsaGrade(grade);
+  if (g == null) return 0.725;
+  return 0.45 + (g / 10) * 0.55;
+}
+
+function normalizeTcgInspirationMultipliers(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const d = DEFAULT_TCG_INSPIRATION_MULTIPLIERS;
+  const num = (key, fallback) => {
+    const n = Number(src[key]);
+    return Number.isFinite(n) && n >= 1 ? n : fallback;
+  };
+  const frac = (key, fallback) => {
+    const n = Number(src[key]);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
+  return {
+    dogOnly: num('dogOnly', d.dogOnly),
+    subjectDogOnly: num('subjectDogOnly', d.subjectDogOnly),
+    holderDogAndCardPsa10: num('holderDogAndCardPsa10', d.holderDogAndCardPsa10),
+    subjectDogAndCardPsa10: num('subjectDogAndCardPsa10', d.subjectDogAndCardPsa10),
+    holderDogAndCardPsa1: num('holderDogAndCardPsa1', d.holderDogAndCardPsa1),
+    subjectDogAndCardPsa1: num('subjectDogAndCardPsa1', d.subjectDogAndCardPsa1),
+    cardOnlyOfDogEval: frac('cardOnlyOfDogEval', d.cardOnlyOfDogEval),
+  };
+}
+
+function interpolatePsaMultiplier(psa1, psa10, grade) {
+  const lo = Math.max(1, Number(psa1) || 1);
+  const hi = Math.max(lo, Number(psa10) || lo);
+  const t = (psaScale(grade) - 0.45) / 0.55;
+  return +(lo + (hi - lo) * Math.max(0, Math.min(1, t))).toFixed(4);
+}
+
+function normalizeTcgInspirations(source) {
+  const list = Array.isArray(source)
+    ? source
+    : (source && typeof source === 'object' ? Object.values(source) : []);
+  const out = [];
+  const seen = new Set();
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue;
+    const dogNumber = Number(raw.dogNumber);
+    if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) continue;
+    const cardName = String(raw.cardName || '').trim();
+    const cardId = String(raw.cardId || '').trim();
+    if (!cardName && !cardId) continue;
+    const key = `${dogNumber}:${(cardId || cardName).toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const wallets = [];
+    const walletSource = Array.isArray(raw.brandedWallets)
+      ? raw.brandedWallets
+      : (raw.brandedWallet ? [raw.brandedWallet] : []);
+    for (const w of walletSource) {
+      const addr = String(w || '').trim();
+      if (!addr || wallets.some(existing => tcgWalletsMatch(existing, addr))) continue;
+      wallets.push(addr);
+    }
+    out.push({
+      dogNumber,
+      cardName: cardName || cardId,
+      cardId: cardId || null,
+      brandedHandle: normalizeTcgHandle(raw.brandedHandle) || null,
+      brandedWallets: wallets,
+      note: String(raw.note || '').trim() || null,
+      updatedAt: raw.updatedAt || null,
+      updatedBy: raw.updatedBy || null,
+    });
+  }
+  return out.sort((a, b) => a.dogNumber - b.dogNumber || String(a.cardName).localeCompare(String(b.cardName)));
+}
+
+function normalizeTcgCardHoldings(source) {
+  const list = Array.isArray(source) ? source : [];
+  const out = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue;
+    const cardName = String(raw.cardName || '').trim();
+    const cardId = String(raw.cardId || '').trim();
+    if (!cardName && !cardId) continue;
+    const wallet = String(raw.wallet || raw.address || '').trim() || null;
+    const handle = normalizeTcgHandle(raw.handle || raw.brandedHandle) || null;
+    if (!wallet && !handle) continue;
+    const psaGrade = normalizePsaGrade(raw.psaGrade != null ? raw.psaGrade : raw.psa);
+    out.push({
+      wallet,
+      handle,
+      cardName: cardName || cardId,
+      cardId: cardId || null,
+      psaGrade,
+      note: String(raw.note || '').trim() || null,
+      updatedAt: raw.updatedAt || null,
+      updatedBy: raw.updatedBy || null,
+    });
+  }
+  return out;
+}
+
+function lookupTcgInspirationsForDog(dogNumber, inspirations) {
+  const n = Number(dogNumber);
+  return (Array.isArray(inspirations) ? inspirations : []).filter(entry => entry.dogNumber === n);
+}
+
+function isTcgSubject(inspiration, { address, handle } = {}) {
+  if (!inspiration) return false;
+  const h = normalizeTcgHandle(handle);
+  if (h && inspiration.brandedHandle && h === inspiration.brandedHandle) return true;
+  const wallets = Array.isArray(inspiration.brandedWallets) ? inspiration.brandedWallets : [];
+  return wallets.some(w => tcgWalletsMatch(w, address));
+}
+
+function holdingMatchesWallet(holding, { address, handle } = {}) {
+  if (!holding) return false;
+  if (holding.wallet && tcgWalletsMatch(holding.wallet, address)) return true;
+  const h = normalizeTcgHandle(handle);
+  return !!(h && holding.handle && h === holding.handle);
+}
+
+function findMatchingTcgHolding(inspiration, holdings, owner) {
+  const list = Array.isArray(holdings) ? holdings : [];
+  const matches = list.filter(h => holdingMatchesWallet(h, owner) && tcgCardsMatch(h, inspiration));
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => (b.psaGrade || 0) - (a.psaGrade || 0));
+  return matches[0];
+}
+
+function resolveTcgDogMultiplier({ ownsCard, psaGrade, isSubject, multipliers }) {
+  const m = normalizeTcgInspirationMultipliers(multipliers);
+  if (!ownsCard) return isSubject ? m.subjectDogOnly : m.dogOnly;
+  if (isSubject) return interpolatePsaMultiplier(m.subjectDogAndCardPsa1, m.subjectDogAndCardPsa10, psaGrade);
+  return interpolatePsaMultiplier(m.holderDogAndCardPsa1, m.holderDogAndCardPsa10, psaGrade);
+}
+
+function resolveTcgCardStandaloneWeight(psaGrade, multipliers) {
+  const m = normalizeTcgInspirationMultipliers(multipliers);
+  return +(m.cardOnlyOfDogEval * psaScale(psaGrade)).toFixed(4);
+}
+
+function applyTcgWalletSynergy({
+  evaluations = [],
+  dogNumbers = [],
+  owner = {},
+  config = {},
+  dogeUsd = null,
+  inspirationEstimates = {},
+} = {}) {
+  const inspirations = Array.isArray(config.tcgInspirations) ? config.tcgInspirations : [];
+  const holdings = Array.isArray(config.tcgCardHoldings) ? config.tcgCardHoldings : [];
+  const multipliers = config.tcgInspirationMultipliers;
+  const dogSet = new Set((dogNumbers || []).map(Number));
+  const byDog = {};
+  const extras = [];
+
+  for (const evaluation of evaluations) {
+    if (!evaluation || evaluation.error) continue;
+    const dogNumber = Number(evaluation.dogNumber);
+    const est = evaluation.estimation || {};
+    let estimatedDoge = est.displayEstimatedDoge != null ? Number(est.displayEstimatedDoge) : Number(est.estimatedDoge || 0);
+    const hits = lookupTcgInspirationsForDog(dogNumber, inspirations);
+    if (hits.length === 0) {
+      byDog[dogNumber] = {
+        estimatedDoge: Math.round(estimatedDoge),
+        estimatedUsd: dogeUsd ? +(estimatedDoge * dogeUsd).toFixed(2) : (est.estimatedUsd != null ? Number(est.estimatedUsd) : null),
+        note: null,
+        tcg: null,
+      };
+      continue;
+    }
+    const dogOnly = normalizeTcgInspirationMultipliers(multipliers).dogOnly;
+    const base = dogOnly > 1 ? estimatedDoge / dogOnly : estimatedDoge;
+    let best = {
+      multi: dogOnly,
+      hit: hits[0],
+      holding: null,
+      isSubject: isTcgSubject(hits[0], owner),
+      label: `${hits[0].cardName} inspiration dog`,
+    };
+    for (const hit of hits) {
+      const isSubject = isTcgSubject(hit, owner);
+      const holding = findMatchingTcgHolding(hit, holdings, owner);
+      const multi = resolveTcgDogMultiplier({
+        ownsCard: !!holding,
+        psaGrade: holding?.psaGrade,
+        isSubject,
+        multipliers,
+      });
+      if (multi >= best.multi) {
+        let label = `${hit.cardName} inspiration dog`;
+        if (isSubject && holding) {
+          label = `${hit.cardName} PSA ${holding.psaGrade || '?'} subject set`;
+        } else if (holding) {
+          label = `${hit.cardName} PSA ${holding.psaGrade || '?'} + dog`;
+        } else if (isSubject) {
+          label = `${hit.cardName} subject dog`;
+        }
+        best = { multi, hit, holding, isSubject, label };
+      }
+    }
+    estimatedDoge = Math.round(base * best.multi);
+    byDog[dogNumber] = {
+      estimatedDoge,
+      estimatedUsd: dogeUsd ? +(estimatedDoge * dogeUsd).toFixed(2) : null,
+      note: best.label,
+      tcg: {
+        multiplier: best.multi,
+        cardName: best.hit.cardName,
+        cardId: best.hit.cardId,
+        psaGrade: best.holding?.psaGrade || null,
+        isSubject: best.isSubject,
+        ownsCard: !!best.holding,
+      },
+    };
+  }
+
+  for (const holding of holdings) {
+    if (!holdingMatchesWallet(holding, owner)) continue;
+    const matched = inspirations.filter(ins => tcgCardsMatch(ins, holding));
+    if (matched.length === 0) continue;
+    if (matched.some(ins => dogSet.has(ins.dogNumber))) continue;
+    const ins = matched[0];
+    const weight = resolveTcgCardStandaloneWeight(holding.psaGrade, multipliers);
+    const sourceEst = inspirationEstimates[ins.dogNumber];
+    const sourceDoge = sourceEst != null
+      ? Number(sourceEst)
+      : Number((evaluations.find(e => Number(e.dogNumber) === ins.dogNumber)?.estimation?.estimatedDoge) || 0);
+    if (!(sourceDoge > 0) || !(weight > 0)) continue;
+    const dogOnly = normalizeTcgInspirationMultipliers(multipliers).dogOnly;
+    const base = dogOnly > 1 ? sourceDoge / dogOnly : sourceDoge;
+    const estimatedDoge = Math.round(base * weight);
+    extras.push({
+      kind: 'tcg_card',
+      dogNumber: ins.dogNumber,
+      cardName: holding.cardName || ins.cardName,
+      cardId: holding.cardId || ins.cardId,
+      psaGrade: holding.psaGrade,
+      estimatedDoge,
+      estimatedUsd: dogeUsd ? +(estimatedDoge * dogeUsd).toFixed(2) : null,
+      note: `${holding.cardName || ins.cardName} PSA ${holding.psaGrade || '?'} (no inspiration dog in wallet)`,
+    });
+  }
+
+  return { byDog, extras };
 }
 
 function normalizeTrendingConfig(raw = {}) {
@@ -327,45 +904,21 @@ function normalizeTrendingConfig(raw = {}) {
   const refusedSource = raw?.refusedOffers && typeof raw.refusedOffers === 'object'
     ? raw.refusedOffers
     : DEFAULT_TRENDING_CONFIG.refusedOffers;
-  const refusedOffers = {};
+  const refusedOffers = normalizeDogFloorMap(refusedSource);
 
-  for (const [dogNumber, value] of Object.entries(refusedSource)) {
-    const normalizedDogNumber = Number(dogNumber);
-    if (!Number.isInteger(normalizedDogNumber) || normalizedDogNumber < 1 || normalizedDogNumber > 10000) {
-      continue;
-    }
-
-    let entry = null;
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      const minOfferUsd = Number(value.minOfferUsd);
-      const minOfferDoge = Number(value.minOfferDoge);
-      if ((Number.isFinite(minOfferUsd) && minOfferUsd > 0) || (Number.isFinite(minOfferDoge) && minOfferDoge > 0)) {
-        entry = {
-          dogNumber: normalizedDogNumber,
-          minOfferUsd: Number.isFinite(minOfferUsd) && minOfferUsd > 0 ? +minOfferUsd.toFixed(2) : null,
-          minOfferDoge: Number.isFinite(minOfferDoge) && minOfferDoge > 0 ? Math.round(minOfferDoge) : null,
-          note: String(value.note || '').trim() || null,
-          updatedAt: value.updatedAt || null,
-          updatedBy: value.updatedBy || null,
-        };
-      }
-    } else {
-      const minOfferDoge = Number(value);
-      if (Number.isFinite(minOfferDoge) && minOfferDoge > 0) {
-        entry = {
-          dogNumber: normalizedDogNumber,
-          minOfferDoge: Math.round(minOfferDoge),
-          note: null,
-          updatedAt: null,
-          updatedBy: null,
-        };
-      }
-    }
-
-    if (entry) {
-      refusedOffers[String(normalizedDogNumber)] = entry;
-    }
-  }
+  const officialLoreSource = raw?.officialLore && typeof raw.officialLore === 'object'
+    ? raw.officialLore
+    : DEFAULT_TRENDING_CONFIG.officialLore;
+  const officialLore = normalizeDogFloorMap(officialLoreSource);
+  const tcgInspirations = normalizeTcgInspirations(
+    raw?.tcgInspirations != null ? raw.tcgInspirations : DEFAULT_TRENDING_CONFIG.tcgInspirations
+  );
+  const tcgCardHoldings = normalizeTcgCardHoldings(
+    raw?.tcgCardHoldings != null ? raw.tcgCardHoldings : DEFAULT_TRENDING_CONFIG.tcgCardHoldings
+  );
+  const tcgInspirationMultipliers = normalizeTcgInspirationMultipliers(
+    raw?.tcgInspirationMultipliers != null ? raw.tcgInspirationMultipliers : DEFAULT_TRENDING_CONFIG.tcgInspirationMultipliers
+  );
 
   const autoSource = raw?.autoTrend && typeof raw.autoTrend === 'object'
     ? raw.autoTrend
@@ -385,11 +938,77 @@ function normalizeTrendingConfig(raw = {}) {
   return {
     manualMultipliers,
     refusedOffers,
+    officialLore,
+    tcgInspirations,
+    tcgCardHoldings,
+    tcgInspirationMultipliers,
     autoTrend,
     specialMultipliers: normalizeSpecialMultipliers(raw?.specialMultipliers),
     updatedAt: raw?.updatedAt || DEFAULT_TRENDING_CONFIG.updatedAt,
     updatedBy: raw?.updatedBy || DEFAULT_TRENDING_CONFIG.updatedBy,
   };
+}
+
+/** Normalize refused-offer / official-lore style per-dog USD|DOGE floors. */
+function normalizeLoreImageUrl(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s || s.length > 500) return null;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith('/assets/') || s.startsWith('/api/')) return s;
+  if (s.startsWith('../assets/')) return `/${s.slice(3)}`;
+  if (s.startsWith('assets/')) return `/${s}`;
+  return null;
+}
+
+function normalizeDogFloorMap(source) {
+  const out = {};
+  if (!source || typeof source !== 'object') {
+    return out;
+  }
+
+  for (const [dogNumber, value] of Object.entries(source)) {
+    const normalizedDogNumber = Number(dogNumber);
+    if (!Number.isInteger(normalizedDogNumber) || normalizedDogNumber < 1 || normalizedDogNumber > 10000) {
+      continue;
+    }
+
+    let entry = null;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const minOfferUsd = Number(value.minOfferUsd);
+      const minOfferDoge = Number(value.minOfferDoge);
+      if ((Number.isFinite(minOfferUsd) && minOfferUsd > 0) || (Number.isFinite(minOfferDoge) && minOfferDoge > 0)) {
+        entry = {
+          dogNumber: normalizedDogNumber,
+          minOfferUsd: Number.isFinite(minOfferUsd) && minOfferUsd > 0 ? +minOfferUsd.toFixed(2) : null,
+          minOfferDoge: Number.isFinite(minOfferDoge) && minOfferDoge > 0 ? Math.round(minOfferDoge) : null,
+          note: String(value.note || '').trim() || null,
+          imageUrl: normalizeLoreImageUrl(value.imageUrl),
+          updatedAt: value.updatedAt || null,
+          updatedBy: value.updatedBy || null,
+        };
+      }
+    } else {
+      const minOfferDoge = Number(value);
+      if (Number.isFinite(minOfferDoge) && minOfferDoge > 0) {
+        entry = {
+          dogNumber: normalizedDogNumber,
+          minOfferUsd: null,
+          minOfferDoge: Math.round(minOfferDoge),
+          note: null,
+          imageUrl: null,
+          updatedAt: null,
+          updatedBy: null,
+        };
+      }
+    }
+
+    if (entry) {
+      out[String(normalizedDogNumber)] = entry;
+    }
+  }
+
+  return out;
 }
 
 function extractLoreEntryPayload(raw) {
@@ -491,17 +1110,20 @@ function annotateTraitBreakdownForCombo(traitBreakdown, traits, matchedCombos) {
   const labels = matchedCombos.map(c => c.label).filter(Boolean);
   const comboLabel = labels.join(' · ') || 'Combo';
   const comboId = matchedCombos.length === 1 ? matchedCombos[0].id : 'combo-stack';
+  const hasDogOnlyCombo = matchedCombos.some(combo => {
+    const conditions = Array.isArray(combo.conditions) ? combo.conditions : [];
+    return conditions.length === 0 && normalizeComboDogNumbers(combo.dogNumbers).length > 0;
+  });
   for (const tb of traitBreakdown) {
     if (tb.isSynthetic) continue;
-    const hit = matchedCombos.some(combo => {
+    const hit = hasDogOnlyCombo || matchedCombos.some(combo => {
       const conditions = Array.isArray(combo.conditions) ? combo.conditions : [];
       return conditions.some(cond => {
         if (!cond || cond.trait !== tb.trait) return false;
         const val = traits[tb.trait];
         const sv = traitSlotIsPresent(val) ? String(val).toLowerCase().trim() : '';
         const cv = String(cond.value || '').toLowerCase().trim();
-        if (!cv) return false;
-        if (cv === 'any') return sv.length > 0;
+        if (!cv || cv === 'any') return false;
         if (cv === 'none') return sv.length === 0;
         if (sv.length === 0) return false;
         return cond.op === 'contains' ? sv.includes(cv) : sv === cv;
@@ -543,26 +1165,38 @@ async function updateTrendingConfig(nextConfig = {}) {
   const current = await getTrendingConfig(true);
   const updatedAt = new Date().toISOString();
   const updatedBy = nextConfig.updatedBy || current.updatedBy || 'admin';
-  const nextRefusedOffers = nextConfig.refusedOffers && typeof nextConfig.refusedOffers === 'object'
-    ? Object.fromEntries(Object.entries(nextConfig.refusedOffers).map(([dogNumber, value]) => {
-        const currentEntry = current.refusedOffers?.[dogNumber] || {};
-        const nextEntry = value && typeof value === 'object' && !Array.isArray(value)
-          ? value
-          : { minOfferDoge: value };
+  const mergeDogFloorMap = (incoming, existing) => {
+    if (!incoming || typeof incoming !== 'object') {
+      return existing;
+    }
+    return Object.fromEntries(Object.entries(incoming).map(([dogNumber, value]) => {
+      const currentEntry = existing?.[dogNumber] || {};
+      const nextEntry = value && typeof value === 'object' && !Array.isArray(value)
+        ? value
+        : { minOfferDoge: value };
 
-        return [dogNumber, {
-          ...currentEntry,
-          ...nextEntry,
-          updatedAt,
-          updatedBy,
-        }];
-      }))
-    : current.refusedOffers;
+      return [dogNumber, {
+        ...currentEntry,
+        ...nextEntry,
+        updatedAt,
+        updatedBy,
+      }];
+    }));
+  };
+
+  const nextRefusedOffers = mergeDogFloorMap(nextConfig.refusedOffers, current.refusedOffers);
+  const nextOfficialLore = mergeDogFloorMap(nextConfig.officialLore, current.officialLore);
   const normalized = normalizeTrendingConfig({
     ...current,
     ...nextConfig,
     manualMultipliers: nextConfig.manualMultipliers ?? current.manualMultipliers,
     refusedOffers: nextRefusedOffers,
+    officialLore: nextOfficialLore,
+    tcgInspirations: nextConfig.tcgInspirations !== undefined ? nextConfig.tcgInspirations : current.tcgInspirations,
+    tcgCardHoldings: nextConfig.tcgCardHoldings !== undefined ? nextConfig.tcgCardHoldings : current.tcgCardHoldings,
+    tcgInspirationMultipliers: nextConfig.tcgInspirationMultipliers !== undefined
+      ? nextConfig.tcgInspirationMultipliers
+      : current.tcgInspirationMultipliers,
     autoTrend: {
       ...current.autoTrend,
       ...(nextConfig.autoTrend || {}),
@@ -714,10 +1348,11 @@ function formatTrendReason(entry) {
   return 'No trend applied.';
 }
 
-function buildTraitTopSaleMap(snapshot) {
+function buildTraitTopSaleMap(snapshot, trendingConfig) {
   const map = Object.create(null);
   const recentSales = Array.isArray(snapshot?.recentSales) ? snapshot.recentSales : [];
   const traitMap = snapshot?.traitMap || {};
+  const config = trendingConfig || _trendingConfigCache || DEFAULT_TRENDING_CONFIG;
 
   for (const sale of recentSales) {
     const dogNumber = Number(sale?.dogNumber);
@@ -729,10 +1364,8 @@ function buildTraitTopSaleMap(snapshot) {
     const traits = traitMap[dogNumber];
     if (!traits) continue;
 
-    for (const traitKey of TRAIT_KEYS) {
-      const value = traits[traitKey];
-      if (!value) continue;
-      const trendKey = `${traitKey}:${value}`;
+    for (const slot of traitAttributionSlots(traits, config)) {
+      const trendKey = `${slot.trait}:${slot.value}`;
       map[trendKey] = map[trendKey] != null ? Math.max(map[trendKey], priceDoge) : priceDoge;
     }
   }
@@ -815,12 +1448,13 @@ async function getTrendingDashboardData() {
   })).filter(entry => entry.source === 'kushmedia-backfill');
   const traitCounts = _snapshot?.traitMeta?.counts || {};
   const traits = [];
-  const rawTopSaleMap = buildTraitTopSaleMap(_snapshot);
-  const communityOffers = Object.values(config.refusedOffers || {})
+  const rawTopSaleMap = buildTraitTopSaleMap(_snapshot, config);
+  const mapDogFloorEntries = (map) => Object.values(map || {})
     .map(entry => ({
       dogNumber: entry.dogNumber,
       name: `Doginal Dog #${entry.dogNumber}`,
-      imageUrl: `${MARKET_BASE}/dogs/${entry.dogNumber}.png`,
+      imageUrl: normalizeLoreImageUrl(entry.imageUrl) || `${MARKET_BASE}/dogs/${entry.dogNumber}.png`,
+      customImageUrl: normalizeLoreImageUrl(entry.imageUrl),
       minOfferUsd: entry.minOfferUsd != null
         ? +Number(entry.minOfferUsd).toFixed(2)
         : (entry.minOfferDoge != null && liveDogeUsd ? +(entry.minOfferDoge * liveDogeUsd).toFixed(2) : null),
@@ -832,6 +1466,11 @@ async function getTrendingDashboardData() {
       updatedBy: entry.updatedBy || null,
     }))
     .sort((left, right) => left.dogNumber - right.dogNumber);
+
+  const communityOffers = mapDogFloorEntries(config.refusedOffers);
+  const officialLoreEntries = mapDogFloorEntries(config.officialLore);
+  const tcgInspirationEntries = Array.isArray(config.tcgInspirations) ? config.tcgInspirations : [];
+  const tcgCardHoldingEntries = Array.isArray(config.tcgCardHoldings) ? config.tcgCardHoldings : [];
 
   for (const traitKey of TRAIT_KEYS) {
     const category = traitCategoryLabel(traitKey);
@@ -945,6 +1584,9 @@ async function getTrendingDashboardData() {
     },
     config,
     communityOffers,
+    officialLoreEntries,
+    tcgInspirationEntries,
+    tcgCardHoldingEntries,
     recentEvaluations,
     trendingTraits,
     basePriceTraits,
@@ -1201,10 +1843,9 @@ function applyTraitDisplayOverrides(traitBreakdown, displayOverride) {
  * (median when available), caps lift toward peak sale by trade depth — less max-heavy than
  * max(floor, topSale). Caller still applies inscription own-sale floor afterward.
  */
-function blendRarestTraitBasePrice(tb) {
+function blendRarestTraitBasePrice(tb, trendingConfig) {
   if (!tb || tb.isSynthetic) return null;
 
-  const floor = tb.floor != null && Number.isFinite(Number(tb.floor)) ? Number(tb.floor) : null;
   const saleMedian = tb.saleMedian != null && Number.isFinite(Number(tb.saleMedian)) ? Number(tb.saleMedian) : null;
   const saleFloorStat = tb.saleFloor != null && Number.isFinite(Number(tb.saleFloor)) ? Number(tb.saleFloor) : null;
   const topSale = tb.topSale != null && Number.isFinite(Number(tb.topSale)) ? Number(tb.topSale) : null;
@@ -1221,6 +1862,10 @@ function blendRarestTraitBasePrice(tb) {
   } else if (topSale != null && topSale > 0) {
     saleSignal = topSale;
   }
+
+  // Non-dominant singleton asks stay ignored (Wizard+Poncho #3449 @ 1M).
+  // Dominant TCG traits keep a real floor, clipped if the ask book is vanity vs sales.
+  const floor = resolveBlendListingFloor(tb, saleSignal, trendingConfig);
 
   const hasFloor = floor != null && floor > 0;
   const hasSale = saleSignal != null && saleSignal > 0;
@@ -1246,6 +1891,16 @@ function blendRarestTraitBasePrice(tb) {
     blended = Math.min(blended, ceiling);
   }
 
+  // Ask book above comps: keep only part of that premium so 4× 800k Wizard
+  // asks lift the estimate without becoming it.
+  if (listed >= 2 && floor > saleSignal) {
+    const excess = floor - saleSignal;
+    let capFrac = 0.42;
+    if (listed >= 8) capFrac = 0.58;
+    else if (listed >= 4) capFrac = 0.48;
+    blended = Math.min(blended, saleSignal + excess * capFrac);
+  }
+
   if (!Number.isFinite(blended) || blended <= 0) {
     const fb = Math.max(floor ?? 0, saleSignal ?? 0, topSale ?? 0);
     return fb > 0 ? fb : null;
@@ -1267,9 +1922,9 @@ function qualifiesRarestTraitThinMarketBaseBoost(tb) {
 
 /** Top-N rarest layers (by supply ≤ maxSupply): base = max(blend each). Caps how many “kind of rare” rows compete. */
 const COMPOUND_ANCHOR_MAX_TRAITS = 3;
-const COMPOUND_ANCHOR_MAX_SUPPLY = 2500;
+const COMPOUND_ANCHOR_MAX_SUPPLY = 500;
 
-function computeCompoundAnchorBase(traitBreakdown) {
+function computeCompoundAnchorBase(traitBreakdown, trendingConfig) {
   const eligible = traitBreakdown.filter(tb => (
     !tb.isSynthetic
     && tb.traitCount != null
@@ -1277,7 +1932,7 @@ function computeCompoundAnchorBase(traitBreakdown) {
   ));
   eligible.sort((a, b) => a.traitCount - b.traitCount || a.trait.localeCompare(b.trait) || String(a.value).localeCompare(String(b.value)));
   const slice = eligible.slice(0, COMPOUND_ANCHOR_MAX_TRAITS);
-  const withBlends = slice.map(tb => ({ tb, blend: blendRarestTraitBasePrice(tb) }));
+  const withBlends = slice.map(tb => ({ tb, blend: blendRarestTraitBasePrice(tb, trendingConfig) }));
 
   let basePriceDoge = null;
   for (const { blend } of withBlends) {
@@ -1396,12 +2051,13 @@ async function buildSnapshot(log = console.log) {
   const start = Date.now();
 
   // Parallel: listings, DOGE price, trait metadata, recent sales, all-time sales
-  const [rawListings, dogeUsd, traitMeta, activityData, allActivityData] = await Promise.all([
+  const [rawListings, dogeUsd, traitMeta, activityData, allActivityData, trendingConfig] = await Promise.all([
     getAllListings({ sortBy: 'price', sortOrder: 'asc' }),
     getDogecoinPrice().catch(() => null),
     getTraitValues().catch(() => null),
     getGlobalActivity(100).catch(() => null),
-    getAllGlobalActivity({ limit: 100, maxPages: 100 }).catch(() => [])
+    getAllGlobalActivity({ limit: 100, maxPages: 100 }).catch(() => []),
+    getTrendingConfig().catch(() => normalizeTrendingConfig(DEFAULT_TRENDING_CONFIG)),
   ]);
 
   const listings = rawListings.map(normaliseListing);
@@ -1459,12 +2115,10 @@ async function buildSnapshot(log = console.log) {
     const traits = traitMap[dn];
     if (!traits) continue;
 
-    for (const key of TRAIT_KEYS) {
-      const val = traits[key];
-      if (!val) continue;
-      if (!traitPrices[key]) traitPrices[key] = {};
-      if (!traitPrices[key][val]) traitPrices[key][val] = [];
-      traitPrices[key][val].push(price);
+    for (const slot of traitAttributionSlots(traits, trendingConfig)) {
+      if (!traitPrices[slot.trait]) traitPrices[slot.trait] = {};
+      if (!traitPrices[slot.trait][slot.value]) traitPrices[slot.trait][slot.value] = [];
+      traitPrices[slot.trait][slot.value].push(price);
     }
   }
 
@@ -1497,28 +2151,24 @@ async function buildSnapshot(log = console.log) {
     dogeUsd: dogeUsd,
   };
 
-  // Recent sales
-  const recentSales = (activityData?.activities || [])
-    .filter(a => a.activityType === 'sale')
-    .map(a => {
-      const saleState = normalizeSaleActivityState(a);
-      return {
-        dogNumber: dogNumberFromName(a.dogName),
-        name: a.dogName,
-        priceDoge: Number(a.priceDoge),
-        status: saleState.status,
-        date: saleState.date,
-        confirmedAt: saleState.confirmedAt,
-        isConfirmed: saleState.isConfirmed,
-        otc: !!a.otc,
-        txid: a.txid,
-      };
-    });
+  // Sales history: merge the live first page with the deep activity scan so
+  // infrequently traded TCG traits (Wizard, Crown, …) still get sale comps.
+  const recentSales = mergeUniqueSales(
+    normalizeActivitySales(activityData?.activities),
+    normalizeActivitySales(allActivityData)
+  );
+  log(`[evaluator] Using ${recentSales.length} priced sales for trait comps.`);
 
   // Enrich traits for recently sold dogs so we can factor sale prices into valuations
   const saleDogs = recentSales.filter(s => s.dogNumber != null && s.priceDoge > 0);
-  const saleTraitQueue = saleDogs.filter(s => !traitMap[s.dogNumber]);
-  log(`[evaluator] Fetching traits for ${saleTraitQueue.length} recently sold dogs...`);
+  const seenSaleDogs = new Set();
+  const saleTraitQueue = [];
+  for (const sale of saleDogs) {
+    if (traitMap[sale.dogNumber] || seenSaleDogs.has(sale.dogNumber)) continue;
+    seenSaleDogs.add(sale.dogNumber);
+    saleTraitQueue.push(sale);
+  }
+  log(`[evaluator] Fetching traits for ${saleTraitQueue.length} sold dogs...`);
 
   const saleQueue = [...saleTraitQueue];
   async function saleEnrichWorker() {
@@ -1539,12 +2189,10 @@ async function buildSnapshot(log = console.log) {
   for (const sale of saleDogs) {
     const traits = traitMap[sale.dogNumber];
     if (!traits) continue;
-    for (const key of TRAIT_KEYS) {
-      const val = traits[key];
-      if (!val) continue;
-      if (!saleTraitPrices[key]) saleTraitPrices[key] = {};
-      if (!saleTraitPrices[key][val]) saleTraitPrices[key][val] = [];
-      saleTraitPrices[key][val].push(sale.priceDoge);
+    for (const slot of traitAttributionSlots(traits, trendingConfig)) {
+      if (!saleTraitPrices[slot.trait]) saleTraitPrices[slot.trait] = {};
+      if (!saleTraitPrices[slot.trait][slot.value]) saleTraitPrices[slot.trait][slot.value] = [];
+      saleTraitPrices[slot.trait][slot.value].push(sale.priceDoge);
     }
   }
 
@@ -1606,6 +2254,7 @@ async function evaluateDog(dogNumber) {
   const trendingConfig = await getTrendingConfig();
   const trendingSummary = buildTrendingSummary(_snapshot, trendingConfig);
   const refusedOfferFloor = trendingConfig?.refusedOffers?.[String(dogNumber)] || null;
+  const officialLoreFloor = trendingConfig?.officialLore?.[String(dogNumber)] || null;
   const { traitStats, saleTraitStats, collectionStats, listingByDog, recentSales } = _snapshot;
   const dogeUsd = await getLiveDogeUsd().catch(() => _snapshot.dogeUsd);
   const traitMeta = _snapshot.traitMeta;
@@ -1653,7 +2302,7 @@ async function evaluateDog(dogNumber) {
     if (saleStats) {
       const salesWithTrait = recentSales.filter(s => {
         const st = _snapshot.traitMap[s.dogNumber];
-        return st && st[key] === val;
+        return st && st[key] === val && saleAttributesToTrait(st, key, val, trendingConfig);
       });
       if (salesWithTrait.length > 0) {
         traitTopSale = Math.max(...salesWithTrait.map(s => s.priceDoge));
@@ -1743,9 +2392,23 @@ async function evaluateDog(dogNumber) {
     }
   }
 
+  let trendingSuppressedByComps = false;
+  if (trendingMultiplier > 1) {
+    const maxHits = trendingHits.filter(h => h.multiplier === trendingMultiplier);
+    const maxHitHasComps = maxHits.some((h) => {
+      const tb = traitBreakdown.find(t => t.trait === h.trait && String(t.value) === String(h.value));
+      if (!tb) return false;
+      return traitHasUsableMarketComps(tb);
+    });
+    if (maxHitHasComps) {
+      trendingSuppressedByComps = true;
+      trendingMultiplier = 1;
+    }
+  }
+
   // --- Valuation logic ---
   // Compound anchor: max(blend) over the top-N rarest non-synthetic traits (supply ≤ cap).
-  const compound = computeCompoundAnchorBase(traitBreakdown);
+  const compound = computeCompoundAnchorBase(traitBreakdown, trendingConfig);
   let basePriceDoge = compound.basePriceDoge;
 
   let rarestTraitThinMarketBoost = null;
@@ -1920,13 +2583,14 @@ async function evaluateDog(dogNumber) {
   for (const combo of smCombos) {
     if (!combo || combo.enabled === false) continue;
     const conditions = Array.isArray(combo.conditions) ? combo.conditions : [];
-    if (conditions.length === 0) continue;
-    const allMatch = conditions.every(cond => {
+    const dogAllowlist = normalizeComboDogNumbers(combo.dogNumbers);
+    if (conditions.length === 0 && dogAllowlist.length === 0) continue;
+    if (dogAllowlist.length > 0 && !dogAllowlist.includes(Number(dogNumber))) continue;
+    const allMatch = conditions.length === 0 || conditions.every(cond => {
       const val = traits[cond.trait];
       const sv = traitSlotIsPresent(val) ? String(val).toLowerCase().trim() : '';
       const cv = String(cond.value || '').toLowerCase().trim();
-      if (!cv) return false;
-      if (cv === 'any') return sv.length > 0;
+      if (!cv || cv === 'any') return true;
       if (cv === 'none') return sv.length === 0;
       if (sv.length === 0) return false;
       return cond.op === 'contains' ? sv.includes(cv) : sv === cv;
@@ -1947,8 +2611,10 @@ async function evaluateDog(dogNumber) {
         label: matchedCombos.map(c => c.label).filter(Boolean).join(' · ') || 'Combo stack',
         conditions: [],
       });
-  if (matchedCombos.length > 0 && estimatedDoge != null && comboMultiplier !== 1) {
-    estimatedDoge = Math.round(estimatedDoge * comboMultiplier);
+  if (matchedCombos.length > 0 && comboMultiplier !== 1) {
+    if (estimatedDoge != null) {
+      estimatedDoge = Math.round(estimatedDoge * comboMultiplier);
+    }
     specialMultiplierDetails.push({
       type: 'combo',
       label: matchedComboDisplay?.label || 'Combo',
@@ -2004,6 +2670,39 @@ async function evaluateDog(dogNumber) {
     });
   }
 
+  // --- DDL TCG set (fancy tag always; stack boost for 2 / 3+ traits, not compounding the 2×) ---
+  const tcgResolved = resolveTcgSetHits(traits, smConfig.tcgSet);
+  let tcgSetMatch = null;
+  if (tcgResolved.count > 0) {
+    const tcgLabelBase = tcgResolved.label;
+    const tierLabel = tcgResolved.tier === 'triple'
+      ? `${tcgLabelBase} Trio+`
+      : (tcgResolved.tier === 'dual' ? `${tcgLabelBase} Duo` : tcgLabelBase);
+    const hitKeys = new Set(tcgResolved.hits.map(h => `${h.trait}:${String(h.value).toLowerCase()}`));
+    for (const tb of traitBreakdown) {
+      if (!tb || tb.isSynthetic) continue;
+      const key = `${tb.trait}:${String(tb.value || '').toLowerCase()}`;
+      if (hitKeys.has(key)) {
+        tb.tcgPart = { label: tcgLabelBase, tier: tcgResolved.tier };
+      }
+    }
+    tcgSetMatch = {
+      label: tierLabel,
+      count: tcgResolved.count,
+      tier: tcgResolved.tier,
+      traits: tcgResolved.hits,
+      multiplier: tcgResolved.multiplier > 1 ? tcgResolved.multiplier : null,
+    };
+    if (estimatedDoge != null && tcgResolved.multiplier > 1) {
+      estimatedDoge = Math.round(estimatedDoge * tcgResolved.multiplier);
+      specialMultiplierDetails.push({
+        type: 'tcg_set',
+        label: `🃏 ${tierLabel}`,
+        multiplier: tcgResolved.multiplier,
+      });
+    }
+  }
+
   const refusedOfferFloorDoge = refusedOfferFloor?.minOfferDoge != null
     ? Number(refusedOfferFloor.minOfferDoge)
     : (refusedOfferFloor?.minOfferUsd != null && dogeUsd ? Math.round(Number(refusedOfferFloor.minOfferUsd) / dogeUsd) : null);
@@ -2012,12 +2711,49 @@ async function evaluateDog(dogNumber) {
     estimatedDoge = Math.round(refusedOfferFloorDoge);
   }
 
+  const officialLoreFloorDoge = officialLoreFloor?.minOfferDoge != null
+    ? Number(officialLoreFloor.minOfferDoge)
+    : (officialLoreFloor?.minOfferUsd != null && dogeUsd ? Math.round(Number(officialLoreFloor.minOfferUsd) / dogeUsd) : null);
+
+  if (officialLoreFloorDoge != null && (estimatedDoge == null || estimatedDoge < officialLoreFloorDoge)) {
+    estimatedDoge = Math.round(officialLoreFloorDoge);
+  }
+
   let communityLoreMultiplierFactor = null;
   if (communityLore && estimatedDoge != null) {
     const lf = normalizeSignedPriceMultiplier(rawCommunityLoreMultiplier);
     if (lf !== 1) {
       estimatedDoge = Math.round(estimatedDoge * lf);
       communityLoreMultiplierFactor = lf;
+    }
+  }
+
+  const tcgInspirationHits = lookupTcgInspirationsForDog(dogNumber, trendingConfig.tcgInspirations);
+  let tcgInspiration = null;
+  if (tcgInspirationHits.length > 0) {
+    const primary = tcgInspirationHits[0];
+    const dogOnlyMultiplier = normalizeTcgInspirationMultipliers(trendingConfig.tcgInspirationMultipliers).dogOnly;
+    tcgInspiration = {
+      cards: tcgInspirationHits.map(hit => ({
+        dogNumber: hit.dogNumber,
+        cardName: hit.cardName,
+        cardId: hit.cardId,
+        brandedHandle: hit.brandedHandle,
+        brandedWallets: hit.brandedWallets,
+        note: hit.note,
+      })),
+      dogOnlyMultiplier,
+      label: tcgInspirationHits.length === 1
+        ? `DDL TCG inspiration · ${primary.cardName}`
+        : `DDL TCG inspiration · ${tcgInspirationHits.map(h => h.cardName).join(', ')}`,
+    };
+    if (estimatedDoge != null && dogOnlyMultiplier > 1) {
+      estimatedDoge = Math.round(estimatedDoge * dogOnlyMultiplier);
+      specialMultiplierDetails.push({
+        type: 'tcg_inspiration',
+        label: `🃏 ${tcgInspiration.label}`,
+        multiplier: dogOnlyMultiplier,
+      });
     }
   }
 
@@ -2088,6 +2824,7 @@ async function evaluateDog(dogNumber) {
       } : null,
       trendingMultiplier: trendingMultiplier > 1 ? trendingMultiplier : null,
       trendingHits: trendingHits.length > 0 ? trendingHits : null,
+      trendingSuppressedByComps: trendingSuppressedByComps || null,
       colorMatch,
       colorMatchMultiplier: colorMatch ? colorMatchMultiplier : null,
       minimalDog: isMinimalDog ? { type: minimalType, label: minimalLabel, extraTraitCount } : null,
@@ -2102,6 +2839,8 @@ async function evaluateDog(dogNumber) {
       comboMultiplier: matchedCombos.length > 0 ? comboMultiplier : null,
       angelNumber: isAngelNumber ? { type: angelType, label: angelLabel } : null,
       angelMultiplier: isAngelNumber ? angelMultiplier : null,
+      tcgSetMatch,
+      tcgInspiration,
       specialMultiplier: specialMultiplierDetails.length > 0 ? specialMultiplierDetails.reduce((acc, detail) => acc * detail.multiplier, 1.0) : null,
       specialMultiplierDetails: specialMultiplierDetails.length > 0 ? specialMultiplierDetails : null,
       ownTopSale,
@@ -2115,6 +2854,17 @@ async function evaluateDog(dogNumber) {
         updatedAt: refusedOfferFloor.updatedAt || null,
         updatedBy: refusedOfferFloor.updatedBy || null,
       } : null,
+      officialLoreFloor: officialLoreFloor ? {
+        dogNumber: officialLoreFloor.dogNumber,
+        minOfferDoge: officialLoreFloorDoge,
+        minOfferUsd: officialLoreFloor.minOfferUsd != null
+          ? +Number(officialLoreFloor.minOfferUsd).toFixed(2)
+          : (officialLoreFloorDoge != null && dogeUsd ? +(officialLoreFloorDoge * dogeUsd).toFixed(2) : null),
+        note: officialLoreFloor.note || null,
+        imageUrl: normalizeLoreImageUrl(officialLoreFloor.imageUrl),
+        updatedAt: officialLoreFloor.updatedAt || null,
+        updatedBy: officialLoreFloor.updatedBy || null,
+      } : null,
       collectionFloor: collectionStats.floor,
       dogeUsd,
       communityLore: communityLore || null,
@@ -2126,6 +2876,10 @@ async function evaluateDog(dogNumber) {
         isMinimalDog ? 'minimal_dog_multiplier' : null,
         matchedCombos.length > 0 ? 'combo_multiplier' : null,
         isAngelNumber ? 'angel_number_multiplier' : null,
+        tcgSetMatch && tcgSetMatch.multiplier ? 'tcg_set_stack_multiplier' : null,
+        tcgInspiration ? 'tcg_inspiration_multiplier' : null,
+        trendingSuppressedByComps ? 'trending_suppressed_by_comps' : null,
+        officialLoreFloorDoge != null ? 'official_lore_floor' : null,
         communityLoreMultiplierFactor ? 'community_lore_multiplier' : null,
       ].filter(Boolean).join(' + '),
     },
@@ -2138,8 +2892,14 @@ async function evaluateWallet(address) {
   if (!_snapshot) throw new Error('Snapshot not ready. Wait for first refresh.');
 
   const dogeUsd = await getLiveDogeUsd().catch(() => _snapshot.dogeUsd);
+  const trendingConfig = await getTrendingConfig().catch(() => normalizeTrendingConfig(DEFAULT_TRENDING_CONFIG));
 
   const walletData = await getWalletData(address);
+  const walletProfile = await searchWallet(address).catch(() => null);
+  const owner = {
+    address,
+    handle: walletProfile?.twitterUsername || walletProfile?.username || null,
+  };
   const rawHoldings = Array.isArray(walletData?.holdings) ? walletData.holdings : [];
   const dogNumbers = [...new Set(rawHoldings
     .map(holding => Number(holding?.dogId))
@@ -2147,9 +2907,45 @@ async function evaluateWallet(address) {
 
   const evaluations = await mapWithConcurrency(dogNumbers, 5, async dogNumber => evaluateDog(dogNumber));
   const successfulEvaluations = evaluations.filter(result => result && !result.error);
+
+  const missingInspirationDogs = [...new Set((trendingConfig.tcgCardHoldings || [])
+    .filter(h => holdingMatchesWallet(h, owner))
+    .flatMap(h => (trendingConfig.tcgInspirations || [])
+      .filter(ins => tcgCardsMatch(ins, h) && !dogNumbers.includes(ins.dogNumber))
+      .map(ins => ins.dogNumber)))];
+  const inspirationEstimates = {};
+  if (missingInspirationDogs.length > 0) {
+    const extraEvals = await mapWithConcurrency(missingInspirationDogs, 3, async dogNumber => evaluateDog(dogNumber));
+    for (const ev of extraEvals) {
+      if (!ev || ev.error) continue;
+      inspirationEstimates[ev.dogNumber] = ev.estimation?.displayEstimatedDoge ?? ev.estimation?.estimatedDoge ?? 0;
+    }
+  }
+
+  const synergy = applyTcgWalletSynergy({
+    evaluations: successfulEvaluations,
+    dogNumbers,
+    owner,
+    config: trendingConfig,
+    dogeUsd,
+    inspirationEstimates,
+  });
+
   const holdings = successfulEvaluations
-    .map(result => summarizeEvaluation(result, dogeUsd))
+    .map(result => {
+      const summary = summarizeEvaluation(result, dogeUsd);
+      const adj = synergy.byDog[result.dogNumber];
+      if (adj) {
+        summary.estimatedDoge = adj.estimatedDoge;
+        summary.estimatedUsd = adj.estimatedUsd;
+        summary.tcgNote = adj.note;
+        summary.tcg = adj.tcg;
+      }
+      return summary;
+    })
     .sort((left, right) => (right.estimatedDoge ?? 0) - (left.estimatedDoge ?? 0));
+
+  const tcgExtras = synergy.extras || [];
 
   const totals = holdings.reduce((summary, holding) => {
     summary.estimatedDoge += holding.estimatedDoge ?? 0;
@@ -2165,6 +2961,12 @@ async function evaluateWallet(address) {
     listedAskingDoge: 0,
     listedAskingUsd: 0,
   });
+  for (const extra of tcgExtras) {
+    totals.estimatedDoge += extra.estimatedDoge ?? 0;
+    totals.estimatedUsd += extra.estimatedUsd ?? 0;
+  }
+  totals.estimatedDoge = Math.round(totals.estimatedDoge);
+  if (dogeUsd) totals.estimatedUsd = +Number(totals.estimatedUsd).toFixed(2);
 
   const floorEquivalentDoge = _snapshot.collectionStats.floor != null
     ? Math.round(_snapshot.collectionStats.floor * dogNumbers.length)
@@ -2188,6 +2990,12 @@ async function evaluateWallet(address) {
       floorEquivalentUsd: floorEquivalentDoge != null && dogeUsd ? +(floorEquivalentDoge * dogeUsd).toFixed(2) : null,
     },
     holdings,
+    tcgExtras,
+    tcgRegistry: {
+      inspirations: trendingConfig.tcgInspirations || [],
+      holdings: trendingConfig.tcgCardHoldings || [],
+      multipliers: trendingConfig.tcgInspirationMultipliers || DEFAULT_TCG_INSPIRATION_MULTIPLIERS,
+    },
     failed: evaluations
       .filter(result => result?.error)
       .map(result => ({ dogNumber: result.dogNumber, error: result.error })),
@@ -2250,4 +3058,8 @@ export {
   evaluateWallet,
   startRefreshLoop,
   stopRefreshLoop,
+  traitAttributionSlots,
+  blendRarestTraitBasePrice,
+  applyTcgWalletSynergy,
+  COMPOUND_ANCHOR_MAX_SUPPLY,
 };

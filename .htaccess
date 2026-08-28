@@ -76,6 +76,20 @@ DirectoryIndex index.html index.htm
   # VOYAGER_PASSWORD). The map/.htaccess inside that directory rewrites all
   # requests to the virtual /__nsv_gate/* path so Passenger (Node) can apply
   # the password gate before any file is served.
+  # DDL TCG companion: same pattern for /ddl/* → /__ddl_gate/* (DDL_PASSWORD).
+  # Legends Bracket: /tourney/* → /__tourney_gate/* (Express serves static /bracket + /tourney-api).
+  # Subdomain: dedicated folder /home/kushmetax/ddltcg.kushmetax.com (standalone
+  # Passenger app). The Host rule below is only a fallback if that host is
+  # accidentally pointed at THIS folder (public_html).
+  # Admin panel: Apache must not serve admin.html as a static file — that
+  # bypasses Node HTTP Basic Auth. Rewrite to a virtual path Express owns.
+  RewriteCond %{ENV:REDIRECT_ADMIN_GATED} !=1
+  RewriteRule ^admin(\.html)?$ /__admin_gate [E=ADMIN_GATED:1,L]
+  # Pretty /tourney/t/slug URLs 404 on the current Node process. Send them to
+  # /tourney/?t=slug, which the live /tourney/ route already serves.
+  RewriteRule ^tourney/t/([^/]+)/?$ /tourney/?t=$1 [R=302,L,QSA]
+  RewriteCond %{ENV:REDIRECT_TOURNEY_GATED} !=1
+  RewriteRule ^tourney(/.*)?$ /__tourney_gate$1 [E=TOURNEY_GATED:1,L]
   # /server/* (Node app data + admin password file)
   RewriteRule ^server(/|$)                                - [F,L,NC]
   # /node_modules/* (full dependency disclosure if served)
@@ -91,6 +105,21 @@ DirectoryIndex index.html index.htm
   # Anything ending in .bak / .env / .ndjson / .log at any depth
   # (defence-in-depth, also caught by FilesMatch above)
   RewriteRule \.(bak|backup|old|orig|env|ndjson|log|sqlite3?|db)$ - [F,L,NC]
+  # ddl.kushmedia.xyz / ddltcg.kushmetax.com (only if that host shares this document root)
+  RewriteCond %{HTTP_HOST} ^(www\.)?(ddl\.kushmedia\.xyz|ddltcg\.kushmetax\.com)$ [NC]
+  RewriteCond %{REQUEST_URI} !^/__ddl_gate
+  RewriteRule ^(.*)$ /__ddl_gate/$1 [E=DDL_HOST:1,L]
+</IfModule>
+<IfModule !mod_rewrite.c>
+  <Files "admin.html">
+    <IfModule mod_authz_core.c>
+      Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+      Order allow,deny
+      Deny from all
+    </IfModule>
+  </Files>
 </IfModule>
 # -----------------------------------------------------------------------------
 # 6. Baseline security headers - applied to every response, including 4xx/5xx.
@@ -108,6 +137,10 @@ DirectoryIndex index.html index.htm
   # Cross-origin isolation defaults.
   Header always set Cross-Origin-Resource-Policy "same-origin"
   Header always set Cross-Origin-Opener-Policy "same-origin"
+  # X/Twitter fetch share images from their own origin.
+  SetEnvIf Request_URI "(^|/)bracket/og\.jpg$" TOURNEY_SHARE_IMAGE
+  Header always unset Cross-Origin-Resource-Policy env=TOURNEY_SHARE_IMAGE
+  Header always set Cross-Origin-Resource-Policy "cross-origin" env=TOURNEY_SHARE_IMAGE
   # Powerful-feature opt-out.
   Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
   # Reduce server fingerprint where the runtime allows it.
@@ -123,7 +156,7 @@ DirectoryIndex index.html index.htm
   # The connect-src allowlist was computed by the Probe Agent from a grep
   # of every HTML/JS asset (see docs/security/deployment-facts.md).
   # ---------------------------------------------------------------------------
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com; script-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai https://therovers.xyz https://assets.coingecko.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com; script-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddl.kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai https://therovers.xyz https://assets.coingecko.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://cdn.discordapp.com https://media.discordapp.net; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
   # ---------------------------------------------------------------------------
   # 6b. STRICT Content-Security-Policy (DISABLED - flip on after refactor)
   # ---------------------------------------------------------------------------
@@ -134,7 +167,7 @@ DirectoryIndex index.html index.htm
   #      (run report-only first, then promote).
   # To activate: comment out 6a above and uncomment the Header line below.
   # ---------------------------------------------------------------------------
-  # Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-elem 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  # Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-elem 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddl.kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
   # Optional: report-only mirror to collect violations without breaking pages.
   # Uncomment together with the strict policy above to run them in parallel
   # for one deploy cycle, then remove report-only and switch the strict one
@@ -181,8 +214,10 @@ PassengerStartupFile server.js
 # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
 # Environment secrets: set in the hosting control panel (LiteSpeed/cPanel
 # "Environment Variables"), or use gitignored files under server/data/
-# (.dd-admin-password, .dd-admin-ui-password, .dd-community-password).
-# Never commit passwords in this file.
+# (.dd-admin-password, .dd-admin-ui-password, .dd-community-password,
+# .ddl-password). Never commit passwords in this file.
+# DDL TCG companion: dedicated host is ddltcg.kushmetax.com (its own folder +
+# .ddl-password). For /ddl on this app, set DDL_PASSWORD in public/.env (same place as VOYAGER_PASSWORD).
 #
 # DogiDex login bridge: Express serves the auth router at POST …/bridge-supabase-token under
 # /dd-evaluator/auth (best for APISIX), /kmx-auth, /kk-auth. HTML 503 + APISIX means the route

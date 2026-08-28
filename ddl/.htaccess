@@ -1,0 +1,43 @@
+# =============================================================================
+# /ddl/.htaccess — DDL TCG companion password gate (Apache layer)
+#
+# WHY THIS EXISTS:
+#   The password lock is enforced server-side in public/server/index.js
+#   (HTTP Basic Auth via DDL_PASSWORD). For that gate to RUN, every
+#   request under /ddl/* must reach the Passenger Node app — Apache must
+#   not serve any static file from this directory directly. Without this
+#   file, Apache would hand out /ddl/index.html and /ddl/data/*.js
+#   to anyone, completely bypassing the password.
+#
+#   Dedicated subdomain: upload the standalone kit into
+#   /home/kushmetax/ddltcg.kushmetax.com (see D:\DDLTCG\deploy\kushmedia-ddl).
+#   This folder is only for https://kushmedia.xyz/ddl/ on the main site.
+# =============================================================================
+
+Options -Indexes -MultiViews
+DirectoryIndex disabled
+
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, nosnippet, noarchive"
+  Header always set Cache-Control "no-store, private"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /ddl/
+
+  RewriteCond %{ENV:REDIRECT_DDL_GATED} !=1
+  RewriteRule ^(.*)$ /__ddl_gate/$1 [E=DDL_GATED:1,L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+  <FilesMatch "\.(html?|js|mjs|css|map|json)$">
+    <IfModule mod_authz_core.c>
+      Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+      Order allow,deny
+      Deny from all
+    </IfModule>
+  </FilesMatch>
+</IfModule>
