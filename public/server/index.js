@@ -9,13 +9,15 @@ const cookieParser = require('cookie-parser');
 
 const { curateDiscoveredPois } = require('./voyager-curate');
 
-const nailDesignerRouter = require('./routes/nail-designer');
 const ddEvaluatorRouter = require('./routes/dd-evaluator');
 const coingeckoRouter = require('./routes/coingecko');
 const btcPublicRouter = require('./routes/btc-public');
 const authDexRouter = require('./routes/auth-dex');
 const { resolveSessionSecret } = require('./session-secret');
 const { timingSafeEqualString } = require('./security-utils');
+const { contentSecurityPolicy } = require('./csp-policy');
+const { sendConfigJs } = require('./dogidex-public-config');
+const { createAdminHtmlGate } = require('./admin-html-gate');
 
 (function loadDotenvFromStandardRoots() {
 	const roots = new Set([
@@ -103,6 +105,12 @@ function pathLooksSensitive(rawPath) {
 	if (/DD\s*Price\s*Evaluation/i.test(normalized)) {
 		return true;
 	}
+	if (
+		lower.includes('/.env')
+		|| /\.(?:env|pem|key|sql)(?:\.|$)/i.test(lower)
+	) {
+		return true;
+	}
 	return false;
 }
 
@@ -122,6 +130,7 @@ app.use((request, response, next) => {
 	if (secure) {
 		response.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 	}
+	response.set('Content-Security-Policy', contentSecurityPolicy());
 	next();
 });
 
@@ -165,7 +174,6 @@ app.use((request, response, next) => {
 	next();
 });
 
-app.use('/api/nail-designer', nailDesignerRouter);
 app.use('/api/dd-evaluator', ddEvaluatorRouter);
 /** Keyless BTC spot + OHLC proxy (Coinbase + ECB FX). Mirrors match `/kk-auth`, `/kmx-*`, `/dd-evaluator/auth` routing quirks on LiteSpeed/APISIX. */
 app.use('/btc-public', btcPublicRouter);
@@ -223,17 +231,6 @@ app.get('/healthz', (request, response) => {
 	});
 });
 
-
-app.get('/nail-designer', (request, response) => {
-	response.sendFile(path.join(siteRoot, 'nail-designer', 'index.html'));
-});
-
-app.get('/gotchi', (request, response) => {
-	response.redirect(301, '/gotchi/');
-});
-app.get('/gotchi/', (request, response) => {
-	response.sendFile(path.join(siteRoot, 'gotchi', 'index.html'));
-});
 
 // DDL Tourney — static files in /bracket, JSON API on this same Node process.
 // No Vite and no extra port. Apache may rewrite /tourney → /__tourney_gate.
@@ -300,7 +297,7 @@ app.get(['/dd-evaluator', '/dd-evaluator/'], (request, response) => {
 
 // =============================================================================
 // NovaScotiaVoyage password gate.
-// Mirrors the /admin.html pattern: HTTP Basic Auth, timing-safe comparison,
+// HTTP Basic Auth, timing-safe comparison,
 // password supplied via VOYAGER_PASSWORD env var (or VOYAGER_PASSWORD_FILE).
 // Default-locked: if no password is configured the tool returns 404 so it
 // stays hidden — only setting the env var unlocks the public surface.
@@ -607,64 +604,32 @@ app.get('/api/voyager/pois', voyagerGate, (request, response) => {
 	response.json({ attribution: 'OpenStreetMap', generatedAt: null, count: 0, pois: [] });
 });
 
-function sendDdAdminHtml(response) {
-	response.sendFile(path.join(siteRoot, 'admin.html'), {
-		headers: {
-			'Cache-Control': 'no-store, private',
-			'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive',
-		},
-	});
-}
+app.get(['/dd-evaluator/config.js', '/__dd_config'], sendConfigJs);
 
-function ddAdminHtmlHidden(response) {
-	response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
-	response.set('Cache-Control', 'no-store, private');
-	response.status(404).send('Not found');
-}
-
-function ddAdminHtmlChallenge(response) {
-	response.set('WWW-Authenticate', 'Basic realm="DD Evaluator Admin", charset="UTF-8"');
-	response.set('Cache-Control', 'no-store, private');
-	response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
-	response.status(401).send('Unauthorized');
-}
-
-function ddAdminHtmlGate(request, response, next) {
-	if (/^(1|true|yes|on)$/i.test(String(process.env.DD_ADMIN_UI_PUBLIC || ''))) {
-		return next();
-	}
-	const gate = ddEvaluatorRouter.resolveAdminHtmlGatePassword();
-	if (!gate) {
-		return ddAdminHtmlHidden(response);
-	}
-	const auth = request.headers.authorization;
-	if (!auth || typeof auth !== 'string' || !auth.startsWith('Basic ')) {
-		return ddAdminHtmlChallenge(response);
-	}
-	let password = '';
-	try {
-		const decoded = Buffer.from(auth.slice(6).trim(), 'base64').toString('utf8');
-		const colon = decoded.indexOf(':');
-		password = colon >= 0 ? decoded.slice(colon + 1) : decoded;
-	} catch (_err) {
-		return ddAdminHtmlChallenge(response);
-	}
-	if (!timingSafeEqualString(gate, password)) {
-		return ddAdminHtmlChallenge(response);
-	}
-	return next();
-}
-
-app.get(['/admin', '/admin.html', '/__admin_gate', '/__admin_gate/'], ddAdminHtmlGate, (request, response) => {
-	sendDdAdminHtml(response);
+const ddAdminHtml = createAdminHtmlGate({
+	resolveLegacyPassword: () => ddEvaluatorRouter.resolveAdminHtmlGatePassword(),
+	adminHtmlFile: path.join(__dirname, 'private', 'dd-admin.html'),
 });
+const ddAdminMount = ddAdminHtml.mount(app);
 
 app.get('/community-suggestions.html', (request, response) => {
 	response.sendFile(path.join(siteRoot, 'community-suggestions.html'));
 });
 
+app.get('/robots.txt', (request, response) => {
+	response.type('text/plain; charset=utf-8');
+	response.set('Cache-Control', 'public, max-age=3600');
+	response.sendFile(path.join(siteRoot, 'robots.txt'));
+});
+app.get('/.well-known/security.txt', (request, response) => {
+	response.type('text/plain; charset=utf-8');
+	response.set('Cache-Control', 'public, max-age=86400');
+	response.sendFile(path.join(siteRoot, '.well-known', 'security.txt'));
+});
+
 app.use(express.static(siteRoot, {
 	dotfiles: 'deny',
+	index: 'index.html',
 	extensions: ['html'],
 	setHeaders(response, filePath) {
 		if (/\.(?:png|jpg|jpeg|gif|webp|svg|mp4|css|js)$/i.test(filePath)) {
@@ -678,6 +643,18 @@ app.use(express.static(siteRoot, {
 	}
 }));
 
+app.use((request, response) => {
+	response.set('X-Robots-Tag', 'noindex, nofollow');
+	response.set('Cache-Control', 'no-store, private');
+	response.status(404);
+	const notFoundPage = path.join(siteRoot, '404.html');
+	if (fs.existsSync(notFoundPage)) {
+		response.sendFile(notFoundPage);
+		return;
+	}
+	response.type('html').send('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Not found</title></head><body><p>Not found.</p></body></html>');
+});
+
 if (require.main === module) {
 	const cb = () => {
 		console.log('KushBrand server listening (passenger=' + Boolean(process.env.PASSENGER_BASE_URI || process.env.PORT) + ')');
@@ -687,8 +664,10 @@ if (require.main === module) {
 		if (uiPw && traitPw && uiPw !== traitPw) {
 			console.log('[dd-evaluator] DD_ADMIN_UI_PASSWORD and DD_ADMIN_PASSWORD both set and differ — API saves use the trait secret (DD_ADMIN_PASSWORD), not the UI Basic gate.');
 		}
-		if (!ddEvaluatorRouter.resolveAdminHtmlGatePassword() && !/^(1|true|yes|on)$/i.test(String(process.env.DD_ADMIN_UI_PUBLIC || ''))) {
-			console.log('[dd-evaluator] /admin.html hidden (404) until DD_ADMIN_PASSWORD or DD_ADMIN_UI_PASSWORD is set.');
+		if (!ddAdminMount.mounted) {
+			console.log('[dd-evaluator] admin HTML hidden (404) until ADMIN_PATH, ADMIN_USER, and ADMIN_PASS (or DD_ADMIN_PASSWORD) are set.');
+		} else {
+			console.log('[dd-evaluator] admin HTML enabled at ADMIN_PATH (Basic realm Restricted).');
 		}
 		if (ddEvaluatorRouter.getCommunitySubmitPassword()) {
 			console.log('[dd-evaluator] Community suggestion submissions require DD_COMMUNITY_PASSWORD.');

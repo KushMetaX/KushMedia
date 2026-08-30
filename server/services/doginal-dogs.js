@@ -344,7 +344,7 @@ async function getCatalogDogTraits(dogNumber) {
 
 function getFetch() {
   if (typeof fetch !== 'function') {
-    throw new Error('Node 18 or newer is required to run the Nail Designer API.');
+    throw new Error('Node 18 or newer is required to run the Doginal Dogs API.');
   }
 
   return fetch.bind(globalThis);
@@ -821,7 +821,7 @@ async function getInscriptionRecord(dogNumber) {
       inscriptionId: searchResult.inscriptionId || null,
       marketInscriptionNumber: searchResult.inscriptionNumber || null,
       imageUrl: searchResult.imageUrl ? `${MARKET_BASE}${searchResult.imageUrl}` : `${MARKET_BASE}/dogs/${dogNumber}.png`,
-      proxyImageUrl: `/api/nail-designer/image/${dogNumber}`,
+      proxyImageUrl: searchResult.imageUrl ? `${MARKET_BASE}${searchResult.imageUrl}` : `${MARKET_BASE}/dogs/${dogNumber}.png`,
       background: {
         name: traits.background,
         color: backgroundColor

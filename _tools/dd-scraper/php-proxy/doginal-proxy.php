@@ -47,7 +47,7 @@ function fetchUrl($url, $accept = 'application/json') {
             CURLOPT_HTTPHEADER     => array(
                 'Accept: ' . $accept,
                 'trpc-accept: application/json',
-                'User-Agent: Mozilla/5.0 (compatible; KushMedia-NailDesigner/1.0)'
+                'User-Agent: Mozilla/5.0 (compatible; KushMedia-DogeProxy/1.0)'
             ),
         ));
         $body     = curl_exec($ch);
@@ -66,7 +66,7 @@ function fetchUrl($url, $accept = 'application/json') {
     // Fallback: file_get_contents (requires allow_url_fopen = On)
     $opts = array('http' => array(
         'method'        => 'GET',
-        'header'        => "Accept: {$accept}\r\ntrpc-accept: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; KushMedia-NailDesigner/1.0)\r\n",
+        'header'        => "Accept: {$accept}\r\ntrpc-accept: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; KushMedia-DogeProxy/1.0)\r\n",
         'timeout'       => 12,
         'ignore_errors' => true,
     ), 'ssl' => array(

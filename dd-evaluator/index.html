@@ -2661,17 +2661,8 @@
   </dialog>
 
   <script src="../brand.js?v=ddl-tourney"></script>
-  <!-- emailRedirectUrl: public base URL for auth emails (magic link, confirm, recover). Must match Supabase Redirect URLs. Without it, localhost dev leaks into those links. -->
-  <script>
-    window.__DOGIDEX_SUPABASE__ = Object.assign(
-      {
-        url: 'https://tblktaifczarnesqucwz.supabase.co',
-        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRibGt0YWlmY3phcm5lc3F1Y3d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NzQzNjcsImV4cCI6MjA5MzA1MDM2N30.Y0dXaaTo-k-i77IVMUQGOHfRpG77mHYdVm7mQiR7Zy8',
-        emailRedirectUrl: 'https://kushmedia.xyz/dd-evaluator'
-      },
-      window.__DOGIDEX_SUPABASE__ || {}
-    );
-  </script>
+  <!-- Anon URL + key injected by Express from env (GET config.js). Never put service_role here. -->
+  <script src="config.js"></script>
   <script src="dogidex-supabase.js"></script>
   <script>
     (function () {

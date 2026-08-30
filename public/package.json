@@ -2,7 +2,7 @@
   "name": "kushmedia",
   "version": "1.0.0",
   "private": true,
-  "description": "KushMetaX site — Express APIs (DD evaluator, nail designer) + static hosting",
+  "description": "KushMetaX site — Express APIs (DD evaluator) + static hosting",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

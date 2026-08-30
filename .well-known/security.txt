@@ -1,0 +1,5 @@
+Contact: https://x.com/KushMetaX
+Contact: mailto:REPLACE-ME@kushmedia.xyz
+Expires: 2027-08-29T00:00:00.00Z
+Preferred-Languages: en
+Canonical: https://kushmedia.xyz/.well-known/security.txt

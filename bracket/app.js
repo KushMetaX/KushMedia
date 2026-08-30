@@ -95,6 +95,7 @@ function tourneyReturnPath() {
   if (parts[0] === 't' && parts[1]) return arenaShareHref(parts[1]);
   if (parts[0] === 'player' && parts[1]) return `/tourney/#/player/${encodeURIComponent(parts[1])}`;
   if (parts[0] === 'records') return '/tourney/#/records';
+  if (parts[0] === 'ledger') return '/tourney/#/ledger';
   if (parts[0] === 'create') return '/tourney/#/create';
   return '/tourney/';
 }
@@ -153,9 +154,12 @@ function applyPlayerChrome() {
   }
   if (nameEl) {
     if (signedIn) {
-      nameEl.textContent = playerUser.tourneyHandle || playerUser.discordUsername || 'Player';
+      const handle = playerUser.tourneyHandle || playerUser.discordUsername || 'Player';
+      nameEl.classList.add('named-handle');
+      nameEl.innerHTML = `${esc(handle)}${medalsInlineHtml(badgesFor(handle))}`;
       nameEl.href = playerUser.tourneyHandle ? `/tourney/#/player/${encodeURIComponent(playerUser.tourneyHandle)}` : '/tourney/#/records';
     } else {
+      nameEl.classList.remove('named-handle');
       nameEl.textContent = '';
       nameEl.removeAttribute('href');
     }
@@ -192,10 +196,10 @@ function applyPlayerChrome() {
   }
 }
 
-function playerLink(handle) {
+function playerLink(handle, badges) {
   const h = String(handle || '').trim();
   if (!h) return '—';
-  return `<a href="/tourney/#/player/${encodeURIComponent(h)}">${esc(h)}</a>`;
+  return `<a class="named-handle" href="/tourney/#/player/${encodeURIComponent(h)}">${esc(h)}${medalsInlineHtml(badgesFor(h, badges))}</a>`;
 }
 
 function hostHeaders() {
@@ -269,6 +273,312 @@ const FORMAT_LABEL = {
   swiss: 'Swiss',
 };
 
+const MARK_ICONS = ['crown', 'flame', 'shield', 'star', 'laurel', 'crest'];
+const BADGE_ICONS = MARK_ICONS.concat((typeof DDL_BADGES !== 'undefined' && DDL_BADGES.ART_ICONS) || []);
+const BADGE_MOTIFS = ['gold', 'ember', 'cream', 'copper', 'verdant'];
+const DDL_CLASS_IDS = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.CLASS_IDS) || ['Crown', 'Bow', 'Wizard', 'Zombie', 'Pirate', 'Neutral'];
+const MOTIF_PALETTE = {
+  gold: { metal: '#f0c45a', metalDeep: '#8a5810', enamel: '#140a04', enamelLight: '#3a2410', charge: '#ffe9a8' },
+  ember: { metal: '#e07a3a', metalDeep: '#7a2e10', enamel: '#1a0804', enamelLight: '#4a1810', charge: '#ffd0a8' },
+  cream: { metal: '#f4e6c3', metalDeep: '#9a7a40', enamel: '#1c1408', enamelLight: '#3a2c14', charge: '#fff6e0' },
+  copper: { metal: '#d4892a', metalDeep: '#7a4a08', enamel: '#1a0e04', enamelLight: '#3e240c', charge: '#ffd090' },
+  verdant: { metal: '#9ec87a', metalDeep: '#3d5c28', enamel: '#0c1408', enamelLight: '#1c2c14', charge: '#e8f6d0' },
+};
+
+let medalSeq = 0;
+let awardIndex = new Map();
+
+function ingestAwards(awards) {
+  const next = new Map();
+  for (const award of awards || []) {
+    const key = String(award.handle || '').toLowerCase();
+    if (!key) continue;
+    if (!next.has(key)) next.set(key, []);
+    next.get(key).push(award);
+  }
+  awardIndex = next;
+}
+
+function badgesFor(handle, fallback) {
+  const fromIndex = awardIndex.get(String(handle || '').toLowerCase()) || [];
+  if (fromIndex.length) return fromIndex;
+  return Array.isArray(fallback) ? fallback : [];
+}
+
+function starPoly(cx, cy, rOut, rIn, points, rotation) {
+  const rot = rotation == null ? -Math.PI / 2 : rotation;
+  const pts = [];
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? rOut : rIn;
+    const a = rot + (Math.PI * i) / points;
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`);
+  }
+  return `M${pts.join('L')}Z`;
+}
+
+function beadCircles(cx, cy, r, count, br) {
+  let markup = '';
+  for (let i = 0; i < count; i++) {
+    const a = (Math.PI * 2 * i) / count - Math.PI / 2;
+    markup += `<circle cx="${(cx + r * Math.cos(a)).toFixed(2)}" cy="${(cy + r * Math.sin(a)).toFixed(2)}" r="${br}"/>`;
+  }
+  return markup;
+}
+
+function chargeMarkup(icon) {
+  const key = BADGE_ICONS.includes(icon) ? icon : 'crest';
+  if (key === 'crown') {
+    return `<path d="M3.1 16.8h17.8v2.4H3.1z"/>
+      <path d="M4.2 16.8 6.7 8.2l2.6 4.8L12 4.6l2.7 8.4 2.6-4.8 2.5 8.6z"/>
+      <circle cx="6.7" cy="16.2" r="0.95"/><circle cx="12" cy="16.2" r="0.95"/><circle cx="17.3" cy="16.2" r="0.95"/>
+      <path d="M11.35 2.2h1.3v2.4h-1.3z"/><path d="M10.55 2.95h2.9v1.05h-2.9z"/>
+      <path d="M8.4 19.6h7.2v1.35H8.4z"/>`;
+  }
+  if (key === 'flame') {
+    return `<path fill-rule="evenodd" d="M12 2.1c3.7 5 6.5 8.4 6.5 13.2A6.5 6.5 0 1 1 5.5 15.3C5.5 10.5 8.3 7.1 12 2.1zm0 7.4c1.55 0 2.65 1.2 2.65 2.7 0 2.15-2.65 4.35-2.65 4.35S9.35 14.35 9.35 12.2c0-1.5 1.1-2.7 2.65-2.7z"/>`;
+  }
+  if (key === 'shield') {
+    return `<path fill-rule="evenodd" d="M12 2.3 4.2 6v6.3c0 5.1 3.5 8.6 7.8 10.4 4.3-1.8 7.8-5.3 7.8-10.4V6zm0 4.2 4.7 7.4H7.3z"/>`;
+  }
+  if (key === 'star') {
+    return `<path d="${starPoly(12, 12, 10.5, 4.15, 8)}"/>`;
+  }
+  if (key === 'laurel') {
+    return `<path d="M7.4 7.6c1.7 1.2 2.5 2.8 2.2 4.5-1.9-.9-3.1-2.4-3.5-4.3.45-.1.9-.2 1.3-.2z"/>
+      <path d="M6.5 11.4c1.8 1.25 2.7 2.9 2.3 4.6-2.1-.9-3.3-2.5-3.7-4.4.47-.1.92-.2 1.4-.2z"/>
+      <path d="M7 15.2c1.85 1.3 2.9 2.85 2.45 4.45-2.15-.85-3.5-2.25-3.9-4.25.5-.1.95-.2 1.45-.2z"/>
+      <path d="M8.8 18.4c1.5 1.15 2.7 2.15 3.2 2.55-.75-1.35-1.55-2.5-2.35-3.3.4.2.75.48 1.15.75z"/>
+      <path d="M16.6 7.6c-1.7 1.2-2.5 2.8-2.2 4.5 1.9-.9 3.1-2.4 3.5-4.3-.45-.1-.9-.2-1.3-.2z"/>
+      <path d="M17.5 11.4c-1.8 1.25-2.7 2.9-2.3 4.6 2.1-.9 3.3-2.5 3.7-4.4-.47-.1-.92-.2-1.4-.2z"/>
+      <path d="M17 15.2c-1.85 1.3-2.9 2.85-2.45 4.45 2.15-.85 3.5-2.25 3.9-4.25-.5-.1-.95-.2-1.45-.2z"/>
+      <path d="M15.2 18.4c-1.5 1.15-2.7 2.15-3.2 2.55.75-1.35 1.55-2.5 2.35-3.3-.4.2-.75.48-1.15.75z"/>
+      <path d="M9.6 19.7h4.8l.55 1.45H9.05z"/><path d="M8.7 21.35h6.6v1.15H8.7z"/>`;
+  }
+  return `<path d="M12 2.05c2.05 2.7 3.7 5.3 3.55 8.05 2.85-.8 5.15.05 5.45 2.7-2.7-.6-4.75.2-6.8 2.5v1.55h2.7v1.5H7.1v-1.5h2.7v-1.55c-2.05-2.3-4.1-3.1-6.8-2.5.3-2.65 2.6-3.5 5.45-2.7C8.3 7.35 9.95 4.75 12 2.05z"/>
+    <path d="M8.15 18.7h7.7v1.4H8.15z"/><path d="M9.35 20.4h5.3v1.2H9.35z"/>`;
+}
+
+function badgeArtSrc(badge) {
+  if (typeof DDL_BADGES === 'undefined') return '';
+  return DDL_BADGES.artFor(badge) || '';
+}
+
+function medalHtml(badge, size) {
+  if (!badge) return '';
+  const motif = BADGE_MOTIFS.includes(badge.motif) ? badge.motif : 'gold';
+  const pal = MOTIF_PALETTE[motif];
+  const title = esc(badge.title || 'Badge');
+  const uid = `md${++medalSeq}`;
+  const sizeClass = size === 'lg' ? ' lg' : size === 'md' ? ' md' : '';
+  const art = badgeArtSrc(badge);
+  if (art) {
+    const kind = String(badge.icon || badge.slug || '').startsWith('standing-') ? ' standing-art' : ' class-art';
+    return `<span class="medal art ${motif}${kind}${sizeClass}" title="${title}" role="img" aria-label="${title}"><img src="${esc(art)}" alt=""></span>`;
+  }
+  return `<span class="medal ${motif}${sizeClass}" title="${title}" role="img" aria-label="${title}">
+    <svg viewBox="0 0 80 80" aria-hidden="true">
+      <defs>
+        <linearGradient id="${uid}-metal" x1="16" y1="6" x2="64" y2="74" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#fff6d2"/>
+          <stop offset=".2" stop-color="${pal.metal}"/>
+          <stop offset=".52" stop-color="${pal.metalDeep}"/>
+          <stop offset=".78" stop-color="${pal.metal}"/>
+          <stop offset="1" stop-color="#5a3408"/>
+        </linearGradient>
+        <radialGradient id="${uid}-enamel" cx="36%" cy="30%" r="70%">
+          <stop offset="0" stop-color="${pal.enamelLight}"/>
+          <stop offset="1" stop-color="${pal.enamel}"/>
+        </radialGradient>
+        <linearGradient id="${uid}-charge" x1="22" y1="10" x2="58" y2="66" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#fff6d8"/>
+          <stop offset=".42" stop-color="${pal.charge}"/>
+          <stop offset="1" stop-color="${pal.metalDeep}"/>
+        </linearGradient>
+      </defs>
+      <path d="${starPoly(40, 40, 39.4, 33.2, 16)}" fill="url(#${uid}-metal)"/>
+      <circle cx="40" cy="40" r="31.6" fill="url(#${uid}-metal)"/>
+      <circle cx="40" cy="40" r="26.4" fill="url(#${uid}-enamel)"/>
+      <circle cx="40" cy="40" r="24.6" fill="none" stroke="${pal.metal}" stroke-width=".85" opacity=".65"/>
+      <circle cx="40" cy="40" r="22.2" fill="none" stroke="${pal.metalDeep}" stroke-width=".45" opacity=".45"/>
+      <g fill="url(#${uid}-metal)">${beadCircles(40, 40, 29.1, 18, 1.55)}</g>
+      <g transform="translate(40 40) scale(1.18) translate(-12 -12)" fill="url(#${uid}-charge)">${chargeMarkup(badge.icon)}</g>
+      <path d="M20 27.5c7.5-9 22-11 33-4" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" opacity=".3"/>
+    </svg>
+  </span>`;
+}
+
+function medalSvg(icon) {
+  return medalHtml({ title: icon, icon, motif: 'gold' }, 'md');
+}
+
+function medalsInlineHtml(badges, size) {
+  const list = Array.isArray(badges) ? badges : [];
+  if (!list.length) return '';
+  return `<span class="medal-inline">${list.map((b) => medalHtml(b, size)).join('')}</span>`;
+}
+
+function namedHandleHtml(handle, badges, size) {
+  const name = String(handle || '').trim();
+  if (!name) return '';
+  return `<span class="named-handle">${esc(name)}${medalsInlineHtml(badgesFor(name, badges), size)}</span>`;
+}
+
+function medalsRowHtml(badges) {
+  const list = Array.isArray(badges) ? badges : [];
+  if (!list.length) return '';
+  return `<div class="medal-row">${list.map((b) => `${medalHtml(b, 'md')}<span class="medal-meta"><strong>${esc(b.title)}</strong><span class="muted">${esc(b.blurb || '')}</span></span>`).join('')}</div>`;
+}
+
+function classSpec(value) {
+  return typeof DDL_BADGES !== 'undefined' ? DDL_BADGES.classSpec(value) : null;
+}
+
+function standingSpec(place) {
+  return typeof DDL_BADGES !== 'undefined' ? DDL_BADGES.standingSpec(place) : null;
+}
+
+function classBadgeHtml(value, size) {
+  const spec = classSpec(value);
+  if (!spec) return '';
+  return medalHtml(spec, size);
+}
+
+function standingBadgeHtml(place, size) {
+  const spec = standingSpec(place);
+  if (!spec) return '';
+  return medalHtml(spec, size);
+}
+
+function entryMarksHtml(entry, size) {
+  if (!entry) return '';
+  return `${classBadgeHtml(entry.ddlClass, size)}${medalsInlineHtml(badgesFor(entry.handle, entry.badges), size)}`;
+}
+
+function classPickerHtml(name, selected) {
+  const current = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.normalizeClass(selected)) || selected || 'Neutral';
+  const classes = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.CLASSES) || DDL_CLASS_IDS.map((id) => ({ id, title: id, icon: `class-${id.toLowerCase()}` }));
+  return `<div class="class-pick" role="radiogroup" aria-label="Class">
+    ${classes.map((c) => `
+      <label class="class-pick-opt ${current === c.id ? 'on' : ''}">
+        <input type="radio" name="${esc(name)}" value="${esc(c.id)}" ${current === c.id ? 'checked' : ''}>
+        ${medalHtml(c, 'md')}
+        <span>${esc(c.title || c.id)}</span>
+      </label>`).join('')}
+  </div>`;
+}
+
+function bindClassPicker(rootEl) {
+  if (!rootEl) return;
+  rootEl.querySelectorAll('.class-pick').forEach((group) => {
+    const sync = () => {
+      group.querySelectorAll('.class-pick-opt').forEach((opt) => {
+        const input = opt.querySelector('input');
+        opt.classList.toggle('on', Boolean(input && input.checked));
+      });
+    };
+    group.addEventListener('change', sync);
+    sync();
+  });
+}
+
+function readClassPick(rootEl, name) {
+  const picked = rootEl && rootEl.querySelector(`input[name="${name}"]:checked`);
+  return (picked && picked.value) || 'Neutral';
+}
+
+function marksGalleryHtml() {
+  if (typeof DDL_BADGES === 'undefined') return '';
+  const standings = DDL_BADGES.STANDINGS.map((b) => `
+    <figure class="mark-tile">
+      ${medalHtml(b, 'lg')}
+      <figcaption><strong>${esc(b.ribbon)}</strong><span>${esc(b.kicker)}</span></figcaption>
+    </figure>`).join('');
+  const classes = DDL_BADGES.CLASSES.map((b) => `
+    <figure class="mark-tile">
+      ${medalHtml(b, 'lg')}
+      <figcaption><strong>${esc(b.title)}</strong><span>Class</span></figcaption>
+    </figure>`).join('');
+  return `<section class="marks-gallery">
+    <h2 class="section-title">Standings badges</h2>
+    <p class="muted">Official finishes pin these on a handle. 1st through 5th land automatically when an arena closes.</p>
+    <div class="mark-grid standing">${standings}</div>
+    <h2 class="section-title">Class badges</h2>
+    <p class="muted">Crown, Bow, Wizard, Zombie, Pirate, and Neutral. Declare a class when you register — the mark follows the roster, the bracket, and the hall.</p>
+    <div class="mark-grid classes">${classes}</div>
+  </section>`;
+}
+
+function prestigeStarSvg() {
+  return `<svg class="prestige-star" viewBox="0 0 24 24" aria-hidden="true"><path d="${starPoly(12, 12, 11, 4.2, 8)}" fill="currentColor"/></svg>`;
+}
+
+function championCrestSvg() {
+  const spec = standingSpec(1);
+  if (spec) {
+    return `<span class="champ-crest art">${medalHtml(spec, 'lg')}</span>`;
+  }
+  const uid = `cr${++medalSeq}`;
+  return `<svg class="champ-crest" viewBox="0 0 96 96" aria-hidden="true">
+    <defs>
+      <linearGradient id="${uid}-m" x1="18" y1="8" x2="78" y2="88" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#fff6d2"/><stop offset=".22" stop-color="#f0c45a"/><stop offset=".55" stop-color="#8a5810"/><stop offset="1" stop-color="#f0c45a"/>
+      </linearGradient>
+      <radialGradient id="${uid}-e" cx="38%" cy="30%" r="70%">
+        <stop offset="0" stop-color="#3a180c"/><stop offset="1" stop-color="#120804"/>
+      </radialGradient>
+    </defs>
+    <path d="${starPoly(48, 48, 47, 39.5, 16)}" fill="url(#${uid}-m)"/>
+    <circle cx="48" cy="48" r="37" fill="url(#${uid}-m)"/>
+    <circle cx="48" cy="48" r="31" fill="url(#${uid}-e)"/>
+    <circle cx="48" cy="48" r="28.5" fill="none" stroke="#f0c45a" stroke-width="1.2" opacity=".7"/>
+    <path d="M48 22c7 10 12 16 12 26a12 12 0 1 1-24 0c0-10 5-16 12-26z" fill="url(#${uid}-m)"/>
+    <path d="M48 36c3.2 4.4 5 7.2 5 11.2A5 5 0 1 1 43 47.2C43 43.2 44.8 40.4 48 36z" fill="#1a0c04" opacity=".45"/>
+    <path d="M48 18.5v8M44.5 21h7" fill="none" stroke="#fff6d2" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function prestigePodiumHtml(podium, rewards) {
+  if (!podium || !podium.first || !podium.first.handle) return '';
+  const first = podium.first;
+  const prize = (n) => {
+    const text = prizeForPlace(rewards, n);
+    return text ? `<p class="prize-won">${esc(text)}</p>` : '';
+  };
+  const banner = `<section class="champ-banner" ${tip('Crowned from the finals. This name is written on the Hall of records.')}>
+    <p class="champ-banner-kicker">Tournament Champion</p>
+    ${championCrestSvg()}
+    <h2>${playerLink(first.handle)}</h2>
+    ${first.record ? `<p class="muted">${esc(first.record)}</p>` : ''}
+    ${prize(1)}
+  </section>`;
+  const second = podium.second;
+  const thirds = Array.isArray(podium.third) ? podium.third : [];
+  if (!second && !thirds.length) return banner;
+  const side = (tone, kicker, rank, inner, n) => `<article class="place ${tone}">
+    ${standingBadgeHtml(n, 'md')}
+    <div class="rank-kicker">${kicker}</div>
+    <div class="rank">${rank}</div>
+    <div class="rank-sub">Place</div>
+    ${inner}
+    ${prize(n)}
+  </article>`;
+  const secondInner = second && second.handle
+    ? `<strong>${playerLink(second.handle)}</strong>${second.record ? `<p class="muted">${esc(second.record)}</p>` : ''}`
+    : '<strong class="muted">—</strong>';
+  const thirdInner = thirds.length
+    ? thirds.map((p) => `<strong>${playerLink(p.handle)}</strong>`).join('')
+    : '<strong class="muted">—</strong>';
+  return `${banner}<section class="podium prestige" ${tip('Final results. 3rd place uses the placement match when that option is on.')}>
+    ${side('silver', 'Runner-up', '2nd', secondInner, 2)}
+    ${side('copper', 'Bronze', '3rd', thirdInner, 3)}
+  </section>`;
+}
+
+function arenaCardHref(event) {
+  if (!event || event.manual || Number(event.tournamentId) < 0 || String(event.slug || '').startsWith('manual-')) return '';
+  return arenaHref(event.slug);
+}
+
 const STATUS_LABEL = {
   registration: 'Registration',
   in_progress: 'Live',
@@ -297,6 +607,136 @@ let lastPointer = 'mouse';
 
 function setTreeMode(on) {
   document.body.classList.toggle('has-tree', Boolean(on));
+}
+
+const KICK_RESERVED = new Set([
+  'about', 'api', 'browse', 'categories', 'category', 'channel', 'channels',
+  'clip', 'clips', 'community', 'dashboard', 'directory', 'embed', 'explore',
+  'following', 'help', 'home', 'live', 'login', 'messages', 'notifications',
+  'player', 'plus', 'premium', 'privacy', 'register', 'search', 'settings',
+  'signup', 'terms', 'video', 'videos',
+]);
+const KICK_MIN_KEY = 'ddl-kick-min';
+let kickWantAudio = false;
+let kickStreamMin = localStorage.getItem(KICK_MIN_KEY) === '1';
+
+function kickChannelOf(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  if (/^[A-Za-z0-9_-]{3,32}$/.test(text) && !KICK_RESERVED.has(text.toLowerCase())) return text;
+  let parsed;
+  try {
+    parsed = new URL(text.includes('://') ? text : `https://${text}`);
+  } catch (_err) {
+    return '';
+  }
+  const host = String(parsed.hostname || '').replace(/^www\./i, '').toLowerCase();
+  if (host !== 'kick.com' && host !== 'player.kick.com') return '';
+  const parts = String(parsed.pathname || '').split('/').filter(Boolean);
+  if (!parts.length) return '';
+  let slug = parts[0];
+  if (slug.toLowerCase() === 'embed' && parts[1]) slug = parts[1];
+  if (KICK_RESERVED.has(slug.toLowerCase())) return '';
+  if (!/^[A-Za-z0-9_-]{3,32}$/.test(slug)) return '';
+  return slug;
+}
+
+function kickWatchUrl(channel) {
+  return `https://kick.com/${encodeURIComponent(channel)}`;
+}
+
+function kickPlayerSrc(channel, withAudio) {
+  const params = new URLSearchParams({
+    autoplay: 'true',
+    muted: withAudio ? 'false' : 'true',
+  });
+  return `https://player.kick.com/${encodeURIComponent(channel)}?${params}`;
+}
+
+function hideKickStream() {
+  const dock = document.getElementById('kick-stream');
+  if (!dock) return;
+  const frame = dock.querySelector('iframe');
+  if (frame) frame.src = 'about:blank';
+  dock.hidden = true;
+  dock.classList.remove('is-min');
+  document.body.classList.remove('has-kick-stream');
+}
+
+function ensureKickStreamDock() {
+  let dock = document.getElementById('kick-stream');
+  if (dock) return dock;
+  dock = document.createElement('aside');
+  dock.id = 'kick-stream';
+  dock.className = 'kick-stream';
+  dock.hidden = true;
+  const main = document.getElementById('app');
+  if (main && main.parentNode) main.parentNode.insertBefore(dock, main);
+  else document.body.appendChild(dock);
+  return dock;
+}
+
+function bindKickStreamDock(dock, channel) {
+  const audioBtn = dock.querySelector('#kick-audio');
+  const toggleBtn = dock.querySelector('#kick-toggle');
+  const frame = dock.querySelector('iframe');
+  if (audioBtn) {
+    audioBtn.onclick = () => {
+      kickWantAudio = true;
+      if (frame) {
+        frame.src = kickPlayerSrc(channel, true);
+        frame.title = `Kick livestream — ${channel} (audio on)`;
+      }
+      audioBtn.hidden = true;
+    };
+  }
+  if (toggleBtn) {
+    toggleBtn.onclick = () => {
+      kickStreamMin = !kickStreamMin;
+      localStorage.setItem(KICK_MIN_KEY, kickStreamMin ? '1' : '0');
+      dock.classList.toggle('is-min', kickStreamMin);
+      toggleBtn.textContent = kickStreamMin ? 'Show player' : 'Hide player';
+      toggleBtn.setAttribute('aria-expanded', kickStreamMin ? 'false' : 'true');
+    };
+  }
+}
+
+function syncKickStream(t) {
+  const live = t && t.status === 'in_progress';
+  const channel = kickChannelOf(t && t.streamUrl);
+  if (!live || !channel) {
+    hideKickStream();
+    return;
+  }
+  const dock = ensureKickStreamDock();
+  const nextSrc = kickPlayerSrc(channel, kickWantAudio);
+  const frame = dock.querySelector('iframe');
+  const sameChannel = frame && frame.getAttribute('data-channel') === channel.toLowerCase();
+  if (sameChannel && !dock.hidden) {
+    dock.classList.toggle('is-min', kickStreamMin);
+    document.body.classList.add('has-kick-stream');
+    const audioBtn = dock.querySelector('#kick-audio');
+    if (audioBtn) audioBtn.hidden = kickWantAudio;
+    const open = dock.querySelector('#kick-open');
+    if (open) open.href = kickWatchUrl(channel);
+    return;
+  }
+  dock.hidden = false;
+  dock.classList.toggle('is-min', kickStreamMin);
+  document.body.classList.add('has-kick-stream');
+  dock.innerHTML = `<div class="kick-stream-bar">
+      <span class="kick-live">Live</span>
+      <strong>kick.com/${esc(channel)}</strong>
+      <div class="kick-stream-acts">
+        <button type="button" class="btn" id="kick-audio" ${kickWantAudio ? 'hidden' : ''} ${tip('Play the stream here with sound. Browsers start muted until you ask for audio.')}>Watch with audio</button>
+        <a class="btn ghost" id="kick-open" href="${esc(kickWatchUrl(channel))}" target="_blank" rel="noopener noreferrer" ${tip('Opens the Kick channel in a new tab.')}>Open on Kick</a>
+        <button type="button" class="btn ghost" id="kick-toggle" aria-expanded="${kickStreamMin ? 'false' : 'true'}">${kickStreamMin ? 'Show player' : 'Hide player'}</button>
+      </div>
+    </div>
+    <div class="kick-stream-stage">
+      <iframe data-channel="${esc(channel.toLowerCase())}" src="${esc(nextSrc)}" title="Kick livestream — ${esc(channel)}" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen scrolling="no" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </div>`;
+  bindKickStreamDock(dock, channel);
 }
 
 function applyTipsMode() {
@@ -454,6 +894,8 @@ function applyHostChrome() {
   }
   const create = document.getElementById('nav-create');
   if (create) create.hidden = !hostMode;
+  const ledger = document.getElementById('nav-ledger');
+  if (ledger) ledger.hidden = !hostMode;
 }
 
 /**
@@ -558,6 +1000,17 @@ function formatUsd(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '$0.00';
   return `$${n.toFixed(2)}`;
+}
+
+function formatUsdRate(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '$0.00';
+  return n.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  });
 }
 
 const MAX_PAYOUT_PLACES = 8;
@@ -974,6 +1427,43 @@ function isOpeningMatch(t, match) {
   return match.side === 'winners' || match.side === 'group';
 }
 
+function usesElimTree(t) {
+  if (!t) return false;
+  if (t.stage === 'playoff') return true;
+  if (t.stage === 'groups') return false;
+  return t.format !== 'swiss' && t.format !== 'round_robin';
+}
+
+function lateSeatOptions(t, matches, entries) {
+  if (!usesElimTree(t)) {
+    return [{
+      value: 'auto',
+      label: t.format === 'round_robin' || t.stage === 'groups'
+        ? 'Add matches against the field'
+        : 'Join the field for the next round',
+    }];
+  }
+  const opening = (matches || []).filter((m) => isOpeningMatch(t, m) && m.status !== 'complete');
+  const out = [];
+  for (const m of opening) {
+    const p1 = entryOf(entries, m.entry1Id);
+    const p2 = entryOf(entries, m.entry2Id);
+    if (m.status === 'bye') {
+      const who = p1 || p2;
+      out.push({ value: `${m.id}:${p1 ? 2 : 1}`, label: `Play ${who ? who.handle : 'BYE'} (fill bye)` });
+    } else if (!p1 || !p2) {
+      out.push({
+        value: `${m.id}:${p1 ? 2 : 1}`,
+        label: `Fill empty slot${p1 || p2 ? ` vs ${(p1 || p2).handle}` : ''}`,
+      });
+    } else if (m.status === 'ready') {
+      out.push({ value: `${m.id}:1`, label: `Replace ${p1.handle} (vs ${p2.handle})` });
+      out.push({ value: `${m.id}:2`, label: `Replace ${p2.handle} (vs ${p1.handle})` });
+    }
+  }
+  return out;
+}
+
 function openExportSheet(text, slug) {
   const overlay = document.createElement('div');
   overlay.className = 'scorecard-overlay';
@@ -1034,6 +1524,33 @@ function playerSuggestHandle(player) {
   return String((player && (player.tourneyHandle || player.discordUsername)) || '').trim();
 }
 
+function pickSuggestedPlayer(input, player) {
+  if (!input) return;
+  const handle = playerSuggestHandle(player);
+  if (handle) input.value = handle;
+  input.dataset.userId = player && player.id ? String(player.id) : '';
+}
+
+function pickedUserId(input) {
+  const stored = Number(input && input.dataset && input.dataset.userId);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+  const typed = String((input && input.value) || '').trim().toLowerCase();
+  const items = (input && input._kmxItems) || [];
+  const hits = items.filter((player) => {
+    const handle = playerSuggestHandle(player).toLowerCase();
+    const discord = String(player.discordUsername || '').toLowerCase();
+    return typed && (handle === typed || discord === typed);
+  });
+  const id = hits.length === 1 ? Number(hits[0].id) : 0;
+  return id > 0 ? id : undefined;
+}
+
+function entryAvatarHtml(entry, size) {
+  const user = entry && entry.discordUser;
+  if (user && (user.avatarUrl || user.discordId)) return pfpHtml(user, entry.handle, size || 28);
+  return avatarHtml(entry && entry.handle);
+}
+
 /**
  * Host "Add a player" typeahead: Discord-connected handles and Discord names
  * that contain the letters typed. Host-only — the search route checks the host password.
@@ -1073,20 +1590,21 @@ function bindHandleTypeahead(input, listEl, takenHandles) {
       const sub = discord && discord.toLowerCase() !== handle.toLowerCase()
         ? `<small>Discord · ${esc(discord)}</small>`
         : '<small>Discord connected</small>';
-      return `<li id="add-handle-opt-${i}" role="option" aria-selected="${i === active ? 'true' : 'false'}">
+      const optId = `${input.id || 'handle'}-opt-${i}`;
+      return `<li id="${optId}" role="option" aria-selected="${i === active ? 'true' : 'false'}">
         ${pfpHtml(player, handle, 28)}
-        <span class="handle-suggest-text"><strong>${esc(handle)}</strong>${sub}</span>
+        <span class="handle-suggest-text"><strong class="named-handle">${esc(handle)}${medalsInlineHtml(badgesFor(handle))}</strong>${sub}</span>
       </li>`;
     }).join('');
     listEl.querySelectorAll('li').forEach((li, i) => {
       li.onmousedown = (event) => {
         event.preventDefault();
-        input.value = playerSuggestHandle(items[i]);
+        pickSuggestedPlayer(input, items[i]);
         hide();
         input.focus();
       };
     });
-    const current = listEl.querySelector(`#add-handle-opt-${active}`);
+    const current = listEl.querySelector(`#${CSS.escape(input.id || 'handle')}-opt-${active}`);
     if (current) {
       input.setAttribute('aria-activedescendant', current.id);
       current.scrollIntoView({ block: 'nearest' });
@@ -1109,6 +1627,7 @@ function bindHandleTypeahead(input, listEl, takenHandles) {
         const handle = playerSuggestHandle(player);
         return handle && !taken.has(handle.toLowerCase());
       });
+      input._kmxItems = items;
       active = items.length ? 0 : -1;
       paintList();
     } catch (_err) {
@@ -1118,6 +1637,7 @@ function bindHandleTypeahead(input, listEl, takenHandles) {
   };
 
   input.addEventListener('input', () => {
+    input.dataset.userId = '';
     window.clearTimeout(timer);
     timer = window.setTimeout(() => runSearch(input.value), 160);
   });
@@ -1135,8 +1655,7 @@ function bindHandleTypeahead(input, listEl, takenHandles) {
       active = (active - 1 + items.length) % items.length;
       paintList();
     } else if (event.key === 'Enter' && active >= 0) {
-      const handle = playerSuggestHandle(items[active]);
-      if (handle) input.value = handle;
+      pickSuggestedPlayer(input, items[active]);
       hide();
     } else if (event.key === 'Escape') {
       event.preventDefault();
@@ -1170,7 +1689,7 @@ function organizerHtml(t, hostUser) {
   const name = organizerDisplayName(t, hostUser);
   const href = organizerHref(hostUser);
   const inner = `${pfpHtml(hostUser, name, 32)}
-            <div><small class="muted">Organized by</small><div class="org-name">${esc(name)}</div></div>`;
+            <div><small class="muted">Organized by</small><div class="org-name named-handle">${esc(name)}${medalsInlineHtml(badgesFor(name))}</div></div>`;
   const extra = href.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : '';
   if (href) {
     return `<a class="organizer" href="${esc(href)}"${extra} ${tip('Organizer of this hearth.')}>${inner}</a>`;
@@ -1209,7 +1728,7 @@ function matchTip(match) {
   return 'Waiting for a player from the previous round.';
 }
 
-function matchCardHtml(match, entries, votes) {
+function matchCardHtml(match, entries, votes, opts) {
   const p1 = entryOf(entries, match.entry1Id);
   const p2 = entryOf(entries, match.entry2Id);
   const clickable = match.status === 'ready' && hostMode;
@@ -1217,12 +1736,13 @@ function matchCardHtml(match, entries, votes) {
   const v1 = (votes || []).filter((v) => v.matchId === match.id && v.winnerId === match.entry1Id).length;
   const v2 = (votes || []).filter((v) => v.matchId === match.id && v.winnerId === match.entry2Id).length;
   const slot = (entry, score, won, fallback) => `<div class="slot ${won ? 'winner' : ''}">
-      ${entry ? `<em>${entry.seed || ''}</em>${avatarHtml(entry.handle)}<span class="who">${esc(entry.handle)}</span>` : `<span class="who tbd">${fallback}</span>`}
+      ${entry ? `<em>${entry.seed || ''}</em>${avatarHtml(entry.handle)}<span class="who"><span class="who-name">${esc(entry.handle)}</span>${entryMarksHtml(entry)}</span>` : `<span class="who tbd">${fallback}</span>`}
       <span class="pts">${score ?? ''}</span>
       <span class="mark">✓</span>
     </div>`;
   const live = match.status === 'ready' && (match.games || []).length > 0;
-  return `<button type="button" class="match-card ${clickable ? 'ready' : ''} ${live ? 'live' : ''} ${match.status}" data-match="${match.id}" ${tip(matchTip(match))} ${clickable ? '' : 'disabled'}>
+  const finals = opts && opts.finals ? ' finals' : '';
+  return `<button type="button" class="match-card ${clickable ? 'ready' : ''} ${live ? 'live' : ''} ${match.status}${finals}" data-match="${match.id}" ${tip(matchTip(match))} ${clickable ? '' : 'disabled'}>
     ${slot(p1, match.score1, match.winnerId === match.entry1Id && match.status === 'complete', empty)}
     ${slot(p2, match.score2, match.winnerId === match.entry2Id && match.status === 'complete', empty)}
     ${v1 + v2 ? `<div class="votes">Votes ${v1}–${v2}</div>` : ''}
@@ -1239,7 +1759,8 @@ function bracketColumnsHtml(matches, entries, side, format, votes) {
       const feed = !next ? 'end' : (next.length === roundMatches.length ? 'line' : 'pair');
       const label = roundLabel(format, side, roundMatches[0].round, maxRound);
       const bo = bestOfLabel(roundMatches[0].bestOf);
-      return `<div class="bracket-round feed-${feed}">
+      const finals = /final/i.test(label);
+      return `<div class="bracket-round feed-${feed}${finals ? ' is-final' : ''}">
         <header ${tip(`${label} is ${bo}.`)}>
           <span>${esc(label)}</span>
           <span class="round-tag">${esc(bo)}</span>
@@ -1247,7 +1768,7 @@ function bracketColumnsHtml(matches, entries, side, format, votes) {
         <div class="bracket-slots">
           ${roundMatches.map((m) => `<div class="bracket-slot">
             <i class="in-line" aria-hidden="true"></i>
-            ${matchCardHtml(m, entries, votes)}
+            ${matchCardHtml(m, entries, votes, { finals })}
             <i class="out-h" aria-hidden="true"></i>
             <i class="out-v" aria-hidden="true"></i>
           </div>`).join('')}
@@ -1330,6 +1851,7 @@ function defaultsFrom(t) {
     name: d.name || '',
     slug: d.slug || '',
     description: d.description || '',
+    streamUrl: d.streamUrl || '',
     game: d.game || 'Doginal Dogs Legends TCG',
     stageType: d.stageType || 'single',
     format: d.format === 'double_elim' ? 'single_elim' : (d.format || 'single_elim'),
@@ -1380,7 +1902,7 @@ function settingsFormHtml(t, opts) {
           ${playerUser ? `<div>
             <div class="organizer organizer-preview">
               ${pfpHtml(playerUser, playerUser.tourneyHandle || playerUser.discordUsername || d.hostName, 32)}
-              <div><small class="muted">Organized by</small><div class="org-name">${esc(playerUser.tourneyHandle || playerUser.discordUsername || d.hostName)}</div></div>
+              <div><small class="muted">Organized by</small><div class="org-name named-handle">${esc(playerUser.tourneyHandle || playerUser.discordUsername || d.hostName)}${medalsInlineHtml(badgesFor(playerUser.tourneyHandle || playerUser.discordUsername || d.hostName))}</div></div>
             </div>
             <input type="hidden" id="s-host" value="${esc(playerUser.tourneyHandle || playerUser.discordUsername || d.hostName)}">
             <p class="hint">Imported from Discord. The public page links this name and PFP.</p>
@@ -1397,7 +1919,13 @@ function settingsFormHtml(t, opts) {
           </div>
         </div>
         <div class="form-row"><label for="s-desc">Description</label>
-          <textarea id="s-desc" maxlength="2000" ${tip('Rules, prize split, stream link. Players see this under the title.')}>${esc(d.description)}</textarea></div>
+          <textarea id="s-desc" maxlength="2000" ${tip('Rules, prize split, and notes. Players see this under the title.')}>${esc(d.description)}</textarea></div>
+        <div class="form-row"><label for="s-stream">Kick stream</label>
+          <div>
+            <input id="s-stream" value="${esc(d.streamUrl)}" placeholder="https://kick.com/yourchannel" maxlength="200" ${tip('Paste a Kick channel or livestream link. While the arena is live, the bracket shows an embedded player with audio, plus a button to open Kick.')}>
+            <p class="hint">Shown on the bracket while this arena is live. Viewers can watch here with audio, or open the Kick channel.</p>
+          </div>
+        </div>
       </div>
     </section>
     <section class="panel">
@@ -1507,6 +2035,7 @@ function settingsFormHtml(t, opts) {
           <div>
             <label class="check"><input type="checkbox" id="s-account" ${d.requireAccount ? 'checked' : ''}> Require Discord sign-in to register (walk-ins can still be added by the host)</label>
             <label class="check"><input type="checkbox" id="s-official" ${d.official ? 'checked' : ''}> Count this arena toward records and accolades</label>
+            <p class="hint">A completed finals, or any arena with at least two confirmed players, can crown an official champion. Uncheck this for a scrim.</p>
           </div>
         </div>
       </div>
@@ -1695,6 +2224,7 @@ function collectSettings(form) {
     name: form.querySelector('#s-name')?.value,
     slug: form.querySelector('#s-slug')?.value,
     description: form.querySelector('#s-desc')?.value,
+    streamUrl: form.querySelector('#s-stream')?.value,
     game: form.querySelector('#s-game')?.value,
     stageType: form.querySelector('input[name="s-stage"]:checked')?.value,
     format: form.querySelector('#s-format')?.value,
@@ -1735,18 +2265,25 @@ function collectSettings(form) {
 
 function route() {
   const parts = routeParts();
+  if (!(parts[0] === 't' && parts[1])) hideKickStream();
   if (parts[0] === 'create') return renderCreate();
   if (parts[0] === 'records') return renderRecords();
+  if (parts[0] === 'ledger') return renderLedger();
   if (parts[0] === 'player' && parts[1]) return renderPlayer(parts[1]);
   if (parts[0] === 't' && parts[1]) return renderArena(parts[1]);
   return renderHome();
 }
 
 const HERO = `<section class="hero">
-  <img src="/bracket/crest.jpg" alt="">
-  <p class="muted" style="letter-spacing:.4em;text-transform:uppercase;font-family:Cinzel,serif;font-size:11px;color:var(--primary)">Doginal Dogs Legends</p>
-  <h1>Legends Bracket</h1>
-  <p>Pick an arena, sign in with Discord, and send the entry if there is one. The host confirms payments and runs the bracket. Wins are stored as records you can carry into a grand tournament.</p>
+  <div class="hero-crest">
+    <img src="/bracket/crest.jpg" alt="">
+  </div>
+  <div class="hero-copy">
+    <p class="hero-kicker">Doginal Dogs Legends</p>
+    <h1>Legends<br>Bracket</h1>
+    <i class="ornament" aria-hidden="true"><span></span></i>
+    <p class="hero-lead">Pick an arena, sign in with Discord, and send the entry if there is one. The host confirms payments and runs the bracket. Wins are stored as records you can carry into a grand tournament.</p>
+  </div>
 </section>`;
 
 async function renderHome() {
@@ -1755,15 +2292,15 @@ async function renderHome() {
   try {
     const arenas = await api.get('/arenas');
     root.innerHTML = `${HERO}
-    <p class="muted"><a href="/tourney/#/records">Hall of records</a> — champions, accolades, and past results.</p>
-    <h2>Tournaments</h2>
+    <p class="muted"><a href="/tourney/#/records">Hall of records</a> — champions, leaderboards, badges, and past results.${hostMode ? ` <a href="/tourney/#/ledger">Write the ledger</a>.` : ''}</p>
+    <h2 class="section-title">Tournaments</h2>
     <div class="grid cards">${arenas.map((t) => `
-      <a class="card" href="${arenaHref(t.slug)}">
+      <a class="card plaque" data-status="${esc(t.status)}" href="${arenaHref(t.slug)}">
         <div class="row"><h3>${esc(t.name)}</h3>${badge(t.status)}</div>
         <p class="muted">${esc(formatTitle(t))} · ${feeUsd(t) > 0 ? `${formatUsd(feeUsd(t))} entry` : 'Free entry'}</p>
         <p class="muted">${t.paidCount}${t.capPlayers !== false ? ` / ${t.maxPlayers}` : ''} players in${hostMode && Math.max(0, (t.entryCount || 0) - t.paidCount) ? ` · ${Math.max(0, (t.entryCount || 0) - t.paidCount)} awaiting payment` : ''}</p>
         ${rewardCardHtml(t)}
-        ${t.status === 'completed' && t.champion && t.champion.handle ? `<p class="muted">Champion: ${esc(t.champion.handle)}</p>` : ''}
+        ${t.status === 'completed' && t.champion && t.champion.handle ? `<p class="muted">Champion: ${namedHandleHtml(t.champion.handle)}</p>` : ''}
       </a>`).join('') || '<p class="muted">No tournaments yet.</p>'}</div>
     ${hostMode ? `<section class="host-panel" style="margin-top:36px">
       <div class="host-flag">Host only</div>
@@ -1831,7 +2368,7 @@ async function renderCreate() {
     errEl.hidden = true;
     try {
       const t = await api.post('/arenas', collectSettings(form));
-      location.hash = `#/t/${t.slug}`;
+      location.hash = `#/t/${encodeURIComponent(t.slug)}`;
     } catch (err) {
       errEl.hidden = false;
       errEl.textContent = err.message;
@@ -1918,7 +2455,7 @@ function openScorecard(data, slug, match, onSaved) {
       errEl.hidden = true;
       const recorded = games.filter((slot) => slot === 1 || slot === 2).map((winnerSlot) => ({ winnerSlot }));
       try {
-        const next = await api.post(`/arenas/${slug}/${path}`, {
+        const next = await api.post(`/arenas/${encodeURIComponent(slug)}/${path}`, {
           hostPassword,
           matchId: match.id,
           bestOf,
@@ -1946,6 +2483,7 @@ function openScorecard(data, slug, match, onSaved) {
 // ---------------------------------------------------------------------------
 
 async function renderArena(slug) {
+  hideKickStream();
   root.innerHTML = `<p class="muted">Loading ${esc(slug)}…</p>`;
   let data;
   try {
@@ -1999,6 +2537,7 @@ async function renderArena(slug) {
     const whitelist = data.entries.filter((e) => e.whitelist);
     const live = t.status !== 'registration';
     setTreeMode(live && tab === 'bracket');
+    syncKickStream(t);
     const start = t.startAt
       ? new Date(t.startAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) + (t.startTentative ? ' (tentative)' : '')
       : 'TBD';
@@ -2014,12 +2553,9 @@ async function renderArena(slug) {
     ].filter(Boolean);
     if (!nav.some(([id]) => id === tab)) tab = 'bracket';
     const rewards = rewardsOf(data, t);
-    const podium = data.podium && t.status === 'completed' && data.podium.first ? `
-      <section class="podium" ${tip('Final results. 3rd place uses the placement match when that option is on.')}>
-        <article class="place gold"><div class="rank">1st</div><strong>${playerLink(data.podium.first.handle)}</strong><p class="muted">${esc(data.podium.first.record || '')}</p>${prizeForPlace(rewards, 1) ? `<p class="prize-won">${esc(prizeForPlace(rewards, 1))}</p>` : ''}</article>
-        <article class="place"><div class="rank">2nd</div><strong>${data.podium.second?.handle ? playerLink(data.podium.second.handle) : '—'}</strong><p class="muted">${esc(data.podium.second?.record || '')}</p>${prizeForPlace(rewards, 2) ? `<p class="prize-won">${esc(prizeForPlace(rewards, 2))}</p>` : ''}</article>
-        <article class="place"><div class="rank">3rd</div>${(data.podium.third || []).map((p) => `<strong>${playerLink(p.handle)}</strong>`).join('<br>') || '—'}${prizeForPlace(rewards, 3) ? `<p class="prize-won">${esc(prizeForPlace(rewards, 3))}</p>` : ''}</article>
-      </section>` : '';
+    const podium = data.podium && t.status === 'completed' && data.podium.first
+      ? prestigePodiumHtml(data.podium, rewards)
+      : '';
     root.innerHTML = `<div class="arena-shell">
       <nav class="arena-nav">
         ${nav.map(([id, label]) => `<button type="button" data-tab="${id}" class="${tab === id ? 'on' : ''} ${id === 'host' ? 'is-host' : ''}">${esc(label)}</button>`).join('')}
@@ -2029,6 +2565,7 @@ async function renderArena(slug) {
           <div>
             <p class="form-kicker">${esc(t.game || 'Doginal Dogs Legends TCG')}</p>
             <h1>${esc(t.name)} ${badge(t.status)}</h1>
+            <i class="ornament tight" aria-hidden="true"><span></span></i>
             <p class="share-line">
               <span class="mono muted">${esc(location.origin)}${arenaShareHref(slug)}</span>
               <button type="button" class="copy" data-copy="${esc(`${location.origin}${arenaShareHref(slug)}`)}" ${tip('Share this link on X. The preview title is this tournament name.')}>Copy link</button>
@@ -2086,6 +2623,7 @@ async function renderArena(slug) {
       <div><label for="handle">${t.requireTeams && !playerUser ? 'Team name' : 'Handle'}</label>
         <input id="handle" required minlength="2" maxlength="24" placeholder="PackName" value="${esc(t.requireTeams && !playerUser ? '' : (lockedHandle || ''))}" ${playerUser && lockedHandle ? 'readonly' : ''}></div>
       ${t.requireTeams ? `<div><label for="team">${playerUser ? 'Team name' : 'Captain handle'}</label><input id="team" ${playerUser ? '' : 'required'} minlength="2" maxlength="24" value="${esc(playerUser ? '' : (lockedHandle || ''))}"></div>` : ''}
+      <div><span class="lbl">Class</span>${classPickerHtml('enter-class', 'Neutral')}</div>
       ${t.requireVerifiedEmail ? `<div><label for="email">Email</label><input id="email" type="email" required></div>` : ''}
       ${t.countryLock ? `<div><label for="country">Country</label><input id="country" required placeholder="${esc(t.allowedCountries || 'Country')}"></div>` : ''}
       ${usd > 0 ? `<p class="quote" id="live-quote">Loading live ${formatUsd(usd)} DOGE quote…</p>
@@ -2095,12 +2633,13 @@ async function renderArena(slug) {
       <button class="btn" type="submit">Register</button>
     </form>`;
     bindCopy(panel);
+    bindClassPicker(panel);
     const quoteEl = document.getElementById('live-quote');
     const refreshQuote = async () => {
       if (!quoteEl) return;
       try {
         const q = await api.get(`/quote?usd=${encodeURIComponent(usd)}`);
-        quoteEl.innerHTML = `Send exactly <strong>${esc(formatCrypto('DOGE', q.DOGE))}</strong> for <strong>${esc(formatUsd(q.usd))}</strong><br><span class="muted">DOGE is ${esc(formatUsd(q.dogeUsd))} right now. Quote refreshes live. Need DOGE? <a href="${esc(K9SWAP_URL)}" target="_blank" rel="noopener noreferrer">Swap on K9SWAP</a>.</span>`;
+        quoteEl.innerHTML = `Send exactly <strong>${esc(formatCrypto('DOGE', q.DOGE))}</strong> for <strong>${esc(formatUsd(q.usd))}</strong><br><span class="muted">DOGE is ${esc(formatUsdRate(q.dogeUsd))} right now. Quote refreshes live. Need DOGE? <a href="${esc(K9SWAP_URL)}" target="_blank" rel="noopener noreferrer">Swap on K9SWAP</a>.</span>`;
       } catch (err) {
         quoteEl.innerHTML = `<span class="err">${esc(err.message)}</span>`;
       }
@@ -2121,20 +2660,21 @@ async function renderArena(slug) {
           playerUser = saved.user;
           applyPlayerChrome();
         }
-        const entry = await api.post(`/arenas/${slug}/enter`, {
+        const entry = await api.post(`/arenas/${encodeURIComponent(slug)}/enter`, {
           handle: document.getElementById('handle').value,
           team: document.getElementById('team')?.value,
           email: document.getElementById('email')?.value,
           country: document.getElementById('country')?.value,
           fromWallet: document.getElementById('from-wallet')?.value || 'FREE-ENTRY',
           payAsset: 'DOGE',
+          ddlClass: readClassPick(form, 'enter-class'),
         });
         window.clearInterval(quoteTimer);
         form.querySelector('button[type="submit"]').disabled = true;
         okEl.hidden = false;
         okEl.innerHTML = usd > 0
           ? `<strong>${esc(entry.handle)}</strong> is registered and waiting on payment.<br>
-             Send <strong>${esc(formatCrypto(entry.payAsset, entry.amountCrypto))}</strong> (${esc(formatUsd(entry.amountUsd))} at ${esc(formatUsd(entry.usdPerCoin))}/${esc(entry.payAsset)}).<br>
+             Send <strong>${esc(formatCrypto(entry.payAsset, entry.amountCrypto))}</strong> (${esc(formatUsd(entry.amountUsd))} at ${esc(formatUsdRate(entry.usdPerCoin))}/${esc(entry.payAsset)}).<br>
              Quote your invoice <span class="mono">${esc(entry.invoiceCode)}</span> if the host needs to find your payment.<br>
              Need DOGE first? <a href="${esc(K9SWAP_URL)}" target="_blank" rel="noopener noreferrer">Swap on K9SWAP</a> — a Doginal Dogs powered, walletless crypto swapper.`
           : `<strong>${esc(entry.handle)}</strong> is in. See you on the bracket.`;
@@ -2156,6 +2696,9 @@ async function renderArena(slug) {
     const paidFee = feeUsd(t) > 0;
     const ordered = [...pending, ...data.entries.filter((e) => (e.paid || e.noShow) && !e.whitelist)];
     const canEdit = hostMode && t.status === 'registration';
+    const canAddLate = hostMode && t.status === 'in_progress';
+    const lateSlots = canAddLate ? lateSeatOptions(t, data.matches, data.entries) : [];
+    const canAdd = canEdit || (canAddLate && lateSlots.length);
 
     const row = (e) => {
       const details = [];
@@ -2165,9 +2708,12 @@ async function renderArena(slug) {
         if (e.invoiceCode && !e.addedByHost) details.push(`<span>Invoice <code class="mono">${esc(e.invoiceCode)}</code></span>`);
         if (e.email) details.push(`<span>${esc(e.email)}</span>`);
         if (e.addedByHost) details.push('<span>Added by you</span>');
+        if (e.lateEntry) details.push('<span>Added after lock</span>');
+        if (e.userId || (e.discordUser && e.discordUser.discordId)) details.push('<span>Discord linked</span>');
+        else details.push('<span>Discord not linked</span>');
       }
       return `<div class="roster-row ${e.paid ? '' : 'is-pending'}">
-        <div class="who">${avatarHtml(e.handle)}<strong>${esc(e.handle)}</strong>${badge(e.noShow ? 'no_show' : e.paid ? 'confirmed' : 'pending')}</div>
+        <div class="who">${entryAvatarHtml(e)}${namedHandleHtml(e.handle, e.badges)}${classBadgeHtml(e.ddlClass)}${badge(e.noShow ? 'no_show' : e.paid ? 'confirmed' : 'pending')}</div>
         ${canEdit ? `<div class="roster-acts">
           ${e.paid
             ? `<button type="button" class="mini" data-unconfirm="${e.id}" ${tip('Move back to unpaid and out of the bracket.')}>Undo</button>`
@@ -2190,34 +2736,44 @@ async function renderArena(slug) {
       </div>` : `<p class="err" id="players-err" hidden></p>`}
       <p class="muted">${confirmed.length} confirmed${paidFee && pending.length && !hostMode ? ` · ${pending.length} awaiting payment` : ''}${t.capPlayers !== false ? ` · room for ${t.maxPlayers}` : ''}</p>
       <div class="roster">${ordered.map(row).join('') || '<p class="muted">Nobody has registered yet.</p>'}</div>
-      ${canEdit ? `<div class="host-panel" style="margin-top:16px">
+      ${canAdd ? `<div class="host-panel" style="margin-top:16px">
         <div class="host-flag">Host only</div>
-        <p><strong>Add a player yourself</strong></p>
-        <p class="muted">${t.registrationMode === 'list' ? 'This arena has no public sign-up, so add every participant here.' : 'For walk-ins or anyone who paid you another way. Added players count as confirmed.'}</p>
-        <form class="row wrap" id="add-form" style="gap:8px">
+        <p><strong>${canAddLate ? 'Add a player to the locked bracket' : 'Add a player yourself'}</strong></p>
+        <p class="muted">${canAddLate
+          ? (usesElimTree(t)
+            ? 'Walk-ins and no-show replacements go into a first-round slot. Filling a bye makes that player play for their spot.'
+            : (t.format === 'round_robin' || t.stage === 'groups'
+              ? 'They join the live field and get matches against everyone still in.'
+              : 'They join the live field and pair in the next Swiss round.'))
+          : (t.registrationMode === 'list' ? 'This arena has no public sign-up, so add every participant here.' : 'For walk-ins or anyone who paid you another way. Added players count as confirmed.')}</p>
+        <form class="stack" id="add-form" style="gap:8px">
           <div class="handle-typeahead">
             <input id="add-handle" placeholder="${t.requireTeams ? 'Team name' : 'Start typing a handle'}" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" aria-autocomplete="list" aria-controls="add-handle-list" aria-expanded="false">
             <ul id="add-handle-list" class="handle-suggest" hidden role="listbox"></ul>
           </div>
-          <button class="btn ghost" type="submit">Add</button>
+          <div><span class="lbl">Class</span>${classPickerHtml('add-class', 'Neutral')}</div>
+          ${canAddLate && usesElimTree(t) ? `<div><label for="add-slot">Put them</label>
+            <select id="add-slot">${lateSlots.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>
+          </div>` : ''}
+          <button class="btn ghost" type="submit">${canAddLate ? 'Add to bracket' : 'Add'}</button>
         </form>
         <p class="hint">Discord-connected handles appear as you type. You can still add a walk-in name that is not in the list.</p>
-      </div>` : ''}`;
+      </div>` : canAddLate ? `<p class="muted" style="margin-top:16px">No open first-round slots left. Use the Whitelist tab to swap a no-show if every first-round match is already locked.</p>` : ''}`;
 
     const errEl = panel.querySelector('#players-err');
     const confirmAll = panel.querySelector('#confirm-all');
-    if (confirmAll) confirmAll.onclick = () => hostAction(errEl, () => api.post(`/arenas/${slug}/confirm`, {
+    if (confirmAll) confirmAll.onclick = () => hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/confirm`, {
       hostPassword,
       entryIds: pending.map((e) => e.id),
     }));
     panel.querySelectorAll('[data-confirm]').forEach((btn) => {
-      btn.onclick = () => hostAction(errEl, () => api.post(`/arenas/${slug}/confirm`, {
+      btn.onclick = () => hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/confirm`, {
         hostPassword,
         entryIds: [Number(btn.getAttribute('data-confirm'))],
       }));
     });
     panel.querySelectorAll('[data-unconfirm]').forEach((btn) => {
-      btn.onclick = () => hostAction(errEl, () => api.post(`/arenas/${slug}/confirm`, {
+      btn.onclick = () => hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/confirm`, {
         hostPassword,
         entryIds: [Number(btn.getAttribute('data-unconfirm'))],
         paid: false,
@@ -2226,7 +2782,7 @@ async function renderArena(slug) {
     panel.querySelectorAll('[data-remove]').forEach((btn) => {
       btn.onclick = () => {
         if (!window.confirm('Remove this entry from the arena?')) return;
-        hostAction(errEl, () => api.post(`/arenas/${slug}/remove-entry`, {
+        hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/remove-entry`, {
           hostPassword,
           entryId: Number(btn.getAttribute('data-remove')),
         }));
@@ -2234,6 +2790,7 @@ async function renderArena(slug) {
     });
     const addForm = panel.querySelector('#add-form');
     if (addForm) {
+      bindClassPicker(addForm);
       bindHandleTypeahead(
         panel.querySelector('#add-handle'),
         panel.querySelector('#add-handle-list'),
@@ -2241,17 +2798,37 @@ async function renderArena(slug) {
       );
       addForm.onsubmit = (event) => {
         event.preventDefault();
-        const handle = panel.querySelector('#add-handle').value;
-        hostAction(errEl, () => api.post(`/arenas/${slug}/add-entry`, { hostPassword, handle }));
+        const handleInput = panel.querySelector('#add-handle');
+        const handle = handleInput.value;
+        const slotEl = panel.querySelector('#add-slot');
+        const [matchId, slot] = String((slotEl && slotEl.value) || 'auto').split(':');
+        hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/add-entry`, {
+          hostPassword,
+          handle,
+          userId: pickedUserId(handleInput),
+          ddlClass: readClassPick(addForm, 'add-class'),
+          matchId: matchId && matchId !== 'auto' ? Number(matchId) : undefined,
+          slot: slot ? Number(slot) : undefined,
+        }));
       };
     }
   }
 
   function paintStandings(panel) {
     const rows = data.standings || [];
+    const entryById = new Map((data.entries || []).map((e) => [e.id, e]));
     panel.innerHTML = `<h2>Standings</h2>
-      <table><thead><tr><th>#</th><th>Handle</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th></tr></thead><tbody>
-      ${rows.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.handle)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.points}</td><td>${s.mapDiff}</td></tr>`).join('') || '<tr><td colspan="6">No matches yet.</td></tr>'}
+      <table class="standings-table"><thead><tr><th>#</th><th>Handle</th><th>Class</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th></tr></thead><tbody>
+      ${rows.map((s, i) => {
+        const place = i + 1;
+        const entry = entryById.get(s.entryId);
+        return `<tr>
+          <td class="standings-place">${standingBadgeHtml(place) || place}</td>
+          <td>${namedHandleHtml(s.handle)}</td>
+          <td>${classBadgeHtml((entry && entry.ddlClass) || s.ddlClass)}${esc((entry && entry.ddlClass) || s.ddlClass || '')}</td>
+          <td>${s.wins}</td><td>${s.losses}</td><td>${s.points}</td><td>${s.mapDiff}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="7">No matches yet.</td></tr>'}
       </tbody></table>`;
   }
 
@@ -2272,12 +2849,12 @@ async function renderArena(slug) {
       <h3>Board</h3>
       <ul>${Object.entries(counts).map(([id, n]) => {
         const e = data.entries.find((row) => String(row.id) === String(id));
-        return `<li>${esc(e?.handle || id)} — ${n}</li>`;
+        return `<li>${namedHandleHtml(e?.handle || id)} — ${n}</li>`;
       }).join('') || '<li class="muted">No picks yet.</li>'}</ul>`;
     document.getElementById('pred-form').onsubmit = async (event) => {
       event.preventDefault();
       try {
-        data = await api.post(`/arenas/${slug}/predict`, {
+        data = await api.post(`/arenas/${encodeURIComponent(slug)}/predict`, {
           voter: document.getElementById('pred-voter').value,
           championId: Number(document.getElementById('pred-champ').value),
           note: document.getElementById('pred-note')?.value,
@@ -2317,7 +2894,7 @@ async function renderArena(slug) {
         ? `${confirmed.length} confirmed ${confirmed.length === 1 ? 'player' : 'players'} will be seeded into a ${esc(formatBlurb(t))}. Locking closes registration.`
         : `You need at least 2 confirmed players. ${confirmed.length} so far.`}</p>
       ${pending.length ? `<p class="muted">${pending.length} ${pending.length === 1 ? 'entry has' : 'entries have'} not paid and will be left out — <button type="button" class="linkish" data-go="players">confirm payments</button> first if that is wrong.</p>` : ''}
-      ${confirmed.length ? `<p class="chips">${confirmed.map((e) => `<span class="chip">${esc(e.handle)}</span>`).join('')}</p>` : ''}
+      ${confirmed.length ? `<p class="chips">${confirmed.map((e) => `<span class="chip named-handle">${esc(e.handle)}${classBadgeHtml(e.ddlClass)}${medalsInlineHtml(badgesFor(e.handle, e.badges))}</span>`).join('')}</p>` : ''}
       <label class="check"><input type="checkbox" id="shuffle" ${shuffle ? 'checked' : ''}> Shuffle seeds for a random draw</label>
       <div style="max-width:16rem"><label for="lock-bestof">Series length</label>${bestOfSelect('lock-bestof', bestOf)}</div>
       <details class="advanced">
@@ -2348,7 +2925,7 @@ async function renderArena(slug) {
     panel.querySelector('#lock-btn').onclick = () => {
       readLocal();
       hostAction(errEl, async () => {
-        const next = await api.post(`/arenas/${slug}/generate`, {
+        const next = await api.post(`/arenas/${encodeURIComponent(slug)}/generate`, {
           hostPassword,
           shuffle,
           confirmSelected: false,
@@ -2368,11 +2945,43 @@ async function renderArena(slug) {
       paintPreLock(panel, t);
       return;
     }
-    panel.innerHTML = `${hostMode ? `<p class="muted host-hint">Host mode: tap any glowing match to report games and lock the series.${Number(t.whitelistSpots) > 0 ? ' First-round no-shows go on the Whitelist tab.' : ''}</p>` : ''}
+    const kickChannel = kickChannelOf(t.streamUrl);
+    panel.innerHTML = `${hostMode ? `<p class="muted host-hint">Host mode: tap any glowing match to report games and lock the series. Add a late player from the Players tab.${Number(t.whitelistSpots) > 0 ? ' First-round no-shows also go on the Whitelist tab.' : ''}</p>
+      <div class="host-panel kick-host">
+        <div class="host-flag">Host only</div>
+        <p><strong>Kick livestream</strong></p>
+        <p class="muted">${kickChannel
+          ? `Viewers see kick.com/${esc(kickChannel)} on this bracket. They can watch here with audio or open Kick.`
+          : 'Paste a Kick channel or livestream link. While this arena is live, the bracket shows an embedded player with audio, plus a button to open Kick.'}</p>
+        <form class="row wrap" id="kick-form" style="gap:8px">
+          <input id="kick-url" value="${esc(t.streamUrl || '')}" placeholder="https://kick.com/yourchannel" maxlength="200" aria-label="Kick stream URL">
+          <button class="btn" type="submit">${kickChannel ? 'Update stream' : 'Show stream'}</button>
+          ${kickChannel ? '<button class="btn ghost" type="button" id="kick-clear">Remove</button>' : ''}
+        </form>
+        <p class="err" id="kick-err" hidden></p>
+      </div>` : ''}
       <div class="row wrap bracket-toolbar">
         <button class="btn ghost" type="button" id="export-rounds" ${tip('Copy or download this round’s scores as text, like Shock vs Dick 1/0.')}>Export round results</button>
       </div>
       ${bracketHtml(data)}`;
+    const kickForm = panel.querySelector('#kick-form');
+    if (kickForm) {
+      const kickErr = panel.querySelector('#kick-err');
+      kickForm.onsubmit = (event) => {
+        event.preventDefault();
+        hostAction(kickErr, () => api.post(`/arenas/${encodeURIComponent(slug)}/settings`, {
+          hostPassword,
+          streamUrl: panel.querySelector('#kick-url').value,
+        }));
+      };
+      const clearBtn = panel.querySelector('#kick-clear');
+      if (clearBtn) {
+        clearBtn.onclick = () => hostAction(kickErr, () => api.post(`/arenas/${encodeURIComponent(slug)}/settings`, {
+          hostPassword,
+          streamUrl: '',
+        }));
+      }
+    }
     const exportBtn = panel.querySelector('#export-rounds');
     if (exportBtn) exportBtn.onclick = () => openExportSheet(roundResultsText(data), slug);
     panel.querySelectorAll('[data-match]').forEach((btn) => {
@@ -2392,19 +3001,26 @@ async function renderArena(slug) {
     const list = data.entries.filter((e) => e.whitelist);
     const unused = list.filter((e) => !e.subbedIn && !e.noShow);
     const live = t.status === 'in_progress';
-    const opening = (data.matches || []).filter((m) => isOpeningMatch(t, m) && m.status === 'ready');
+    const opening = (data.matches || []).filter((m) => isOpeningMatch(t, m) && m.status !== 'complete');
     const slotOptions = opening.flatMap((m) => {
       const p1 = entryOf(data.entries, m.entry1Id);
       const p2 = entryOf(data.entries, m.entry2Id);
       const rows = [];
-      if (p1) rows.push({ value: `${m.id}:1`, label: `${p1.handle} vs ${p2?.handle || 'TBD'} — replace ${p1.handle}` });
-      if (p2) rows.push({ value: `${m.id}:2`, label: `${p1?.handle || 'TBD'} vs ${p2.handle} — replace ${p2.handle}` });
+      if (m.status === 'bye') {
+        const who = p1 || p2;
+        rows.push({ value: `${m.id}:${p1 ? 2 : 1}`, label: `Play ${who ? who.handle : 'BYE'} (fill empty slot)` });
+        return rows;
+      }
+      if (!p1) rows.push({ value: `${m.id}:1`, label: `${p2 ? `${p2.handle} vs TBD` : 'Empty match'} — fill empty slot` });
+      else rows.push({ value: `${m.id}:1`, label: `${p1.handle} vs ${p2?.handle || 'TBD'} — replace ${p1.handle}` });
+      if (!p2) rows.push({ value: `${m.id}:2`, label: `${p1 ? `${p1.handle} vs TBD` : 'Empty match'} — fill empty slot` });
+      else rows.push({ value: `${m.id}:2`, label: `${p1?.handle || 'TBD'} vs ${p2.handle} — replace ${p2.handle}` });
       return rows;
     });
     panel.innerHTML = `
       <h2>Whitelist</h2>
       <p class="muted">${spots
-        ? `${list.length} of ${spots} substitute spot${spots === 1 ? '' : 's'} filled. These names stay off the bracket until you drop one into a first-round match for a no-show.`
+        ? `${list.length} of ${spots} substitute spot${spots === 1 ? '' : 's'} filled. These names stay off the bracket until you drop one into a first-round no-show or an empty slot.`
         : 'Set how many substitute spots this arena holds, then add names.'}</p>
       ${hostMode ? `<div class="host-panel">
         <div class="host-flag">Host only</div>
@@ -2418,7 +3034,7 @@ async function renderArena(slug) {
       <div class="roster">${list.map((e) => {
         const state = e.subbedIn ? 'In round 1' : e.noShow ? 'Sat out' : 'On deck';
         return `<div class="roster-row">
-          <div class="who">${avatarHtml(e.handle)}<strong>${esc(e.handle)}</strong>${badge(e.subbedIn ? 'confirmed' : e.noShow ? 'no_show' : 'pending')}</div>
+          <div class="who">${entryAvatarHtml(e)}${namedHandleHtml(e.handle, e.badges)}${classBadgeHtml(e.ddlClass)}${badge(e.subbedIn ? 'confirmed' : e.noShow ? 'no_show' : 'pending')}</div>
           <span class="muted">${esc(state)}</span>
           ${hostMode && !e.subbedIn && !e.noShow ? `<div class="roster-acts">
             <button type="button" class="mini bad" data-wl-remove="${e.id}">Remove</button>
@@ -2428,7 +3044,7 @@ async function renderArena(slug) {
       ${hostMode && list.length < spots ? `<div class="host-panel" style="margin-top:16px">
         <div class="host-flag">Host only</div>
         <p><strong>Add a substitute</strong></p>
-        <p class="muted">${live ? 'They sit on deck until you put them in a first-round match.' : 'They will not be seeded when you lock the bracket.'}</p>
+        <p class="muted">${live ? 'They sit on deck until you put them in a first-round no-show or empty slot.' : 'They will not be seeded when you lock the bracket.'}</p>
         <form class="row wrap" id="wl-add-form" style="gap:8px">
           <div class="handle-typeahead">
             <input id="wl-handle" placeholder="Start typing a handle" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" aria-autocomplete="list" aria-controls="wl-handle-list" aria-expanded="false">
@@ -2440,10 +3056,10 @@ async function renderArena(slug) {
       </div>` : ''}
       ${hostMode && live ? `<div class="host-panel" style="margin-top:16px">
         <div class="host-flag">Host only</div>
-        <p><strong>Replace a first-round no-show</strong></p>
-        <p class="muted">Pick the missing player and the substitute. The series resets if any games were already entered.</p>
+        <p><strong>Put a substitute in round 1</strong></p>
+        <p class="muted">Pick an empty slot or a no-show, then the substitute. Filling a bye makes that player play for their spot. The series resets if any games were already entered.</p>
         ${slotOptions.length && (unused.length || list.length < spots) ? `<form class="stack" id="wl-sub-form">
-          <div><label for="wl-slot">Replace</label>
+          <div><label for="wl-slot">Slot</label>
             <select id="wl-slot">${slotOptions.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>
           </div>
           ${unused.length ? `<div><label for="wl-entry">With whitelist player</label>
@@ -2453,7 +3069,7 @@ async function renderArena(slug) {
           </div>`}
           <p class="err" id="wl-sub-err" hidden></p>
           <button class="btn" type="submit">Put them in round 1</button>
-        </form>` : `<p class="muted">${!opening.length ? 'No open first-round matches left to fill.' : list.length >= spots && !unused.length ? 'Every whitelist spot is already used.' : 'Add a whitelist player first.'}</p>`}
+        </form>` : `<p class="muted">${!slotOptions.length ? 'No open first-round slots left to fill.' : list.length >= spots && !unused.length ? 'Every whitelist spot is already used.' : 'Add a whitelist player first.'}</p>`}
       </div>` : ''}
       <p class="err" id="wl-err" hidden></p>`;
 
@@ -2462,7 +3078,7 @@ async function renderArena(slug) {
     if (spotsForm) spotsForm.onsubmit = (event) => {
       event.preventDefault();
       const spotsErr = panel.querySelector('#wl-spots-err');
-      hostAction(spotsErr, () => api.post(`/arenas/${slug}/settings`, {
+      hostAction(spotsErr, () => api.post(`/arenas/${encodeURIComponent(slug)}/settings`, {
         hostPassword,
         whitelistSpots: Number(panel.querySelector('#wl-spots').value || 0),
       }));
@@ -2477,14 +3093,19 @@ async function renderArena(slug) {
       addForm.onsubmit = (event) => {
         event.preventDefault();
         const addErr = panel.querySelector('#wl-add-err');
-        const handle = panel.querySelector('#wl-handle').value;
-        hostAction(addErr, () => api.post(`/arenas/${slug}/add-entry`, { hostPassword, handle, whitelist: true }));
+        const handleInput = panel.querySelector('#wl-handle');
+        hostAction(addErr, () => api.post(`/arenas/${encodeURIComponent(slug)}/add-entry`, {
+          hostPassword,
+          handle: handleInput.value,
+          userId: pickedUserId(handleInput),
+          whitelist: true,
+        }));
       };
     }
     panel.querySelectorAll('[data-wl-remove]').forEach((btn) => {
       btn.onclick = () => {
         if (!window.confirm('Remove this whitelist player?')) return;
-        hostAction(errEl, () => api.post(`/arenas/${slug}/remove-entry`, {
+        hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/remove-entry`, {
           hostPassword,
           entryId: Number(btn.getAttribute('data-wl-remove')),
         }));
@@ -2497,7 +3118,7 @@ async function renderArena(slug) {
       const [matchId, slot] = String(panel.querySelector('#wl-slot').value || '').split(':');
       const entrySel = panel.querySelector('#wl-entry');
       const handleInput = panel.querySelector('#wl-new');
-      hostAction(subErr, () => api.post(`/arenas/${slug}/sub-round1`, {
+      hostAction(subErr, () => api.post(`/arenas/${encodeURIComponent(slug)}/sub-round1`, {
         hostPassword,
         matchId: Number(matchId),
         slot: Number(slot),
@@ -2579,7 +3200,7 @@ async function renderArena(slug) {
       const setErr = document.getElementById('set-err');
       const payload = collectSettings(settingsForm);
       hostAction(setErr, async () => {
-        const next = await api.post(`/arenas/${slug}/settings`, { ...payload, hostPassword });
+        const next = await api.post(`/arenas/${encodeURIComponent(slug)}/settings`, { ...payload, hostPassword });
         assertRewardsSaved(payload, next);
         hostSavedMsg = payload.rewardMode === 'prize'
           ? 'Prizes saved. The header now says Prizes instead of Pot.'
@@ -2590,7 +3211,7 @@ async function renderArena(slug) {
       });
     };
     const rulesBtn = document.getElementById('rules-btn');
-    if (rulesBtn) rulesBtn.onclick = () => hostAction(errEl, () => api.post(`/arenas/${slug}/round-rules`, {
+    if (rulesBtn) rulesBtn.onclick = () => hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/round-rules`, {
       hostPassword,
       bestOf: t.bestOf,
       roundBestOf: readRoundBestOf(panel),
@@ -2632,7 +3253,7 @@ async function renderArena(slug) {
             continue;
           }
           try {
-            const next = await api.post(`/arenas/${slug}/add-entry`, { hostPassword, handle });
+            const next = await api.post(`/arenas/${encodeURIComponent(slug)}/add-entry`, { hostPassword, handle });
             data = next;
             existing.add(handle.toLowerCase());
             added += 1;
@@ -2653,7 +3274,7 @@ async function renderArena(slug) {
     };
     panel.querySelectorAll('[data-claim]').forEach((btn) => {
       btn.onclick = () => hostAction(document.getElementById('claim-err'), () => api.post(
-        `/arenas/${slug}/claims/${btn.getAttribute('data-claim')}/resolve`,
+        `/arenas/${encodeURIComponent(slug)}/claims/${encodeURIComponent(btn.getAttribute('data-claim') || '')}/resolve`,
         { hostPassword, approve: btn.getAttribute('data-approve') === '1' },
       ));
     });
@@ -2662,36 +3283,98 @@ async function renderArena(slug) {
   paint();
 }
 
+function eventCardHtml(event) {
+  const href = arenaCardHref(event);
+  const tag = event.official
+    ? '<span class="badge ok">Official</span>'
+    : '<span class="badge">Scrim</span>';
+  const champ = event.champion && event.champion.handle ? `Champion: ${namedHandleHtml(event.champion.handle)}` : 'No champion recorded';
+  const inner = `<div class="row"><h3>${esc(event.name)}</h3>${event.manual ? '<span class="badge ok">Recorded</span>' : tag}</div>
+    <p class="muted">${esc(FORMAT_LABEL[event.format] || event.format || 'Record')} · ${event.manual ? 'Handwritten title' : `${event.fieldSize} players`}</p>
+    <p class="muted">${champ}</p>`;
+  return href ? `<a class="card plaque" href="${href}">${inner}</a>` : `<div class="card plaque">${inner}</div>`;
+}
+
 async function renderRecords() {
   setTreeMode(false);
   root.innerHTML = `<div class="form-page">
     <p class="form-kicker">DDL Tourney</p>
     <h1>Hall of records</h1>
-    <p class="muted">Official arenas with at least four confirmed players count toward accolades. Sign in with Discord so your finishes stick to one handle.</p>
     <p class="muted">Loading…</p>
   </div>`;
   try {
     const pack = await api.get('/records');
+    ingestAwards(pack.awards);
     const events = pack.events || [];
     const champions = pack.champions || [];
+    const mentions = pack.mentions || [];
+    const ledgers = pack.ledgers || [];
     root.innerHTML = `<div class="form-page">
       <p class="form-kicker">DDL Tourney</p>
       <h1>Hall of records</h1>
-      <p class="muted">Official results across every completed arena. Use these names when you seed a grand tournament.</p>
+      <p class="muted">Official results across every completed arena. A finals winner is crowned champion. Use these names when you seed a grand tournament.</p>
+      ${marksGalleryHtml()}
+      ${hostMode ? `<p class="muted">Host: Remove on a card takes that name off the hall. Real arenas become scrims. Handwritten titles are deleted. <a href="/tourney/#/ledger">Write the ledger</a>.</p>` : ''}
       ${pack.warning ? `<p class="err">${esc(pack.warning)}</p>` : ''}
-      <h2>Champions</h2>
-      <div class="grid cards">${champions.map((c) => `
-        <a class="card" href="/tourney/#/player/${encodeURIComponent(c.handle)}">
-          <div class="row"><h3>${esc(c.handle)}</h3><span class="badge ok">${c.titles} title${c.titles === 1 ? '' : 's'}</span></div>
-        </a>`).join('') || '<p class="muted">No official champions yet.</p>'}</div>
-      <h2>Recent arenas</h2>
-      <div class="grid cards">${events.map((e) => `
-        <a class="card" href="${arenaHref(e.slug)}">
-          <div class="row"><h3>${esc(e.name)}</h3>${e.official ? '<span class="badge ok">Official</span>' : '<span class="badge">Scrim</span>'}</div>
-          <p class="muted">${esc(FORMAT_LABEL[e.format] || e.format)} · ${e.fieldSize} players</p>
-          <p class="muted">${e.champion && e.champion.handle ? `Champion: ${esc(e.champion.handle)}` : 'No champion recorded'}</p>
-        </a>`).join('') || '<p class="muted">No completed arenas on the ledger yet.</p>'}</div>
+      <h2 class="section-title">Champions</h2>
+      <div class="grid cards">${champions.map((c) => {
+        const inner = `<div class="row"><h3>${hostMode ? `<a href="/tourney/#/player/${encodeURIComponent(c.handle)}">${namedHandleHtml(c.handle, c.badges)}</a>` : namedHandleHtml(c.handle, c.badges)}</h3><span class="rank-seal gold">${c.titles} title${c.titles === 1 ? '' : 's'}</span></div>
+          ${hostMode ? `<div class="hall-acts"><button type="button" class="mini bad" data-remove-champ="${esc(c.handle)}">Remove</button></div>` : ''}`;
+        return hostMode
+          ? `<article class="card plaque champ-card">${inner}</article>`
+          : `<a class="card plaque champ-card" href="/tourney/#/player/${encodeURIComponent(c.handle)}">${inner}</a>`;
+      }).join('') || '<p class="muted">No official champions yet.</p>'}</div>
+      <h2 class="section-title">Honourable mentions</h2>
+      <div class="grid cards">${mentions.map((m) => {
+        const inner = `<div class="row"><h3>${hostMode ? `<a href="/tourney/#/player/${encodeURIComponent(m.handle)}">${namedHandleHtml(m.handle, m.badges)}</a>` : namedHandleHtml(m.handle, m.badges)}</h3><span class="rank-seal honour">Mention</span></div>
+          <p class="muted">${esc(m.title)}</p>
+          ${m.blurb ? `<p class="muted">${esc(m.blurb)}</p>` : ''}
+          ${hostMode ? `<div class="hall-acts"><button type="button" class="mini bad" data-del-mention="${m.id}">Remove</button></div>` : ''}`;
+        return hostMode
+          ? `<article class="card plaque honour-card">${inner}</article>`
+          : `<a class="card plaque honour-card" href="/tourney/#/player/${encodeURIComponent(m.handle)}">${inner}</a>`;
+      }).join('') || '<p class="muted">No honourable mentions recorded yet.</p>'}</div>
+      ${ledgers.map((board) => `
+        <h2 class="section-title">${esc(board.name)}</h2>
+        ${board.blurb ? `<p class="muted">${esc(board.blurb)}</p>` : ''}
+        <div class="card">
+          <ol class="rank-list">${(board.entries || []).map((row) => `
+            <li>
+              <span class="place">${row.rank != null ? esc(placeLabel(row.rank)) : '—'}</span>
+              <div><a class="named-handle" href="/tourney/#/player/${encodeURIComponent(row.handle)}">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}</a>${row.note ? `<p class="muted" style="margin:2px 0 0">${esc(row.note)}</p>` : ''}</div>
+              <span></span>
+            </li>`).join('') || '<li><span></span><p class="muted">No names on this board yet.</p><span></span></li>'}</ol>
+          ${(board.mentions || []).length ? `<p class="muted" style="margin:14px 0 8px">Honourable mentions</p>
+            <div class="chips">${board.mentions.map((row) => `<a class="chip named-handle" href="/tourney/#/player/${encodeURIComponent(row.handle)}">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}${row.note ? ` · ${esc(row.note)}` : ''}</a>`).join('')}</div>` : ''}
+        </div>`).join('')}
+      <h2 class="section-title">Recent arenas</h2>
+      <div class="grid cards">${events.map(eventCardHtml).join('') || '<p class="muted">No completed arenas on the ledger yet.</p>'}</div>
     </div>`;
+    if (hostMode) {
+      root.querySelectorAll('[data-remove-champ]').forEach((btn) => {
+        btn.onclick = async () => {
+          const handle = btn.getAttribute('data-remove-champ');
+          if (!window.confirm(`Remove ${handle} from the Hall of records? Official arenas they won become scrims. Handwritten titles are deleted.`)) return;
+          try {
+            await api.post('/records/host', { hostPassword, op: 'removeChampion', handle });
+            renderRecords();
+          } catch (err) {
+            window.alert(err.message);
+          }
+        };
+      });
+      root.querySelectorAll('[data-del-mention]').forEach((btn) => {
+        btn.onclick = async () => {
+          if (!window.confirm('Remove this honourable mention?')) return;
+          try {
+            await api.post('/records/host', { hostPassword, op: 'deleteMention', id: Number(btn.getAttribute('data-del-mention')) });
+            renderRecords();
+          } catch (err) {
+            window.alert(err.message);
+          }
+        };
+      });
+    }
   } catch (err) {
     root.innerHTML = `<div class="form-page"><h1>Hall of records</h1><p class="err">${esc(err.message)}</p></div>`;
   }
@@ -2711,23 +3394,31 @@ async function renderPlayer(handle) {
         unclaimed = u.results || [];
       } catch (_err) {}
     }
-    const place = (n) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : 'Played');
+    const place = (n) => {
+      if (!n) return 'Played';
+      return `<span class="place-cell">${standingBadgeHtml(n)}${esc(placeLabel(n))}</span>`;
+    };
     root.innerHTML = `<div class="form-page">
       <p class="form-kicker">Player</p>
       <div class="organizer" style="margin-bottom:16px">
         ${pfpHtml(pack.user, pack.handle, 48)}
         <div>
-          <h1 style="margin:0">${esc(pack.handle)}</h1>
+          <h1 style="margin:0" class="named-handle">${esc(pack.handle)}${medalsInlineHtml(pack.badges)}</h1>
           <p class="muted">${pack.titles} title${pack.titles === 1 ? '' : 's'} · ${pack.appearances} official appearance${pack.appearances === 1 ? '' : 's'}</p>
         </div>
       </div>
+      ${(pack.badges || []).length ? `<h2>Badges</h2>
+      ${medalsRowHtml(pack.badges)}` : ''}
       <h2>Accolades</h2>
       <div class="chips">${(pack.accolades || []).map((a) => `<span class="chip" title="${esc(a.blurb)}">${esc(a.title)}</span>`).join('') || '<p class="muted">No official accolades yet.</p>'}</div>
+      ${pack.mention ? `<p class="muted" style="margin-top:12px">Honourable mention — ${esc(pack.mention.title)}${pack.mention.blurb ? `: ${esc(pack.mention.blurb)}` : ''}</p>` : ''}
       <h2>Results</h2>
       <table><thead><tr><th>Arena</th><th>Format</th><th>Place</th><th>Record</th></tr></thead>
       <tbody>${(pack.results || []).map((r) => `
         <tr>
-          <td><a href="${arenaHref(r.slug)}">${esc(r.name)}</a>${r.official ? '' : ' <span class="muted">scrim</span>'}</td>
+          <td>${String(r.slug || '').startsWith('manual-') || Number(r.tournamentId) < 0
+            ? esc(r.name)
+            : `<a href="${arenaHref(r.slug)}">${esc(r.name)}</a>`}${r.official ? '' : ' <span class="muted">scrim</span>'}</td>
           <td>${esc(FORMAT_LABEL[r.format] || r.format)}</td>
           <td>${place(r.placement)}</td>
           <td>${esc(r.record || '')}</td>
@@ -2766,9 +3457,371 @@ async function renderPlayer(handle) {
   }
 }
 
+async function renderLedger() {
+  setTreeMode(false);
+  if (!hostMode) {
+    root.innerHTML = `<div class="form-page">
+      <p class="form-kicker">Host only</p>
+      <h1>The ledger</h1>
+      <p class="muted">Sign in as host to write champions, leaderboards, badges, and honourable mentions.</p>
+      <button class="btn" type="button" id="ledger-signin">Host sign in</button>
+    </div>`;
+    const btn = document.getElementById('ledger-signin');
+    if (btn) btn.onclick = async () => { if (await openHostSignIn()) renderLedger(); };
+    return;
+  }
+
+  root.innerHTML = `<div class="form-page"><p class="muted">Loading the ledger…</p></div>`;
+  let pack;
+  try {
+    pack = await api.get('/records');
+  } catch (err) {
+    root.innerHTML = `<div class="form-page"><h1>The ledger</h1><p class="err">${esc(err.message)}</p></div>`;
+    return;
+  }
+
+  let tab = 'records';
+  let badgeDraft = { title: '', blurb: '', icon: 'crest', motif: 'gold' };
+
+  const run = async (op, extra, errId) => {
+    const errEl = errId ? document.getElementById(errId) : null;
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+    try {
+      pack = await api.post('/records/host', { hostPassword, op, ...extra });
+      ingestAwards(pack.awards);
+      applyPlayerChrome();
+      paint();
+      return true;
+    } catch (err) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = err.message;
+      } else {
+        window.alert(err.message);
+      }
+      return false;
+    }
+  };
+
+  const handleField = (id) => `<div class="handle-typeahead">
+    <input id="${id}" autocomplete="off" placeholder="Handle" aria-autocomplete="list">
+    <ul class="handle-suggest" hidden></ul>
+  </div>`;
+
+  const paint = () => {
+    ingestAwards(pack.awards);
+    const events = pack.events || [];
+    const ledgers = pack.ledgers || [];
+    const mentions = pack.mentions || [];
+    const badges = pack.badges || [];
+    const allAwards = pack.awards || [];
+
+    const recordsTab = `<section class="host-panel wide">
+      <div class="host-flag">Host only</div>
+      <h2 style="margin:0">Champions and arenas</h2>
+      <p class="muted">Finals winners crown automatically. Promote a scrim, or write a title by hand if the arena never landed on the ledger.</p>
+      <form id="title-form" class="stack wide">
+        <div class="form-row"><label for="title-handle">Champion</label>${handleField('title-handle')}</div>
+        <div class="form-row"><label for="title-arena">Arena or title</label><input id="title-arena" placeholder="SHOCK VS DICK - THE FINALS"></div>
+        <div class="row wrap"><button class="btn" type="submit">Add champion</button></div>
+        <p class="err" id="title-err" hidden></p>
+      </form>
+      <div class="grid cards" style="margin-top:12px">${events.map((e) => `
+        <div class="card">
+          <div class="row"><h3>${esc(e.name)}</h3>${e.official ? '<span class="badge ok">Official</span>' : '<span class="badge">Scrim</span>'}</div>
+          <p class="muted">${e.champion && e.champion.handle ? `Champion: ${namedHandleHtml(e.champion.handle)}` : 'No champion recorded'} · ${e.manual ? 'Handwritten' : `${e.fieldSize} players`}</p>
+          <div class="roster-acts" style="margin-top:10px">
+            ${e.official
+              ? `<button type="button" class="mini" data-official="0" data-tid="${e.tournamentId}">Mark scrim</button>`
+              : `<button type="button" class="mini go" data-official="1" data-tid="${e.tournamentId}">Crown official</button>`}
+            ${e.manual ? `<button type="button" class="mini bad" data-remove-title="${e.tournamentId}">Remove</button>` : ''}
+          </div>
+        </div>`).join('') || '<p class="muted">No completed arenas yet.</p>'}</div>
+    </section>`;
+
+    const boardsTab = `<section class="host-panel wide">
+      <div class="host-flag">Host only</div>
+      <h2 style="margin:0">Leaderboards</h2>
+      <p class="muted">Name a board, then rank players. Honourable mentions on a board sit under the ranking.</p>
+      <form id="board-form" class="stack wide">
+        <div class="form-row"><label for="board-name">Board name</label><input id="board-name" placeholder="Season 1 standings"></div>
+        <div class="form-row"><label for="board-blurb">Blurb</label><input id="board-blurb" placeholder="Optional line under the title"></div>
+        <div class="row wrap"><button class="btn" type="submit">Create leaderboard</button></div>
+        <p class="err" id="board-err" hidden></p>
+      </form>
+      ${ledgers.map((board) => `
+        <article class="card" style="margin-top:14px">
+          <div class="row"><h3>${esc(board.name)}</h3><button type="button" class="mini bad" data-del-board="${board.id}">Delete board</button></div>
+          ${board.blurb ? `<p class="muted">${esc(board.blurb)}</p>` : ''}
+          <ol class="rank-list">${(board.entries || []).map((row) => `
+            <li>
+              <span class="place">${row.rank != null ? esc(placeLabel(row.rank)) : '—'}</span>
+              <div><strong class="named-handle">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}</strong>${row.note ? `<p class="muted" style="margin:2px 0 0">${esc(row.note)}</p>` : ''}</div>
+              <button type="button" class="mini bad" data-del-row="${row.id}">Remove</button>
+            </li>`).join('') || '<li><span></span><p class="muted">Empty board.</p><span></span></li>'}</ol>
+          ${(board.mentions || []).length ? `<p class="muted" style="margin:12px 0 6px">Honourable mentions</p>
+            <div class="chips">${board.mentions.map((row) => `<span class="chip named-handle">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}${row.note ? ` · ${esc(row.note)}` : ''} <button type="button" class="linkish" data-del-row="${row.id}">remove</button></span>`).join('')}</div>` : ''}
+          <form class="row wrap" style="margin-top:12px" data-board-row="${board.id}">
+            ${handleField(`row-handle-${board.id}`)}
+            <input type="number" min="1" max="99" value="${(board.entries || []).length + 1}" id="row-rank-${board.id}" style="max-width:5.5rem" aria-label="Rank">
+            <input placeholder="Note" id="row-note-${board.id}" style="flex:1 1 10rem">
+            <button class="mini go" type="submit">Add rank</button>
+            <button class="mini" type="submit" data-kind="honour">Add mention</button>
+          </form>
+          <p class="err" id="row-err-${board.id}" hidden></p>
+        </article>`).join('')}
+    </section>`;
+
+    const mentionsTab = `<section class="host-panel wide">
+      <div class="host-flag">Host only</div>
+      <h2 style="margin:0">Honourable mentions</h2>
+      <p class="muted">These sit on the Hall of records under Champions — for names that deserve the flame without a title.</p>
+      <form id="mention-form" class="stack wide">
+        <div class="form-row"><label for="mention-handle">Player</label>${handleField('mention-handle')}</div>
+        <div class="form-row"><label for="mention-title">Line</label><input id="mention-title" placeholder="Sportsmanship, clutch run, host's pick…"></div>
+        <div class="form-row"><label for="mention-blurb">Note</label><input id="mention-blurb" placeholder="Optional"></div>
+        <div class="row wrap"><button class="btn" type="submit">Add mention</button></div>
+        <p class="err" id="mention-err" hidden></p>
+      </form>
+      <div class="grid cards" style="margin-top:12px">${mentions.map((m) => `
+        <div class="card honour-card">
+          <div class="row"><h3>${namedHandleHtml(m.handle, m.badges)}</h3><button type="button" class="mini bad" data-del-mention="${m.id}">Remove</button></div>
+          <p class="muted">${esc(m.title)}</p>
+          ${m.blurb ? `<p class="muted">${esc(m.blurb)}</p>` : ''}
+        </div>`).join('') || '<p class="muted">None recorded yet.</p>'}</div>
+    </section>`;
+
+    const standingIcons = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.STANDING_ICONS) || [];
+    const classIcons = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.CLASS_ICONS) || [];
+    const pickIcons = (icons, label) => icons.length ? `<div class="form-row"><span class="lbl">${label}</span>
+      <div class="icon-pick">${icons.map((icon) => `
+        <button type="button" data-icon="${icon}" class="${badgeDraft.icon === icon ? 'on' : ''}" title="${icon}">${medalHtml({ title: icon, icon, motif: badgeDraft.motif }, 'md')}</button>`).join('')}
+      </div>
+    </div>` : '';
+    const badgesTab = `<section class="host-panel wide">
+      <div class="host-flag">Host only</div>
+      <h2 style="margin:0">Badge builder</h2>
+      <p class="muted">Standings and class marks are already in the hall. Award them here, or forge a custom medallion.</p>
+      <div class="badge-preview">
+        ${medalHtml({ title: badgeDraft.title || 'New badge', icon: badgeDraft.icon, motif: badgeDraft.motif }, 'lg')}
+        <div class="medal-meta">
+          <p class="form-kicker" style="margin:0">Preview</p>
+          <h3>${esc(badgeDraft.title || 'Untitled badge')}</h3>
+          <p class="muted">${esc(badgeDraft.blurb || 'A mark for the hall.')}</p>
+        </div>
+      </div>
+      <form id="badge-form" class="stack wide">
+        ${pickIcons(standingIcons, 'Standings')}
+        ${pickIcons(classIcons, 'Classes')}
+        <div class="form-row"><span class="lbl">Custom mark</span>
+          <div class="icon-pick">${MARK_ICONS.map((icon) => `
+            <button type="button" data-icon="${icon}" class="${badgeDraft.icon === icon ? 'on' : ''}" title="${icon}">${medalHtml({ title: icon, icon, motif: badgeDraft.motif }, 'md')}</button>`).join('')}
+          </div>
+        </div>
+        <div class="form-row"><span class="lbl">Fire</span>
+          <div class="swatch-pick">${BADGE_MOTIFS.map((motif) => `
+            <button type="button" class="${motif}${badgeDraft.motif === motif ? ' on' : ''}" data-motif="${motif}" title="${motif}"></button>`).join('')}
+          </div>
+        </div>
+        <div class="form-row"><label for="badge-title">Title</label><input id="badge-title" value="${esc(badgeDraft.title)}" placeholder="Flamebound"></div>
+        <div class="form-row"><label for="badge-blurb">Blurb</label><input id="badge-blurb" value="${esc(badgeDraft.blurb)}" placeholder="Won the first official finals."></div>
+        <div class="row wrap"><button class="btn" type="submit">Save badge</button></div>
+        <p class="err" id="badge-err" hidden></p>
+      </form>
+      ${badges.map((b) => `
+        <article class="card" style="margin-top:14px">
+          <div class="row">
+            <div class="medal-row">${medalHtml(b, 'md')}<span class="medal-meta"><strong>${esc(b.title)}</strong><span class="muted">${esc(b.blurb || '')}${b.system ? ' · system' : ''}</span></span></div>
+            ${b.system ? '' : `<button type="button" class="mini bad" data-del-badge="${b.id}">Delete</button>`}
+          </div>
+          <form class="award-row" style="margin-top:12px" data-award="${b.id}">
+            ${handleField(`award-handle-${b.id}`)}
+            <button class="mini go" type="submit">Award</button>
+          </form>
+          <p class="err" id="award-err-${b.id}" hidden></p>
+          <div class="chips" style="margin-top:10px">${allAwards.filter((a) => a.badgeId === b.id).map((a) => `
+            <span class="chip named-handle">${esc(a.handle)}${medalsInlineHtml(badgesFor(a.handle))} <button type="button" class="linkish" data-revoke="${a.id}">revoke</button></span>`).join('') || '<span class="muted">Not awarded yet.</span>'}</div>
+        </article>`).join('') || '<p class="muted" style="margin-top:12px">No badges forged yet.</p>'}
+    </section>`;
+
+    const tabHtml = {
+      records: recordsTab,
+      boards: boardsTab,
+      mentions: mentionsTab,
+      badges: badgesTab,
+    };
+
+    root.innerHTML = `<div class="form-page">
+      <p class="form-kicker">DDL Tourney</p>
+      <h1>The ledger</h1>
+      <p class="muted">Write what the bracket missed. Champions from a finals still land on their own — this page is for everything you need to put on the hall by hand.</p>
+      <p class="muted"><a href="/tourney/#/records">Back to Hall of records</a></p>
+      ${pack.warning ? `<p class="err">${esc(pack.warning)}</p>` : ''}
+      <div class="tabs">
+        <button type="button" data-tab="records" class="${tab === 'records' ? 'on' : ''}">Champions</button>
+        <button type="button" data-tab="boards" class="${tab === 'boards' ? 'on' : ''}">Leaderboards</button>
+        <button type="button" data-tab="mentions" class="${tab === 'mentions' ? 'on' : ''}">Mentions</button>
+        <button type="button" data-tab="badges" class="${tab === 'badges' ? 'on' : ''}">Badges</button>
+      </div>
+      ${tabHtml[tab] || recordsTab}
+    </div>`;
+
+    root.querySelectorAll('[data-tab]').forEach((btn) => {
+      btn.onclick = () => { tab = btn.getAttribute('data-tab'); paint(); };
+    });
+
+    root.querySelectorAll('input[id$="-handle"], input[id^="row-handle-"], input[id^="award-handle-"], #title-handle, #mention-handle').forEach((input) => {
+      const list = input.parentElement && input.parentElement.querySelector('.handle-suggest');
+      bindHandleTypeahead(input, list, []);
+    });
+
+    const titleForm = document.getElementById('title-form');
+    if (titleForm) titleForm.onsubmit = (event) => {
+      event.preventDefault();
+      run('addTitle', {
+        handle: document.getElementById('title-handle').value,
+        arenaName: document.getElementById('title-arena').value,
+      }, 'title-err');
+    };
+    root.querySelectorAll('[data-official]').forEach((btn) => {
+      btn.onclick = () => run('setOfficial', {
+        tournamentId: Number(btn.getAttribute('data-tid')),
+        official: btn.getAttribute('data-official') === '1',
+      });
+    });
+    root.querySelectorAll('[data-remove-title]').forEach((btn) => {
+      btn.onclick = () => {
+        if (!window.confirm('Remove this handwritten title?')) return;
+        run('removeTitle', { tournamentId: Number(btn.getAttribute('data-remove-title')) });
+      };
+    });
+
+    const boardForm = document.getElementById('board-form');
+    if (boardForm) boardForm.onsubmit = (event) => {
+      event.preventDefault();
+      run('saveBoard', {
+        name: document.getElementById('board-name').value,
+        blurb: document.getElementById('board-blurb').value,
+      }, 'board-err');
+    };
+    root.querySelectorAll('[data-del-board]').forEach((btn) => {
+      btn.onclick = () => {
+        if (!window.confirm('Delete this leaderboard?')) return;
+        run('deleteBoard', { id: Number(btn.getAttribute('data-del-board')) });
+      };
+    });
+    root.querySelectorAll('[data-del-row]').forEach((btn) => {
+      btn.onclick = () => run('removeBoardRow', { id: Number(btn.getAttribute('data-del-row')) });
+    });
+    root.querySelectorAll('form[data-board-row]').forEach((form) => {
+      form.onsubmit = (event) => {
+        event.preventDefault();
+        const id = form.getAttribute('data-board-row');
+        const honour = event.submitter && event.submitter.getAttribute('data-kind') === 'honour';
+        run('addBoardRow', {
+          ledgerId: Number(id),
+          handle: document.getElementById(`row-handle-${id}`).value,
+          rank: Number(document.getElementById(`row-rank-${id}`).value || 1),
+          note: document.getElementById(`row-note-${id}`).value,
+          kind: honour ? 'honour' : 'entry',
+        }, `row-err-${id}`);
+      };
+    });
+
+    const mentionForm = document.getElementById('mention-form');
+    if (mentionForm) mentionForm.onsubmit = (event) => {
+      event.preventDefault();
+      run('saveMention', {
+        handle: document.getElementById('mention-handle').value,
+        title: document.getElementById('mention-title').value,
+        blurb: document.getElementById('mention-blurb').value,
+      }, 'mention-err');
+    };
+    root.querySelectorAll('[data-del-mention]').forEach((btn) => {
+      btn.onclick = () => run('deleteMention', { id: Number(btn.getAttribute('data-del-mention')) });
+    });
+
+    root.querySelectorAll('[data-icon]').forEach((btn) => {
+      btn.onclick = () => {
+        const icon = btn.getAttribute('data-icon');
+        badgeDraft.icon = icon;
+        const spec = typeof DDL_BADGES !== 'undefined' ? DDL_BADGES.specFor({ icon }) : null;
+        if (spec) {
+          badgeDraft.title = spec.title;
+          badgeDraft.blurb = spec.blurb;
+        } else {
+          badgeDraft.title = document.getElementById('badge-title')?.value || badgeDraft.title;
+          badgeDraft.blurb = document.getElementById('badge-blurb')?.value || badgeDraft.blurb;
+        }
+        paint();
+      };
+    });
+    root.querySelectorAll('[data-motif]').forEach((btn) => {
+      btn.onclick = () => {
+        badgeDraft.motif = btn.getAttribute('data-motif');
+        badgeDraft.title = document.getElementById('badge-title')?.value || badgeDraft.title;
+        badgeDraft.blurb = document.getElementById('badge-blurb')?.value || badgeDraft.blurb;
+        paint();
+      };
+    });
+    const badgeTitle = document.getElementById('badge-title');
+    const badgeBlurb = document.getElementById('badge-blurb');
+    if (badgeTitle) badgeTitle.oninput = () => {
+      badgeDraft.title = badgeTitle.value;
+      const el = root.querySelector('.badge-preview h3');
+      if (el) el.textContent = badgeDraft.title || 'Untitled badge';
+    };
+    if (badgeBlurb) badgeBlurb.oninput = () => {
+      badgeDraft.blurb = badgeBlurb.value;
+      const el = root.querySelector('.badge-preview .muted');
+      if (el) el.textContent = badgeDraft.blurb || 'A mark for the hall.';
+    };
+    const badgeForm = document.getElementById('badge-form');
+    if (badgeForm) badgeForm.onsubmit = (event) => {
+      event.preventDefault();
+      badgeDraft.title = document.getElementById('badge-title').value;
+      badgeDraft.blurb = document.getElementById('badge-blurb').value;
+      run('saveBadge', { ...badgeDraft }, 'badge-err').then((ok) => {
+        if (ok) {
+          badgeDraft = { title: '', blurb: '', icon: badgeDraft.icon, motif: badgeDraft.motif };
+          paint();
+        }
+      });
+    };
+    root.querySelectorAll('[data-del-badge]').forEach((btn) => {
+      btn.onclick = () => {
+        if (!window.confirm('Delete this badge and every award?')) return;
+        run('deleteBadge', { id: Number(btn.getAttribute('data-del-badge')) });
+      };
+    });
+    root.querySelectorAll('form[data-award]').forEach((form) => {
+      form.onsubmit = (event) => {
+        event.preventDefault();
+        const id = form.getAttribute('data-award');
+        run('awardBadge', {
+          badgeId: Number(id),
+          handle: document.getElementById(`award-handle-${id}`).value,
+        }, `award-err-${id}`);
+      };
+    });
+    root.querySelectorAll('[data-revoke]').forEach((btn) => {
+      btn.onclick = () => run('revokeAward', { id: Number(btn.getAttribute('data-revoke')) });
+    });
+  };
+
+  paint();
+}
+
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
+
+async function loadAwardIndex() {
+  try {
+    const pack = await api.get('/records/awards');
+    ingestAwards(pack.awards);
+  } catch (_err) {}
+}
 
 async function boot() {
   applyHostChrome();
@@ -2801,7 +3854,8 @@ async function boot() {
     applyPlayerChrome();
     route();
   });
-  await loadPlayerSession();
+  await Promise.all([loadPlayerSession(), loadAwardIndex()]);
+  applyPlayerChrome();
   route();
   try {
     serverStatus = await api.get('/status');

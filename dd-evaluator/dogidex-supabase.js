@@ -8,7 +8,8 @@
  *     emailRedirectUrl: 'https://yourdomain.com/dd-evaluator' // optional; avoids localhost in emails
  *   };
  *
- * anon key is public (safe in-browser) once RLS is enabled — see dd-evaluator/supabase-schema.sql
+ * The evaluator page loads /dd-evaluator/config.js (env-injected at start). Anon key is
+ * public (safe in-browser) once RLS is enabled — see docs/supabase/dogidex-schema.sql
  */
 (function (global) {
   'use strict';
@@ -51,6 +52,8 @@
   }
 
   function getTokens() {
+    // sessionStorage is readable to any script on this origin. XSS here is token theft,
+    // which is why evaluator/tourney HTML must not assign untrusted strings to innerHTML.
     try {
       var k = storageKeys();
       return {

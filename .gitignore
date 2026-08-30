@@ -2,7 +2,12 @@
 .env
 .env.local
 .env.production
+.env.*
+!.env.example
+!**/.env.example
 public/.env
+*.pem
+*.key
 
 assets/videos/
 assets/audio/

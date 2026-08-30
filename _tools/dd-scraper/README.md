@@ -68,7 +68,7 @@ console.log(record.rarityLabel);  // 'Collector'
 
 ## PHP Proxy (for browser use)
 
-The `php-proxy/` folder contains a PHP proxy you can deploy to cPanel to avoid CORS when calling the tRPC API from a browser. See the KushBrand nail-designer for usage.
+The `php-proxy/` folder contains a PHP proxy you can deploy to cPanel to avoid CORS when calling the tRPC API from a browser.
 
 ## tRPC Endpoints Used
 
