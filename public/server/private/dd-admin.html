@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>KushMetaX &#8212; Admin</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="icon" href="../assets/Kush.png" type="image/png">
-  <link rel="apple-touch-icon" href="../assets/Kush.png">
+  <link rel="icon" href="/assets/Kush.png" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/Kush.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css">
+  <link rel="stylesheet" href="/brand.css">
   <style>
     .dd-settings{margin-top:2.5rem;padding-top:2rem;border-top:1px solid rgba(255,255,255,.08)}
     .dd-settings-copy{color:#8d8d8d;font-size:.92rem;max-width:54rem;margin:.35rem 0 0}
@@ -133,8 +133,8 @@
   <!-- ===== HEADER ===== -->
   <header class="site-header">
     <div class="header-inner">
-      <a href="../index.html" class="header-logo">
-        <img src="../assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+      <a href="/index.html" class="header-logo">
+        <img src="/assets/Kush.png" alt="KushMetaX" class="header-logo-img">
         <span class="header-logo-text">KushMetaX</span>
       </a>
       <button class="hamburger" aria-label="Open menu" aria-expanded="false">
@@ -145,14 +145,14 @@
 
   <nav class="nav-overlay" aria-label="Main navigation">
     <ul class="nav-list">
-      <li><a href="../index.html" class="nav-link">Home</a></li>
-      <li><a href="../about.html" class="nav-link">About</a></li>
-      <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
-      <li><a href="../services.html" class="nav-link">Services</a></li>
-      <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
-      <li><a href="../ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
-      <li><a href="../voyager.html" class="nav-link">Voyager</a></li>
-      <li><a href="../contact.html" class="nav-link">Connect</a></li>
+      <li><a href="/index.html" class="nav-link">Home</a></li>
+      <li><a href="/about.html" class="nav-link">About</a></li>
+      <li><a href="/gallery.html" class="nav-link">Gallery</a></li>
+      <li><a href="/services.html" class="nav-link">Services</a></li>
+      <li><a href="/dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="/ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
+      <li><a href="/voyager.html" class="nav-link">Voyager</a></li>
+      <li><a href="/contact.html" class="nav-link">Connect</a></li>
     </ul>
   </nav>
 
@@ -646,12 +646,12 @@
       </div>
       <div class="footer-mascot-wrap">
         <span class="footer-mascot-text">KushMetaX</span>
-        <img src="../assets/SWB.gif" alt="" class="footer-mascot">
+        <img src="/assets/SWB.gif" alt="" class="footer-mascot">
       </div>
     </div>
   </footer>
 
-  <script src="../brand.js"></script>
+  <script src="/brand.js"></script>
   <script>
   /* ==================================================
      KushMetaX — Admin Dashboard
@@ -755,7 +755,7 @@
     }
 
     function ddDogImageUrl(dogNumber){
-      return dogNumber ? ('/api/doginal-proxy.php?action=image&dogNumber=' + encodeURIComponent(dogNumber)) : '../assets/collection-logo.png';
+      return dogNumber ? ('/api/doginal-proxy.php?action=image&dogNumber=' + encodeURIComponent(dogNumber)) : '/assets/collection-logo.png';
     }
 
     function loreMediaUploadUrl(){
@@ -1388,7 +1388,7 @@
         return '<tr data-community-index="' + index + '" data-updated-at="' + esc(entry.updatedAt || '') + '" data-updated-by="' + esc(entry.updatedBy || '') + '">' +
           '<td>' +
             '<div class="dd-community-stack">' +
-              '<img class="dd-community-thumb" src="' + esc(ddDogImageUrl(dogNumber)) + '" alt="Dog preview" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+              '<img class="dd-community-thumb" src="' + esc(ddDogImageUrl(dogNumber)) + '" alt="Dog preview" onerror="this.onerror=null;this.src=\'/assets/collection-logo.png\'" />' +
               '<div>' +
                 '<div class="dd-community-name">' + esc(dogNumber ? ('Doginal Dog #' + dogNumber) : 'New refused offer') + '</div>' +
                 '<div class="dd-settings-small dd-community-meta">Estimator floor guard</div>' +
@@ -1491,7 +1491,7 @@
         return '<tr data-official-lore-index="' + index + '" data-updated-at="' + esc(entry.updatedAt || '') + '" data-updated-by="' + esc(entry.updatedBy || '') + '" data-image-url="' + esc(customImageUrl) + '">' +
           '<td>' +
             '<div class="dd-community-stack">' +
-              '<img class="dd-community-thumb dd-official-lore-thumb" src="' + esc(previewUrl) + '" alt="Lore media preview" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+              '<img class="dd-community-thumb dd-official-lore-thumb" src="' + esc(previewUrl) + '" alt="Lore media preview" onerror="this.onerror=null;this.src=\'/assets/collection-logo.png\'" />' +
               '<div>' +
                 '<div class="dd-community-name">' + esc(dogNumber ? ('Doginal Dog #' + dogNumber) : 'New official lore') + '</div>' +
                 '<div class="dd-settings-small dd-community-meta">Official lore floor</div>' +
@@ -1602,7 +1602,7 @@
         var dogNumber = entry.dogNumber != null ? entry.dogNumber : '';
         var wallets = Array.isArray(entry.brandedWallets) ? entry.brandedWallets.join(', ') : (entry.brandedWallet || '');
         return '<tr data-tcg-inspiration-index="' + index + '">' +
-          '<td><img class="dd-community-thumb" src="' + esc(ddDogImageUrl(dogNumber)) + '" alt="" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'"></td>' +
+          '<td><img class="dd-community-thumb" src="' + esc(ddDogImageUrl(dogNumber)) + '" alt="" onerror="this.onerror=null;this.src=\'/assets/collection-logo.png\'"></td>' +
           '<td><input class="dd-tcg-insp-dog" type="number" min="1" max="10000" step="1" value="' + esc(dogNumber) + '" placeholder="1234"></td>' +
           '<td><input class="dd-tcg-insp-card" type="text" value="' + esc(entry.cardName || '') + '" placeholder="Web"></td>' +
           '<td><input class="dd-tcg-insp-id" type="text" value="' + esc(entry.cardId || '') + '" placeholder="V034"></td>' +
@@ -1780,7 +1780,7 @@
         return '<tr>' +
           '<td>' +
             '<div class="dd-community-stack">' +
-              '<img class="dd-community-thumb" src="' + esc(imageUrl) + '" alt="' + esc(name) + '" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+              '<img class="dd-community-thumb" src="' + esc(imageUrl) + '" alt="' + esc(name) + '" onerror="this.onerror=null;this.src=\'/assets/collection-logo.png\'" />' +
               '<div>' +
                 '<div class="dd-community-name">' + esc(name) + '</div>' +
                 '<div class="dd-settings-small">' + esc(entry.inscriptionId || (dogNumber ? ('Dog #' + dogNumber) : 'Unknown inscription')) + '</div>' +

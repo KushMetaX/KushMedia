@@ -8,6 +8,7 @@
 require('dotenv').config();
 
 const ddEvaluatorRouter = require('./server/routes/dd-evaluator');
+const { adminHtmlConfigured } = require('./server/admin-html-gate');
 const app = require('./server/index.js');
 
 /**
@@ -26,8 +27,10 @@ function startServer() {
 		if (uiPw && traitPw && uiPw !== traitPw) {
 			console.log('[dd-evaluator] DD_ADMIN_UI_PASSWORD and DD_ADMIN_PASSWORD both set and differ — API saves use the trait secret (DD_ADMIN_PASSWORD), not the UI Basic gate.');
 		}
-		if (!ddEvaluatorRouter.resolveAdminHtmlGatePassword() && !/^(1|true|yes|on)$/i.test(String(process.env.DD_ADMIN_UI_PUBLIC || ''))) {
-			console.log('[dd-evaluator] /admin.html hidden (404) until DD_ADMIN_PASSWORD or DD_ADMIN_UI_PASSWORD is set.');
+		if (!adminHtmlConfigured(() => ddEvaluatorRouter.resolveAdminHtmlGatePassword())) {
+			console.log('[dd-evaluator] admin HTML hidden (404) until ADMIN_PATH, ADMIN_USER, and ADMIN_PASS (or DD_ADMIN_PASSWORD) are set.');
+		} else {
+			console.log('[dd-evaluator] admin HTML enabled at ADMIN_PATH (Basic realm Restricted).');
 		}
 		if (ddEvaluatorRouter.getCommunitySubmitPassword()) {
 			console.log('[dd-evaluator] Community suggestion submissions require DD_COMMUNITY_PASSWORD.');
