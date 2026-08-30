@@ -297,7 +297,7 @@ app.get(['/dd-evaluator', '/dd-evaluator/'], (request, response) => {
 
 // =============================================================================
 // NovaScotiaVoyage password gate.
-// Mirrors the /admin.html pattern: HTTP Basic Auth, timing-safe comparison,
+// HTTP Basic Auth, timing-safe comparison,
 // password supplied via VOYAGER_PASSWORD env var (or VOYAGER_PASSWORD_FILE).
 // Default-locked: if no password is configured the tool returns 404 so it
 // stays hidden — only setting the env var unlocks the public surface.
@@ -614,6 +614,17 @@ const ddAdminMount = ddAdminHtml.mount(app);
 
 app.get('/community-suggestions.html', (request, response) => {
 	response.sendFile(path.join(siteRoot, 'community-suggestions.html'));
+});
+
+app.get('/robots.txt', (request, response) => {
+	response.type('text/plain; charset=utf-8');
+	response.set('Cache-Control', 'public, max-age=3600');
+	response.sendFile(path.join(siteRoot, 'robots.txt'));
+});
+app.get('/.well-known/security.txt', (request, response) => {
+	response.type('text/plain; charset=utf-8');
+	response.set('Cache-Control', 'public, max-age=86400');
+	response.sendFile(path.join(siteRoot, '.well-known', 'security.txt'));
 });
 
 app.use(express.static(siteRoot, {

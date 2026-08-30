@@ -241,6 +241,17 @@ app.get('/community-suggestions.html', (request, response) => {
 	response.sendFile(path.join(siteRoot, 'community-suggestions.html'));
 });
 
+app.get('/robots.txt', (request, response) => {
+	response.type('text/plain; charset=utf-8');
+	response.set('Cache-Control', 'public, max-age=3600');
+	response.sendFile(path.join(siteRoot, 'robots.txt'));
+});
+app.get('/.well-known/security.txt', (request, response) => {
+	response.type('text/plain; charset=utf-8');
+	response.set('Cache-Control', 'public, max-age=86400');
+	response.sendFile(path.join(siteRoot, '.well-known', 'security.txt'));
+});
+
 app.use(express.static(siteRoot, {
 	dotfiles: 'deny',
 	index: 'index.html',
