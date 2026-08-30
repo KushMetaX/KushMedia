@@ -38,21 +38,6 @@
     var overlay = document.querySelector('.nav-overlay');
     if (!btn || !overlay) return;
 
-    overlay.querySelectorAll('.nav-link').forEach(function (link) {
-      var href = String(link.getAttribute('href') || '');
-      var label = String(link.textContent || '').replace(/\s+/g, ' ').trim();
-      if (!/gotchi/i.test(href) && !/^doginal gotchi$/i.test(label)) return;
-
-      if (href.charAt(0) === '/') {
-        link.setAttribute('href', '/ddl-tourney.html');
-      } else if (href.indexOf('../') !== -1) {
-        link.setAttribute('href', '../ddl-tourney.html');
-      } else {
-        link.setAttribute('href', 'ddl-tourney.html');
-      }
-      link.textContent = 'DDL Tourney - Legends Bracket';
-    });
-
     // Toggle menu
     btn.addEventListener('click', function () {
       document.body.classList.toggle('menu-open');

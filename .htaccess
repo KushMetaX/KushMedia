@@ -65,8 +65,8 @@ DirectoryIndex index.html index.htm
 # -----------------------------------------------------------------------------
 # 5. Block whole directory trees that have no business being public.
 #    Uses mod_rewrite so it works even where <Directory> isn't allowed.
-#    Note: /api/ and /assets/ and /components/ are intentionally NOT blocked -
-#    they ship the live site. /components/ filenames are still filtered by
+#    Note: /api/ and /assets/ ship the live site. /components/ is blocked
+#    (Nail Designer was removed). Filenames are still filtered by
 #    the FilesMatch rules above (no .bak, no .md, no .git inside).
 # -----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
@@ -92,6 +92,8 @@ DirectoryIndex index.html index.htm
   RewriteRule ^tourney(/.*)?$ /__tourney_gate$1 [E=TOURNEY_GATED:1,L]
   # /server/* (Node app data + admin password file)
   RewriteRule ^server(/|$)                                - [F,L,NC]
+  # /components/* (removed Nail Designer tree)
+  RewriteRule ^components(/|$)                            - [F,L,NC]
   # /node_modules/* (full dependency disclosure if served)
   RewriteRule ^node_modules(/|$)                          - [F,L,NC]
   # SecretWeapon (duplicate site fork) and its former standalone variant
@@ -156,7 +158,7 @@ DirectoryIndex index.html index.htm
   # The connect-src allowlist was computed by the Probe Agent from a grep
   # of every HTML/JS asset (see docs/security/deployment-facts.md).
   # ---------------------------------------------------------------------------
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com; script-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddl.kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai https://therovers.xyz https://assets.coingecko.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://cdn.discordapp.com https://media.discordapp.net; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com; script-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddl.kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai https://therovers.xyz https://assets.coingecko.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://cdn.discordapp.com https://media.discordapp.net; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self' https://kick.com https://*.kick.com; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
   # ---------------------------------------------------------------------------
   # 6b. STRICT Content-Security-Policy (DISABLED - flip on after refactor)
   # ---------------------------------------------------------------------------
@@ -167,7 +169,7 @@ DirectoryIndex index.html index.htm
   #      (run report-only first, then promote).
   # To activate: comment out 6a above and uncomment the Header line below.
   # ---------------------------------------------------------------------------
-  # Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-elem 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddl.kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  # Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-elem 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddl.kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://image.pollinations.ai; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://image.pollinations.ai; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self' https://kick.com https://*.kick.com; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
   # Optional: report-only mirror to collect violations without breaking pages.
   # Uncomment together with the strict policy above to run them in parallel
   # for one deploy cycle, then remove report-only and switch the strict one

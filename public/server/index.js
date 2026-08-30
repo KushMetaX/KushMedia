@@ -9,7 +9,6 @@ const cookieParser = require('cookie-parser');
 
 const { curateDiscoveredPois } = require('./voyager-curate');
 
-const nailDesignerRouter = require('./routes/nail-designer');
 const ddEvaluatorRouter = require('./routes/dd-evaluator');
 const coingeckoRouter = require('./routes/coingecko');
 const btcPublicRouter = require('./routes/btc-public');
@@ -165,7 +164,6 @@ app.use((request, response, next) => {
 	next();
 });
 
-app.use('/api/nail-designer', nailDesignerRouter);
 app.use('/api/dd-evaluator', ddEvaluatorRouter);
 /** Keyless BTC spot + OHLC proxy (Coinbase + ECB FX). Mirrors match `/kk-auth`, `/kmx-*`, `/dd-evaluator/auth` routing quirks on LiteSpeed/APISIX. */
 app.use('/btc-public', btcPublicRouter);
@@ -223,17 +221,6 @@ app.get('/healthz', (request, response) => {
 	});
 });
 
-
-app.get('/nail-designer', (request, response) => {
-	response.sendFile(path.join(siteRoot, 'nail-designer', 'index.html'));
-});
-
-app.get('/gotchi', (request, response) => {
-	response.redirect(301, '/gotchi/');
-});
-app.get('/gotchi/', (request, response) => {
-	response.sendFile(path.join(siteRoot, 'gotchi', 'index.html'));
-});
 
 // DDL Tourney — static files in /bracket, JSON API on this same Node process.
 // No Vite and no extra port. Apache may rewrite /tourney → /__tourney_gate.

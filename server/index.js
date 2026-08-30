@@ -7,7 +7,6 @@ const dotenv = require('dotenv');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 
-const nailDesignerRouter = require('./routes/nail-designer');
 const ddEvaluatorRouter = require('./routes/dd-evaluator');
 const authDexRouter = require('../public/server/routes/auth-dex');
 const { resolveSessionSecret } = require('../public/server/session-secret');
@@ -133,7 +132,6 @@ app.use((request, response, next) => {
 	next();
 });
 
-app.use('/api/nail-designer', nailDesignerRouter);
 app.use('/api/dd-evaluator', ddEvaluatorRouter);
 app.use('/api/auth', authDexRouter);
 /** Same router; `/kmx-auth` avoids LiteSpeed/APACHE trapping `/api/*` for the PHP folder (503 HTML instead of Passenger). */
@@ -150,17 +148,6 @@ app.get('/healthz', (request, response) => {
 		// Liveness only; auth is optional for /healthz. See Network tab on POST /kmx-auth/* (or legacy /api/auth/*).
 		authSessionConfigured: Boolean(resolveSessionSecret()),
 	});
-});
-
-app.get('/nail-designer', (request, response) => {
-	response.sendFile(path.join(siteRoot, 'nail-designer', 'index.html'));
-});
-
-app.get('/gotchi', (request, response) => {
-	response.redirect(301, '/gotchi/');
-});
-app.get('/gotchi/', (request, response) => {
-	response.sendFile(path.join(siteRoot, 'gotchi', 'index.html'));
 });
 
 const bracketDir = path.join(siteRoot, 'bracket');
