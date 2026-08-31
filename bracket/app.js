@@ -277,6 +277,7 @@ const MARK_ICONS = ['crown', 'flame', 'shield', 'star', 'laurel', 'crest'];
 const BADGE_ICONS = MARK_ICONS.concat((typeof DDL_BADGES !== 'undefined' && DDL_BADGES.ART_ICONS) || []);
 const BADGE_MOTIFS = ['gold', 'ember', 'cream', 'copper', 'verdant'];
 const DDL_CLASS_IDS = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.CLASS_IDS) || ['Crown', 'Bow', 'Wizard', 'Zombie', 'Pirate', 'Neutral'];
+const DDL_DEFAULT_CLASS = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.DEFAULT_CLASS) || 'Undeclared';
 const MOTIF_PALETTE = {
   gold: { metal: '#f0c45a', metalDeep: '#8a5810', enamel: '#140a04', enamelLight: '#3a2410', charge: '#ffe9a8' },
   ember: { metal: '#e07a3a', metalDeep: '#7a2e10', enamel: '#1a0804', enamelLight: '#4a1810', charge: '#ffd0a8' },
@@ -429,18 +430,28 @@ function medalsRowHtml(badges) {
   return `<div class="medal-row">${list.map((b) => `${medalHtml(b, 'md')}<span class="medal-meta"><strong>${esc(b.title)}</strong><span class="muted">${esc(b.blurb || '')}</span></span>`).join('')}</div>`;
 }
 
-function classSpec(value) {
-  return typeof DDL_BADGES !== 'undefined' ? DDL_BADGES.classSpec(value) : null;
-}
-
 function standingSpec(place) {
   return typeof DDL_BADGES !== 'undefined' ? DDL_BADGES.standingSpec(place) : null;
 }
 
-function classBadgeHtml(value, size) {
-  const spec = classSpec(value);
-  if (!spec) return '';
-  return medalHtml(spec, size);
+function parseDdlClass(value) {
+  if (typeof DDL_BADGES !== 'undefined' && typeof DDL_BADGES.parseClass === 'function') {
+    return DDL_BADGES.parseClass(value);
+  }
+  const id = String(value || '').trim();
+  return { kind: id ? 'hero' : 'undeclared', ids: id ? [id] : [], label: id, stored: id || DDL_DEFAULT_CLASS };
+}
+
+function classLabelText(value) {
+  if (typeof DDL_BADGES !== 'undefined' && typeof DDL_BADGES.classLabel === 'function') {
+    return DDL_BADGES.classLabel(value);
+  }
+  return parseDdlClass(value).label || '';
+}
+
+function classLabelHtml(value) {
+  const label = classLabelText(value);
+  return label ? `<span class="class-tag">${esc(label)}</span>` : '';
 }
 
 function standingBadgeHtml(place, size) {
@@ -451,30 +462,60 @@ function standingBadgeHtml(place, size) {
 
 function entryMarksHtml(entry, size) {
   if (!entry) return '';
-  return `${classBadgeHtml(entry.ddlClass, size)}${medalsInlineHtml(badgesFor(entry.handle, entry.badges), size)}`;
+  return medalsInlineHtml(badgesFor(entry.handle, entry.badges), size);
+}
+
+function classPickMarkHtml(item) {
+  if (item && item.file) return medalHtml(item, 'md');
+  if (item && item.id === 'Split') return '<span class="class-mark split" aria-hidden="true"><i></i><i></i></span>';
+  return '<span class="class-mark undeclared" aria-hidden="true"></span>';
 }
 
 function classPickerHtml(name, selected) {
-  const current = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.normalizeClass(selected)) || selected || 'Neutral';
-  const classes = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.CLASSES) || DDL_CLASS_IDS.map((id) => ({ id, title: id, icon: `class-${id.toLowerCase()}` }));
-  return `<div class="class-pick" role="radiogroup" aria-label="Class">
-    ${classes.map((c) => `
-      <label class="class-pick-opt ${current === c.id ? 'on' : ''}">
-        <input type="radio" name="${esc(name)}" value="${esc(c.id)}" ${current === c.id ? 'checked' : ''}>
-        ${medalHtml(c, 'md')}
-        <span>${esc(c.title || c.id)}</span>
-      </label>`).join('')}
+  const parsed = parseDdlClass(selected);
+  const currentId = parsed.kind === 'split' || parsed.ids.length > 1
+    ? 'Split'
+    : (parsed.kind === 'hero' ? parsed.stored : DDL_DEFAULT_CLASS);
+  const options = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.REGISTRATION)
+    || [{ id: 'Undeclared', title: 'Undeclared' }].concat(DDL_CLASS_IDS.map((id) => ({ id, title: id, icon: `class-${id.toLowerCase()}` }))).concat([{ id: 'Split', title: 'Split' }]);
+  const heroes = (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.CLASSES)
+    || DDL_CLASS_IDS.map((id) => ({ id, title: id }));
+  const splitA = parsed.ids[0] || (heroes[0] && heroes[0].id) || 'Crown';
+  const splitB = parsed.ids[1] || (heroes[1] && heroes[1].id) || 'Bow';
+  const heroOptions = (picked) => heroes.map((h) => `<option value="${esc(h.id)}" ${h.id === picked ? 'selected' : ''}>${esc(h.title || h.id)}</option>`).join('');
+  return `<div class="class-field">
+    <div class="class-pick" role="radiogroup" aria-label="Class">
+      ${options.map((c) => `
+        <label class="class-pick-opt ${currentId === c.id ? 'on' : ''}" title="${esc(c.blurb || c.title || c.id)}">
+          <input type="radio" name="${esc(name)}" value="${esc(c.id)}" ${currentId === c.id ? 'checked' : ''}>
+          ${classPickMarkHtml(c)}
+          <span>${esc(c.title || c.id)}</span>
+        </label>`).join('')}
+    </div>
+    <div class="split-pick" ${currentId === 'Split' ? '' : 'hidden'}>
+      <span class="lbl">Split of</span>
+      <div class="split-pick-row">
+        <select name="${esc(name)}-a" aria-label="First class">${heroOptions(splitA)}</select>
+        <span class="split-amp">/</span>
+        <select name="${esc(name)}-b" aria-label="Second class">${heroOptions(splitB)}</select>
+      </div>
+    </div>
+    <p class="hint">Listed on the roster only. Class medals are earned by a podium finish, not by signing up.</p>
   </div>`;
 }
 
 function bindClassPicker(rootEl) {
   if (!rootEl) return;
   rootEl.querySelectorAll('.class-pick').forEach((group) => {
+    const field = group.closest('.class-field') || group.parentElement;
+    const splitBox = field && field.querySelector('.split-pick');
     const sync = () => {
       group.querySelectorAll('.class-pick-opt').forEach((opt) => {
         const input = opt.querySelector('input');
         opt.classList.toggle('on', Boolean(input && input.checked));
       });
+      const picked = group.querySelector('input:checked');
+      if (splitBox) splitBox.hidden = !picked || picked.value !== 'Split';
     };
     group.addEventListener('change', sync);
     sync();
@@ -483,7 +524,14 @@ function bindClassPicker(rootEl) {
 
 function readClassPick(rootEl, name) {
   const picked = rootEl && rootEl.querySelector(`input[name="${name}"]:checked`);
-  return (picked && picked.value) || 'Neutral';
+  const value = (picked && picked.value) || DDL_DEFAULT_CLASS;
+  if (value !== 'Split') {
+    return (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.normalizeClass(value)) || value;
+  }
+  const a = rootEl.querySelector(`[name="${name}-a"]`);
+  const b = rootEl.querySelector(`[name="${name}-b"]`);
+  const stored = `${(a && a.value) || 'Crown'}/${(b && b.value) || 'Bow'}`;
+  return (typeof DDL_BADGES !== 'undefined' && DDL_BADGES.normalizeClass(stored)) || stored;
 }
 
 function marksGalleryHtml() {
@@ -503,7 +551,7 @@ function marksGalleryHtml() {
     <p class="muted">Official finishes pin these on a handle. 1st through 5th land automatically when an arena closes.</p>
     <div class="mark-grid standing">${standings}</div>
     <h2 class="section-title">Class badges</h2>
-    <p class="muted">Crown, Bow, Wizard, Zombie, Pirate, and Neutral. Declare a class when you register — the mark follows the roster, the bracket, and the hall.</p>
+    <p class="muted">These marks are for people who podium with a class. Registering a deck does not pin one on your handle.</p>
     <div class="mark-grid classes">${classes}</div>
   </section>`;
 }
@@ -537,6 +585,25 @@ function championCrestSvg() {
   </svg>`;
 }
 
+function formatRecord(value) {
+  const text = String(value || '').trim();
+  return text ? text.replace(/-/g, '–') : '';
+}
+
+function matchRecordHtml(value) {
+  const text = formatRecord(value);
+  if (!text) return '';
+  return `<p class="match-record"><span>Record</span><strong>${esc(text)}</strong></p>`;
+}
+
+function podiumPersonHtml(person) {
+  if (!person || !person.handle) return '<strong class="muted">—</strong>';
+  return `<div class="podium-person">
+    <strong>${playerLink(person.handle)}</strong>
+    ${matchRecordHtml(person.record)}
+  </div>`;
+}
+
 function prestigePodiumHtml(podium, rewards) {
   if (!podium || !podium.first || !podium.first.handle) return '';
   const first = podium.first;
@@ -548,7 +615,7 @@ function prestigePodiumHtml(podium, rewards) {
     <p class="champ-banner-kicker">Tournament Champion</p>
     ${championCrestSvg()}
     <h2>${playerLink(first.handle)}</h2>
-    ${first.record ? `<p class="muted">${esc(first.record)}</p>` : ''}
+    ${matchRecordHtml(first.record)}
     ${prize(1)}
   </section>`;
   const second = podium.second;
@@ -562,11 +629,9 @@ function prestigePodiumHtml(podium, rewards) {
     ${inner}
     ${prize(n)}
   </article>`;
-  const secondInner = second && second.handle
-    ? `<strong>${playerLink(second.handle)}</strong>${second.record ? `<p class="muted">${esc(second.record)}</p>` : ''}`
-    : '<strong class="muted">—</strong>';
+  const secondInner = podiumPersonHtml(second);
   const thirdInner = thirds.length
-    ? thirds.map((p) => `<strong>${playerLink(p.handle)}</strong>`).join('')
+    ? thirds.map(podiumPersonHtml).join('')
     : '<strong class="muted">—</strong>';
   return `${banner}<section class="podium prestige" ${tip('Final results. 3rd place uses the placement match when that option is on.')}>
     ${side('silver', 'Runner-up', '2nd', secondInner, 2)}
@@ -2623,7 +2688,7 @@ async function renderArena(slug) {
       <div><label for="handle">${t.requireTeams && !playerUser ? 'Team name' : 'Handle'}</label>
         <input id="handle" required minlength="2" maxlength="24" placeholder="PackName" value="${esc(t.requireTeams && !playerUser ? '' : (lockedHandle || ''))}" ${playerUser && lockedHandle ? 'readonly' : ''}></div>
       ${t.requireTeams ? `<div><label for="team">${playerUser ? 'Team name' : 'Captain handle'}</label><input id="team" ${playerUser ? '' : 'required'} minlength="2" maxlength="24" value="${esc(playerUser ? '' : (lockedHandle || ''))}"></div>` : ''}
-      <div><span class="lbl">Class</span>${classPickerHtml('enter-class', 'Neutral')}</div>
+      <div><span class="lbl">Class</span>${classPickerHtml('enter-class', DDL_DEFAULT_CLASS)}</div>
       ${t.requireVerifiedEmail ? `<div><label for="email">Email</label><input id="email" type="email" required></div>` : ''}
       ${t.countryLock ? `<div><label for="country">Country</label><input id="country" required placeholder="${esc(t.allowedCountries || 'Country')}"></div>` : ''}
       ${usd > 0 ? `<p class="quote" id="live-quote">Loading live ${formatUsd(usd)} DOGE quote…</p>
@@ -2713,7 +2778,7 @@ async function renderArena(slug) {
         else details.push('<span>Discord not linked</span>');
       }
       return `<div class="roster-row ${e.paid ? '' : 'is-pending'}">
-        <div class="who">${entryAvatarHtml(e)}${namedHandleHtml(e.handle, e.badges)}${classBadgeHtml(e.ddlClass)}${badge(e.noShow ? 'no_show' : e.paid ? 'confirmed' : 'pending')}</div>
+        <div class="who">${entryAvatarHtml(e)}${namedHandleHtml(e.handle, e.badges)}${classLabelHtml(e.ddlClass)}${badge(e.noShow ? 'no_show' : e.paid ? 'confirmed' : 'pending')}</div>
         ${canEdit ? `<div class="roster-acts">
           ${e.paid
             ? `<button type="button" class="mini" data-unconfirm="${e.id}" ${tip('Move back to unpaid and out of the bracket.')}>Undo</button>`
@@ -2751,7 +2816,7 @@ async function renderArena(slug) {
             <input id="add-handle" placeholder="${t.requireTeams ? 'Team name' : 'Start typing a handle'}" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" aria-autocomplete="list" aria-controls="add-handle-list" aria-expanded="false">
             <ul id="add-handle-list" class="handle-suggest" hidden role="listbox"></ul>
           </div>
-          <div><span class="lbl">Class</span>${classPickerHtml('add-class', 'Neutral')}</div>
+          <div><span class="lbl">Class</span>${classPickerHtml('add-class', DDL_DEFAULT_CLASS)}</div>
           ${canAddLate && usesElimTree(t) ? `<div><label for="add-slot">Put them</label>
             <select id="add-slot">${lateSlots.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')}</select>
           </div>` : ''}
@@ -2818,18 +2883,19 @@ async function renderArena(slug) {
     const rows = data.standings || [];
     const entryById = new Map((data.entries || []).map((e) => [e.id, e]));
     panel.innerHTML = `<h2>Standings</h2>
-      <table class="standings-table"><thead><tr><th>#</th><th>Handle</th><th>Class</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th></tr></thead><tbody>
+      <div class="table-scroll"><table class="standings-table"><thead><tr><th>#</th><th>Handle</th><th>Class</th><th>Record</th><th>Pts</th><th>+/-</th></tr></thead><tbody>
       ${rows.map((s, i) => {
         const place = i + 1;
         const entry = entryById.get(s.entryId);
         return `<tr>
           <td class="standings-place">${standingBadgeHtml(place) || place}</td>
           <td>${namedHandleHtml(s.handle)}</td>
-          <td>${classBadgeHtml((entry && entry.ddlClass) || s.ddlClass)}${esc((entry && entry.ddlClass) || s.ddlClass || '')}</td>
-          <td>${s.wins}</td><td>${s.losses}</td><td>${s.points}</td><td>${s.mapDiff}</td>
+          <td>${classLabelHtml((entry && entry.ddlClass) || s.ddlClass) || '—'}</td>
+          <td class="record-cell">${esc(formatRecord(`${s.wins}-${s.losses}`))}</td>
+          <td>${s.points}</td><td>${s.mapDiff}</td>
         </tr>`;
-      }).join('') || '<tr><td colspan="7">No matches yet.</td></tr>'}
-      </tbody></table>`;
+      }).join('') || '<tr><td colspan="6">No matches yet.</td></tr>'}
+      </tbody></table></div>`;
   }
 
   function paintPredict(panel, t) {
@@ -2894,7 +2960,7 @@ async function renderArena(slug) {
         ? `${confirmed.length} confirmed ${confirmed.length === 1 ? 'player' : 'players'} will be seeded into a ${esc(formatBlurb(t))}. Locking closes registration.`
         : `You need at least 2 confirmed players. ${confirmed.length} so far.`}</p>
       ${pending.length ? `<p class="muted">${pending.length} ${pending.length === 1 ? 'entry has' : 'entries have'} not paid and will be left out — <button type="button" class="linkish" data-go="players">confirm payments</button> first if that is wrong.</p>` : ''}
-      ${confirmed.length ? `<p class="chips">${confirmed.map((e) => `<span class="chip named-handle">${esc(e.handle)}${classBadgeHtml(e.ddlClass)}${medalsInlineHtml(badgesFor(e.handle, e.badges))}</span>`).join('')}</p>` : ''}
+      ${confirmed.length ? `<p class="chips">${confirmed.map((e) => `<span class="chip named-handle">${esc(e.handle)}${classLabelHtml(e.ddlClass)}${medalsInlineHtml(badgesFor(e.handle, e.badges))}</span>`).join('')}</p>` : ''}
       <label class="check"><input type="checkbox" id="shuffle" ${shuffle ? 'checked' : ''}> Shuffle seeds for a random draw</label>
       <div style="max-width:16rem"><label for="lock-bestof">Series length</label>${bestOfSelect('lock-bestof', bestOf)}</div>
       <details class="advanced">
@@ -3034,7 +3100,7 @@ async function renderArena(slug) {
       <div class="roster">${list.map((e) => {
         const state = e.subbedIn ? 'In round 1' : e.noShow ? 'Sat out' : 'On deck';
         return `<div class="roster-row">
-          <div class="who">${entryAvatarHtml(e)}${namedHandleHtml(e.handle, e.badges)}${classBadgeHtml(e.ddlClass)}${badge(e.subbedIn ? 'confirmed' : e.noShow ? 'no_show' : 'pending')}</div>
+          <div class="who">${entryAvatarHtml(e)}${namedHandleHtml(e.handle, e.badges)}${classLabelHtml(e.ddlClass)}${badge(e.subbedIn ? 'confirmed' : e.noShow ? 'no_show' : 'pending')}</div>
           <span class="muted">${esc(state)}</span>
           ${hostMode && !e.subbedIn && !e.noShow ? `<div class="roster-acts">
             <button type="button" class="mini bad" data-wl-remove="${e.id}">Remove</button>
@@ -3413,7 +3479,7 @@ async function renderPlayer(handle) {
       <div class="chips">${(pack.accolades || []).map((a) => `<span class="chip" title="${esc(a.blurb)}">${esc(a.title)}</span>`).join('') || '<p class="muted">No official accolades yet.</p>'}</div>
       ${pack.mention ? `<p class="muted" style="margin-top:12px">Honourable mention — ${esc(pack.mention.title)}${pack.mention.blurb ? `: ${esc(pack.mention.blurb)}` : ''}</p>` : ''}
       <h2>Results</h2>
-      <table><thead><tr><th>Arena</th><th>Format</th><th>Place</th><th>Record</th></tr></thead>
+      <div class="table-scroll"><table class="results-table"><thead><tr><th>Arena</th><th>Format</th><th>Place</th><th>Record</th></tr></thead>
       <tbody>${(pack.results || []).map((r) => `
         <tr>
           <td>${String(r.slug || '').startsWith('manual-') || Number(r.tournamentId) < 0
@@ -3421,8 +3487,8 @@ async function renderPlayer(handle) {
             : `<a href="${arenaHref(r.slug)}">${esc(r.name)}</a>`}${r.official ? '' : ' <span class="muted">scrim</span>'}</td>
           <td>${esc(FORMAT_LABEL[r.format] || r.format)}</td>
           <td>${place(r.placement)}</td>
-          <td>${esc(r.record || '')}</td>
-        </tr>`).join('') || '<tr><td colspan="4" class="muted">No results on the ledger.</td></tr>'}</tbody></table>
+          <td class="record-cell">${esc(formatRecord(r.record) || '—')}</td>
+        </tr>`).join('') || '<tr><td colspan="4" class="muted">No results on the ledger.</td></tr>'}</tbody></table></div>
       ${unclaimed.length ? `<h2>Claim a walk-in result</h2>
         <p class="muted">These finishes used your handle but were not linked to Discord. Ask the host to approve.</p>
         ${unclaimed.map((r) => `<div class="roster-row">

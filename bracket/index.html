@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#140a04">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <title>DDL Tourney - Legends Bracket</title>
   <meta name="description" content="Host Doginal Dogs Legends pack tournaments. DOGE entry, paid roster, live brackets.">
   <link rel="canonical" href="https://kushmedia.xyz/tourney/">
@@ -22,13 +24,15 @@
   <link rel="icon" href="/assets/Kush.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Figtree:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/bracket/styles.css?v=bracket-ui-27">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Figtree:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/bracket/styles.css?v=bracket-ui-39">
 </head>
 <body>
   <div class="bg" aria-hidden="true">
     <img src="/bracket/flames.jpg" alt="" onerror="this.onerror=null;this.src='/assets/tourney-flames.jpg'">
+    <div class="embers"></div>
   </div>
+  <div class="grain" aria-hidden="true"></div>
   <header class="top">
     <a class="brand" href="/tourney/" data-tip="Home — every open arena.">
       <img src="/bracket/crest.jpg" alt="">
@@ -43,7 +47,8 @@
     <nav id="top-nav">
       <button type="button" id="tips-toggle" class="tips-toggle" aria-pressed="true" aria-label="Toggle usage tips">Tips on</button>
       <a href="/tourney/" data-tip="Browse arenas. Open one to register and follow the bracket.">Arenas</a>
-      <a href="/tourney/#/records" data-tip="Champions, accolades, and past official results.">Records</a>
+      <a href="/tourney/#/records" data-tip="Champions, leaderboards, badges, and past official results.">Records</a>
+      <a href="/tourney/#/ledger" id="nav-ledger" hidden data-tip="Write champions, leaderboards, badges, and honourable mentions.">Leaderboards</a>
       <a class="host" href="/tourney/#/create" id="nav-create" hidden data-tip="Open a new arena.">New tournament</a>
       <a id="discord-login" class="discord-login" href="/kmx-auth/discord/start?return=/tourney/" data-tip="Sign in with Discord. No password is stored.">Sign in with Discord</a>
       <div id="player-session" class="player-session" hidden>
@@ -55,7 +60,9 @@
     </nav>
   </header>
   <div id="tip-bubble" hidden role="tooltip"></div>
+  <aside id="kick-stream" class="kick-stream" hidden></aside>
   <main id="app"></main>
-  <script src="/bracket/app.js?v=bracket-ui-27"></script>
+  <script src="/bracket/badges/catalog.js?v=bracket-ui-39"></script>
+  <script src="/bracket/app.js?v=bracket-ui-39"></script>
 </body>
 </html>
