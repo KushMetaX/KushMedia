@@ -35,6 +35,24 @@ function looksLikeFinals(name) {
 	return /\bfinals?\b|\bgrand\s*finals?\b|\bchampionship\b/i.test(String(name || ''));
 }
 
+function looksLikeGrandTournament(name) {
+	const n = String(name || '');
+	return /\bddnyc\b/i.test(n) && /\b2026\b/.test(n) && /\birl\b/i.test(n);
+}
+
+function sanitizeEventKind(value, name) {
+	if (value === 'duel') return 'duel';
+	if (value === 'grand' || looksLikeGrandTournament(name)) return 'grand';
+	return 'tournament';
+}
+
+function resolveEventKind(row) {
+	if (!row) return 'tournament';
+	const fieldSize = Number(row.field_size != null ? row.field_size : row.fieldSize);
+	if (fieldSize === 2) return 'duel';
+	return sanitizeEventKind(row.event_kind || row.eventKind, row.name);
+}
+
 function addColumnIfMissing(database, table, name, type) {
 	try {
 		database.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
@@ -122,6 +140,8 @@ function ensureSchema(database) {
 		);
 	`);
 	addColumnIfMissing(database, 'tourney_events', 'official_lock', 'INTEGER NOT NULL DEFAULT 0');
+	addColumnIfMissing(database, 'tourney_events', 'event_kind', "TEXT NOT NULL DEFAULT 'tournament'");
+	repairEventKinds(database);
 	seedSystemBadges(database);
 }
 
@@ -147,6 +167,7 @@ function getDb() {
 	if (database) {
 		ensureSchema(database);
 		repairFinalsOfficial(database);
+		repairEventKinds(database);
 	}
 	return database;
 }
@@ -165,13 +186,17 @@ function placementMap(podium, standings) {
 		for (const row of podium.third || []) {
 			if (row && row.id != null) map.set(Number(row.id), 3);
 		}
+		if (podium.fourth && podium.fourth.id != null) map.set(Number(podium.fourth.id), 4);
 	}
+	const used = new Set(map.values());
 	let next = 4;
 	for (const row of standings || []) {
 		const id = Number(row && row.entryId);
 		if (!id || map.has(id)) continue;
+		while (used.has(next)) next += 1;
 		if (next > 5) break;
 		map.set(id, next);
+		used.add(next);
 		next += 1;
 	}
 	return map;
@@ -200,21 +225,31 @@ function snapshotResults(database, store, tournament, extras) {
 	if (!database || !tournament || tournament.status !== 'completed') return { ok: false, skipped: true };
 	ensureSchema(database);
 	const existing = database.prepare('SELECT tournament_id FROM tourney_events WHERE tournament_id = ?').get(tournament.id);
-	if (existing) return { ok: true, skipped: true };
-
 	const confirmed = (store.entries || []).filter((e) => e.tournamentId === tournament.id && e.paid);
 	const fieldSize = confirmed.length;
+	const arenaName = String(tournament.name || 'arena');
+	const eventKind = resolveEventKind({
+		event_kind: tournament.eventKind,
+		name: arenaName,
+		field_size: fieldSize,
+	});
+	if (existing) {
+		database.prepare(
+			`UPDATE tourney_events SET name = ?, event_kind = ? WHERE tournament_id = ?`
+		).run(arenaName, eventKind, tournament.id);
+		return { ok: true, skipped: true };
+	}
+
 	const official = countsTowardRecord(tournament, fieldSize, Boolean(extras && extras.isDemo)) ? 1 : 0;
 	const standings = (extras && extras.standings) || [];
 	const places = placementMap(extras && extras.podium, standings);
 	const completedAt = new Date().toISOString();
-	const arenaName = String(tournament.name || 'arena');
 
 	const tx = database.transaction(() => {
 		database.prepare(
 			`INSERT INTO tourney_events
-			 (tournament_id, slug, name, format, stage_type, field_size, official, completed_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+			 (tournament_id, slug, name, format, stage_type, field_size, official, completed_at, event_kind)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		).run(
 			tournament.id,
 			String(tournament.slug || ''),
@@ -228,6 +263,7 @@ function snapshotResults(database, store, tournament, extras) {
 			fieldSize,
 			official,
 			completedAt,
+			eventKind,
 		);
 		const ins = database.prepare(
 			`INSERT INTO tourney_results (tournament_id, entry_id, user_id, handle, placement, record)
@@ -245,7 +281,7 @@ function snapshotResults(database, store, tournament, extras) {
 				place,
 				recordFor(standings, entry.id),
 			);
-			if (!official) continue;
+			if (!official || fieldSize < 3) continue;
 			const standing = ddlBadges.standingSpec(place);
 			if (standing) {
 				grantBadgeBySlug(database, standing.slug, handle, userId, `${standing.ribbon} · ${arenaName}`);
@@ -389,7 +425,18 @@ function findUserById(database, userId) {
 	).get(Number(userId)) || null;
 }
 
+function personFromResult(row) {
+	if (!row || !row.handle) return null;
+	return {
+		handle: row.handle,
+		userId: row.user_id || null,
+		record: row.record || '',
+	};
+}
+
 function mapResultRow(row) {
+	const fieldSize = Number(row.field_size) || 0;
+	const kind = resolveEventKind(row);
 	return {
 		tournamentId: row.tournament_id,
 		entryId: row.entry_id,
@@ -401,7 +448,9 @@ function mapResultRow(row) {
 		name: row.name,
 		format: row.format,
 		stageType: row.stage_type,
-		fieldSize: Number(row.field_size) || 0,
+		fieldSize,
+		kind,
+		eventKind: kind,
 		official: Boolean(row.official),
 		completedAt: row.completed_at,
 	};
@@ -409,9 +458,10 @@ function mapResultRow(row) {
 
 function resultsForUser(database, userId) {
 	if (!database || !userId) return [];
+	ensureSchema(database);
 	return database.prepare(
 		`SELECT r.tournament_id, r.entry_id, r.user_id, r.handle, r.placement, r.record,
-		        e.slug, e.name, e.format, e.stage_type, e.field_size, e.official, e.completed_at
+		        e.slug, e.name, e.format, e.stage_type, e.field_size, e.official, e.completed_at, e.event_kind
 		 FROM tourney_results r
 		 JOIN tourney_events e ON e.tournament_id = r.tournament_id
 		 WHERE r.user_id = ?
@@ -421,11 +471,12 @@ function resultsForUser(database, userId) {
 
 function resultsForHandle(database, handle) {
 	if (!database) return [];
+	ensureSchema(database);
 	const h = String(handle || '').trim();
 	if (h.length < 2) return [];
 	return database.prepare(
 		`SELECT r.tournament_id, r.entry_id, r.user_id, r.handle, r.placement, r.record,
-		        e.slug, e.name, e.format, e.stage_type, e.field_size, e.official, e.completed_at
+		        e.slug, e.name, e.format, e.stage_type, e.field_size, e.official, e.completed_at, e.event_kind
 		 FROM tourney_results r
 		 JOIN tourney_events e ON e.tournament_id = r.tournament_id
 		 WHERE r.handle = ? COLLATE NOCASE
@@ -435,22 +486,57 @@ function resultsForHandle(database, handle) {
 
 function mapEventRow(database, row) {
 	const tid = Number(row.tournament_id);
+	const fieldSize = Number(row.field_size) || 0;
+	const podium = database.prepare(
+		`SELECT handle, user_id, placement, record FROM tourney_results
+		 WHERE tournament_id = ? AND placement IS NOT NULL AND placement <= 3
+		 ORDER BY placement ASC, handle COLLATE NOCASE`
+	).all(tid);
+	const first = podium.find((r) => Number(r.placement) === 1) || null;
+	const second = podium.find((r) => Number(r.placement) === 2) || null;
+	const third = podium.filter((r) => Number(r.placement) === 3).map(personFromResult).filter(Boolean);
+	const kind = resolveEventKind(row);
 	return {
 		tournamentId: tid,
 		slug: row.slug,
 		name: row.name,
 		format: row.format,
 		stageType: row.stage_type,
-		fieldSize: Number(row.field_size) || 0,
+		fieldSize,
+		kind,
+		eventKind: kind,
 		official: Boolean(row.official),
 		officialLock: Boolean(row.official_lock),
 		completedAt: row.completed_at,
 		manual: tid < 0 || String(row.slug || '').startsWith('manual-'),
-		champion: database.prepare(
-			`SELECT handle, user_id, record FROM tourney_results
-			 WHERE tournament_id = ? AND placement = 1 LIMIT 1`
-		).get(tid) || null,
+		champion: personFromResult(first),
+		runnerUp: personFromResult(second),
+		third,
 	};
+}
+
+function repairEventKinds(database) {
+	if (!database) return 0;
+	addColumnIfMissing(database, 'tourney_events', 'event_kind', "TEXT NOT NULL DEFAULT 'tournament'");
+	let rows;
+	try {
+		rows = database.prepare(
+			`SELECT tournament_id, name, field_size, event_kind FROM tourney_events`
+		).all();
+	} catch (_err) {
+		return 0;
+	}
+	let changed = 0;
+	const upd = database.prepare(
+		`UPDATE tourney_events SET event_kind = ? WHERE tournament_id = ?`
+	);
+	for (const row of rows) {
+		const kind = resolveEventKind(row);
+		if (kind === row.event_kind) continue;
+		upd.run(kind, row.tournament_id);
+		changed += 1;
+	}
+	return changed;
 }
 
 function repairFinalsOfficial(database) {
@@ -606,15 +692,68 @@ function attachBadges(champions, awards) {
 	}));
 }
 
+function hallStats(database) {
+	const row = database.prepare(
+		`SELECT
+			COUNT(*) AS total,
+			SUM(CASE WHEN field_size = 2 THEN 1 ELSE 0 END) AS duels,
+			SUM(CASE WHEN field_size > 2 THEN 1 ELSE 0 END) AS tournaments,
+			SUM(CASE WHEN official = 1 THEN 1 ELSE 0 END) AS official
+		 FROM tourney_events`
+	).get() || {};
+	return {
+		total: Number(row.total) || 0,
+		duels: Number(row.duels) || 0,
+		tournaments: Number(row.tournaments) || 0,
+		official: Number(row.official) || 0,
+	};
+}
+
+function listDuelists(database, limit) {
+	const cap = Math.min(80, Math.max(5, Number(limit) || 20));
+	return database.prepare(
+		`SELECT MAX(r.handle) AS handle, MAX(r.user_id) AS user_id,
+		        SUM(CASE WHEN r.placement = 1 THEN 1 ELSE 0 END) AS wins,
+		        SUM(CASE WHEN r.placement = 2 THEN 1 ELSE 0 END) AS losses
+		 FROM tourney_results r
+		 JOIN tourney_events e ON e.tournament_id = r.tournament_id
+		 WHERE e.field_size = 2 AND e.official = 1
+		 GROUP BY CASE WHEN r.user_id IS NOT NULL THEN 'u:' || r.user_id ELSE 'h:' || lower(r.handle) END
+		 ORDER BY wins DESC, losses ASC, handle COLLATE NOCASE ASC
+		 LIMIT ?`
+	).all(cap).map((row) => {
+		const wins = Number(row.wins) || 0;
+		const losses = Number(row.losses) || 0;
+		return {
+			handle: row.handle,
+			userId: row.user_id || null,
+			wins,
+			losses,
+			played: wins + losses,
+			record: `${wins}-${losses}`,
+		};
+	});
+}
+
 function hallOfFame(database, limit) {
 	if (!database) {
-		return { events: [], champions: [], mentions: [], ledgers: [], badges: [], awards: [] };
+		return {
+			events: [],
+			champions: [],
+			duelists: [],
+			mentions: [],
+			ledgers: [],
+			badges: [],
+			awards: [],
+			stats: { total: 0, duels: 0, tournaments: 0, official: 0 },
+		};
 	}
 	ensureSchema(database);
 	repairFinalsOfficial(database);
+	repairEventKinds(database);
 	const cap = Math.min(80, Math.max(5, Number(limit) || 20));
 	const events = database.prepare(
-		`SELECT tournament_id, slug, name, format, stage_type, field_size, official, official_lock, completed_at
+		`SELECT tournament_id, slug, name, format, stage_type, field_size, official, official_lock, completed_at, event_kind
 		 FROM tourney_events
 		 ORDER BY completed_at DESC
 		 LIMIT ?`
@@ -623,7 +762,7 @@ function hallOfFame(database, limit) {
 		`SELECT MAX(r.handle) AS handle, MAX(r.user_id) AS user_id, COUNT(*) AS titles
 		 FROM tourney_results r
 		 JOIN tourney_events e ON e.tournament_id = r.tournament_id
-		 WHERE r.placement = 1 AND e.official = 1
+		 WHERE r.placement = 1 AND e.official = 1 AND e.field_size > 2
 		 GROUP BY CASE WHEN r.user_id IS NOT NULL THEN 'u:' || r.user_id ELSE 'h:' || lower(r.handle) END
 		 ORDER BY titles DESC, handle COLLATE NOCASE ASC
 		 LIMIT ?`
@@ -636,10 +775,12 @@ function hallOfFame(database, limit) {
 	return {
 		events,
 		champions: attachBadges(champions, awards),
+		duelists: attachBadges(listDuelists(database, cap), awards),
 		mentions: attachBadges(listMentions(database), awards),
 		ledgers: listLedgers(database),
 		badges: listBadges(database),
 		awards,
+		stats: hallStats(database),
 	};
 }
 
@@ -652,7 +793,7 @@ function listChampions(database, query) {
 		SELECT r.handle, r.user_id, e.format, e.slug, e.name, e.completed_at, e.field_size
 		FROM tourney_results r
 		JOIN tourney_events e ON e.tournament_id = r.tournament_id
-		WHERE r.placement = 1 AND e.official = 1
+		WHERE r.placement = 1 AND e.official = 1 AND e.field_size > 2
 	`;
 	const params = [];
 	if (format) {
@@ -688,6 +829,9 @@ function playerProfile(database, handle) {
 	const user = findUserByHandle(database, handle);
 	const results = user ? resultsForUser(database, user.user_id) : resultsForHandle(database, handle);
 	const official = results.filter((r) => r.official);
+	const tourWins = official.filter((r) => r.placement === 1 && Number(r.fieldSize) > 2);
+	const duelWins = official.filter((r) => r.placement === 1 && Number(r.fieldSize) === 2);
+	const duelLosses = official.filter((r) => r.placement === 2 && Number(r.fieldSize) === 2);
 	const displayHandle = (user && user.tourney_handle) || handle;
 	return {
 		handle: displayHandle,
@@ -695,7 +839,9 @@ function playerProfile(database, handle) {
 		results,
 		accolades: unlockFor(official),
 		badges: awardsForHandle(database, displayHandle),
-		titles: official.filter((r) => r.placement === 1).length,
+		titles: tourWins.length,
+		duelWins: duelWins.length,
+		duelRecord: `${duelWins.length}-${duelLosses.length}`,
 		appearances: official.length,
 		mention: listMentions(database).find(
 			(row) => String(row.handle).toLowerCase() === String(displayHandle).toLowerCase(),
@@ -705,11 +851,12 @@ function playerProfile(database, handle) {
 
 function unclaimedForHandle(database, handle) {
 	if (!database) return [];
+	ensureSchema(database);
 	const h = String(handle || '').trim();
 	if (h.length < 2) return [];
 	return database.prepare(
 		`SELECT r.tournament_id, r.entry_id, r.user_id, r.handle, r.placement, r.record,
-		        e.slug, e.name, e.format, e.stage_type, e.field_size, e.official, e.completed_at
+		        e.slug, e.name, e.format, e.stage_type, e.field_size, e.official, e.completed_at, e.event_kind
 		 FROM tourney_results r
 		 JOIN tourney_events e ON e.tournament_id = r.tournament_id
 		 WHERE r.user_id IS NULL AND r.handle = ? COLLATE NOCASE
@@ -1114,6 +1261,30 @@ function revokeAward(database, awardId) {
 	return { ok: true, id };
 }
 
+function clearBadgeAwards(database, badgeId) {
+	ensureSchema(database);
+	const id = Number(badgeId);
+	const badge = database.prepare('SELECT id, title FROM tourney_badges WHERE id = ?').get(id);
+	if (!badge) fail(404, 'Badge not found');
+	const info = database.prepare('DELETE FROM tourney_badge_awards WHERE badge_id = ?').run(id);
+	return { ok: true, id, removed: info.changes, title: badge.title };
+}
+
+function stripPlayedClassAwards(database) {
+	ensureSchema(database);
+	const info = database.prepare(
+		`DELETE FROM tourney_badge_awards
+		 WHERE id IN (
+			SELECT a.id
+			FROM tourney_badge_awards a
+			JOIN tourney_badges b ON b.id = a.badge_id
+			WHERE b.slug LIKE 'class-%'
+			  AND a.note LIKE 'Played %'
+		 )`
+	).run();
+	return { ok: true, removed: info.changes };
+}
+
 function hostOp(database, op, body) {
 	if (!database) fail(503, 'Records database unavailable');
 	ensureSchema(database);
@@ -1147,12 +1318,16 @@ function hostOp(database, op, body) {
 			return awardBadge(database, body);
 		case 'revokeAward':
 			return revokeAward(database, body && body.id);
+		case 'clearBadgeAwards':
+			return clearBadgeAwards(database, body && (body.badgeId || body.id));
+		case 'stripPlayedClassAwards':
+			return stripPlayedClassAwards(database);
 		default:
 			fail(400, 'Unknown ledger operation');
 	}
 }
 
-module.exports = {
+Object.assign(module.exports, {
 	MIN_FIELD,
 	BADGE_ICONS,
 	BADGE_MOTIFS,
@@ -1167,10 +1342,14 @@ module.exports = {
 	ensureSchema,
 	getDb,
 	looksLikeFinals,
+	looksLikeGrandTournament,
+	sanitizeEventKind,
+	resolveEventKind,
 	countsTowardRecord,
 	snapshotResults,
 	backfillWithFns,
 	repairFinalsOfficial,
+	repairEventKinds,
 	findUserByHandle,
 	findUserById,
 	findUserByDiscordUsername,
@@ -1188,4 +1367,4 @@ module.exports = {
 	hostOp,
 	listAwards,
 	attachBadges,
-};
+});

@@ -1233,12 +1233,13 @@
 
         const lock = root.querySelector('[data-lock]');
         if (lock) {
+          const hostCanLock = typeof opts.canReport === 'function' ? opts.canReport() : Boolean(opts.canReport);
           const canLock = Boolean((opts.onResult || opts.onWinner) && (opts.matchOpen !== false) && player1 && player2 && !opts.matchComplete);
-          if (canLock) {
+          if (canLock && hostCanLock) {
             const bo = [1, 3, 5].includes(Number(opts.bestOf)) ? Number(opts.bestOf) : 3;
             const need = Math.ceil(bo / 2);
             lock.hidden = false;
-            const lockKey = `open|${busy ? 1 : 0}|${bo}`;
+            const lockKey = `open|host|${busy ? 1 : 0}|${bo}`;
             if (lock.dataset.key !== lockKey) {
               lock.dataset.key = lockKey;
               lock.innerHTML = `<p class="muted">When the paper match is over, type the games won and lock the series. First to ${need} (best of ${bo}).</p>
@@ -1276,6 +1277,25 @@
                   renderChrome();
                 }
               };
+            }
+          } else if (canLock) {
+            lock.hidden = false;
+            const lockKey = `open|guest|${busy ? 1 : 0}`;
+            if (lock.dataset.key !== lockKey) {
+              lock.dataset.key = lockKey;
+              lock.innerHTML = `<p class="muted">Only the host can lock this series. Sit, play, and keep health and mana in sync — the host types the games won when the paper match is over.</p>
+                ${typeof opts.onHostGate === 'function' ? '<button type="button" class="btn" data-host-lock>Host sign in to lock</button>' : ''}`;
+              const gate = lock.querySelector('[data-host-lock]');
+              if (gate) {
+                gate.onclick = async () => {
+                  try {
+                    const ok = await opts.onHostGate();
+                    if (ok) renderChrome();
+                  } catch (err) {
+                    toast(root, err && err.message ? err.message : 'Host sign-in failed', false);
+                  }
+                };
+              }
             }
           } else if (opts.matchComplete) {
             lock.hidden = false;

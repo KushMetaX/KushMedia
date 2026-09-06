@@ -87,6 +87,31 @@ function resolveByes(map) {
 	}
 }
 
+function fieldSizeFromDrafts(drafts) {
+	const ids = new Set();
+	for (const d of drafts || []) {
+		if (d.entry1Id) ids.add(d.entry1Id);
+		if (d.entry2Id) ids.add(d.entry2Id);
+	}
+	return ids.size;
+}
+
+function attachPlacement(drafts) {
+	const list = Array.isArray(drafts) ? drafts : [];
+	if (fieldSizeFromDrafts(list) < 4) return list;
+	if (list.some((d) => d.side === 'placement')) return list;
+	const winners = list.filter((d) => d.side === 'winners');
+	const maxRound = winners.reduce((n, d) => Math.max(n, d.round), 0);
+	if (maxRound < 2) return list;
+	const semis = winners.filter((d) => d.round === maxRound - 1).sort((a, b) => a.position - b.position);
+	if (semis.length < 2) return list;
+	list.push({ side: 'placement', round: 1, position: 1, entry1Id: null, entry2Id: null });
+	semis.forEach((m, i) => {
+		m.loserGoesTo = { side: 'placement', round: 1, position: 1, slot: (i % 2) + 1 };
+	});
+	return list;
+}
+
 function generateSingleElim(seededIds) {
 	const n = nextPowerOfTwo(seededIds.length);
 	const wbRounds = Math.log2(n);
@@ -257,4 +282,5 @@ module.exports = {
 	generateRoundRobin,
 	pairSwissRound,
 	defaultSwissRounds,
+	attachPlacement,
 };

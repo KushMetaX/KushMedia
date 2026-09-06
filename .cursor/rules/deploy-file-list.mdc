@@ -1,0 +1,14 @@
+---
+description: Always list the exact files that must be uploaded for changes to show live.
+alwaysApply: true
+---
+
+# Deploy file list
+
+After any change that is meant to show on the live site, end the reply with a **Files to upload** list.
+
+- List every path that must go up, relative to the repo root.
+- Group by what it affects (browser vs Node vs Apache) when that matters.
+- Call out a Node restart if `public/server/**` changed.
+- Do not list test-only files (`scripts/**`, `*.test.*`) unless they asked for those too.
+- Do this every time, including small CSS/JS cache-bust edits.

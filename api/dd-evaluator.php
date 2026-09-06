@@ -3640,7 +3640,8 @@ function getAllTimeTopSales($limit = 5) {
     global $MARKET_PULSE_CACHE_CANDIDATE_PATHS;
 
     static $cache = array();
-    $limit = max(1, min(50, intval($limit)));
+    $persistLimit = 100;
+    $limit = max(1, min($persistLimit, intval($limit)));
 
     if (array_key_exists($limit, $cache)) {
         return $cache[$limit];
@@ -3658,19 +3659,22 @@ function getAllTimeTopSales($limit = 5) {
     $cachedSales = is_array($cachedPayload) && isset($cachedPayload['topSales']) && is_array($cachedPayload['topSales'])
         ? $cachedPayload['topSales']
         : null;
+    $cachedCount = is_array($cachedSales) ? count($cachedSales) : 0;
 
-    if ($cachedSales !== null && $cachedSalesAt !== false && (time() - $cachedSalesAt) < $cacheTtl && count($cachedSales) >= $limit) {
+    if ($cachedSales !== null && $cachedSalesAt !== false && (time() - $cachedSalesAt) < $cacheTtl && $cachedCount >= $limit) {
         $cache[$limit] = array_slice($cachedSales, 0, $limit);
         return $cache[$limit];
     }
 
     // Incremental refresh: once a leaderboard has been built, we only need to
     // pull the newest activity pages and fold them in. A full deep scan only
-    // happens on first build (bootstrap) or if the persisted leaderboard was
-    // lost. This keeps periodic refreshes cheap instead of re-scanning ~10k
-    // activities every 15 minutes.
-    $haveCache = is_array($cachedSales) && count($cachedSales) > 0;
-    $scanPages = $haveCache ? 3 : 100;
+    // happens on first build (bootstrap), if the persisted leaderboard was
+    // lost, or if the caller asked for more rows than we have cached (e.g.
+    // expanding from 25 to 100). This keeps periodic refreshes cheap instead of
+    // re-scanning ~10k activities every 15 minutes.
+    $needDeeperThanCache = $cachedCount < $limit;
+    $haveCache = $cachedCount > 0;
+    $scanPages = ($haveCache && !$needDeeperThanCache) ? 3 : 100;
     $activities = getAllGlobalActivity(100, $scanPages);
 
     $fresh = array();
@@ -3703,7 +3707,7 @@ function getAllTimeTopSales($limit = 5) {
         $merged[] = $sale;
     }
 
-    $topSales = selectTopSales($merged, 50);
+    $topSales = selectTopSales($merged, $persistLimit);
     $cacheData = is_array($cachedPayload) ? $cachedPayload : array();
     $cacheData['generatedAt'] = gmdate('c');
     $cacheData['topSalesAt'] = gmdate('c');

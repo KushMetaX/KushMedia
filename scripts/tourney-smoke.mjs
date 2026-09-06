@@ -159,6 +159,19 @@ async function main() {
 	check('lock bracket succeeds', locked.status === 200 && locked.data.tournament.status === 'in_progress', locked.text.slice(0, 300));
 	check('lock bracket builds matches', (locked.data.matches || []).length > 0);
 
+	const stream = await call('POST', `/arenas/${arena}/settings`, {
+		hostPassword: HOST_PW,
+		streamUrl: 'https://kick.com/kushmetax',
+	});
+	check('host can set a Kick stream on a live arena', stream.status === 200 && stream.data.tournament.streamUrl === 'https://kick.com/kushmetax', stream.text.slice(0, 200));
+	const badStream = await call('POST', `/arenas/${arena}/settings`, {
+		hostPassword: HOST_PW,
+		streamUrl: 'https://twitch.tv/nope',
+	});
+	check('non-Kick stream URLs are refused', badStream.status === 400, badStream.text.slice(0, 200));
+	const visitorLive = await call('GET', `/arenas/${arena}`);
+	check('visitors see the Kick stream URL', visitorLive.data && visitorLive.data.tournament.streamUrl === 'https://kick.com/kushmetax');
+
 	const ready = (locked.data.matches || []).find((m) => m.status === 'ready');
 	check('a match is ready to report', Boolean(ready));
 	if (ready) {

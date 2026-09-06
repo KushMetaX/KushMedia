@@ -93,7 +93,7 @@ ErrorDocument 404 /404.html
   # /tourney/?t=slug, which the live /tourney/ route already serves.
   RewriteRule ^tourney/t/([^/]+)/?$ /tourney/?t=$1 [R=302,L,QSA]
   RewriteCond %{ENV:REDIRECT_TOURNEY_GATED} !=1
-  RewriteRule ^tourney(/.*)?$ /__tourney_gate$1 [E=TOURNEY_GATED:1,L]
+  RewriteRule ^tourney(/.*)?$ /__tourney_gate$1 [E=TOURNEY_GATED:1,E=TOURNEY_MEDIA:1,L]
   # /server/* (Node app data + admin password file)
   RewriteRule ^server(/|$)                                - [F,L,NC]
   # /components/* (removed Nail Designer tree)
@@ -147,8 +147,10 @@ ErrorDocument 404 /404.html
   SetEnvIf Request_URI "(^|/)bracket/og\.jpg$" TOURNEY_SHARE_IMAGE
   Header always unset Cross-Origin-Resource-Policy env=TOURNEY_SHARE_IMAGE
   Header always set Cross-Origin-Resource-Policy "cross-origin" env=TOURNEY_SHARE_IMAGE
-  # Powerful-feature opt-out.
-  Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+  # Permissions-Policy is owned by Express (permissionsPolicyFor). Do not
+  # unset/replace it here: LiteSpeed never set TOURNEY_MEDIA after the
+  # /tourney → /__tourney_gate rewrite, so Apache sent camera=() and the
+  # IRL table could not show an Allow popup even when the padlock was on.
   # Reduce server fingerprint where the runtime allows it.
   Header always unset X-Powered-By
   Header unset X-Powered-By

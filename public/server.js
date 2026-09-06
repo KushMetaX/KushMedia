@@ -35,7 +35,9 @@ function startServer() {
 		if (ddEvaluatorRouter.getCommunitySubmitPassword()) {
 			console.log('[dd-evaluator] Community suggestion submissions require DD_COMMUNITY_PASSWORD.');
 		}
-		if (String(process.env.DDL_PASSWORD || '').trim() || String(process.env.DDL_PASSWORD_FILE || '').trim()) {
+		if (/^(1|true|yes|on)$/i.test(String(process.env.DDL_PUBLIC || ''))) {
+			console.log('[ddl-tcg] public mode (no password, Prices tab hidden)');
+		} else if (String(process.env.DDL_PASSWORD || '').trim() || String(process.env.DDL_PASSWORD_FILE || '').trim()) {
 			console.log('[ddl-tcg] password gate on /ddl, ddl.kushmedia.xyz, ddltcg.kushmetax.com');
 		} else {
 			console.log('[ddl-tcg] hidden (404) until DDL_PASSWORD is set');

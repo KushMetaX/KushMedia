@@ -10,9 +10,20 @@ const {
 	generateRoundRobin,
 	pairSwissRound,
 	defaultSwissRounds,
+	attachPlacement,
 } = require('../lib/bracket-engine');
-const records = require('../lib/tourney-records');
+const {
+	restackElimTree,
+	reseatCompletePair,
+	repairKnownBracketHistory,
+} = require('../lib/bracket-layout');
+const {
+	restoreMissingArenasFromRecords,
+	parseRecord,
+} = require('../lib/arena-archive');
+let records = require('../lib/tourney-records');
 const authDex = require('./auth-dex');
+const tourneyOg = require('../lib/tourney-og');
 
 const FORMATS = ['single_elim', 'double_elim', 'round_robin', 'swiss'];
 const BEST_OF = [1, 3, 5];
@@ -84,16 +95,31 @@ function sanitizeRoundBestOf(raw) {
 	const out = {};
 	if (!raw || typeof raw !== 'object') return out;
 	for (const [key, value] of Object.entries(raw)) {
-		if (!/^(winners|losers|grand|group):\d+$/.test(String(key))) continue;
+		if (!/^(winners|losers|grand|group|placement):\d+$/.test(String(key))) continue;
 		out[key] = normalizeBestOf(value, 3);
 	}
 	return out;
 }
 
-function bestOfFor(tournament, side, round) {
+function sanitizeFinalsBestOf(value) {
+	if (value == null || value === '') return null;
+	const n = Number(value);
+	return BEST_OF.includes(n) ? n : null;
+}
+
+function isFinalsMatch(match) {
+	if (!match) return false;
+	if (match.side === 'grand') return true;
+	if (match.side === 'placement' || match.side === 'losers' || match.side === 'group') return false;
+	return match.side === 'winners' && !match.winnerGoesTo;
+}
+
+function bestOfFor(tournament, side, round, match) {
 	const rules = (tournament && tournament.roundBestOf) || {};
 	const keyed = rules[roundKey(side, round)];
 	if (keyed) return normalizeBestOf(keyed, tournament && tournament.bestOf);
+	const finals = sanitizeFinalsBestOf(tournament && tournament.finalsBestOf);
+	if (finals && isFinalsMatch(match || { side, round, winnerGoesTo: true })) return finals;
 	return normalizeBestOf(tournament && tournament.bestOf, 3);
 }
 
@@ -345,10 +371,22 @@ function sanitizePayouts(raw) {
 	return out.sort((a, b) => a.place - b.place);
 }
 
+function looksLikeGrandTournament(name) {
+	const n = String(name || '');
+	return /\bddnyc\b/i.test(n) && /\b2026\b/.test(n) && /\birl\b/i.test(n);
+}
+
+function sanitizeEventKind(value, name) {
+	if (value === 'duel') return 'duel';
+	if (value === 'grand' || looksLikeGrandTournament(name)) return 'grand';
+	return 'tournament';
+}
+
 function normalizeTournament(tournament) {
 	if (!tournament || typeof tournament !== 'object') return tournament;
 	tournament.bestOf = normalizeBestOf(tournament.bestOf, 3);
 	tournament.roundBestOf = sanitizeRoundBestOf(tournament.roundBestOf);
+	tournament.finalsBestOf = sanitizeFinalsBestOf(tournament.finalsBestOf);
 	tournament.hostName = String(tournament.hostName || 'KushMetaX').trim() || 'KushMetaX';
 	try {
 		tournament.streamUrl = sanitizeKickStream(tournament.streamUrl);
@@ -356,6 +394,7 @@ function normalizeTournament(tournament) {
 		tournament.streamUrl = '';
 	}
 	tournament.rewardMode = tournament.rewardMode === 'prize' ? 'prize' : 'pot';
+	tournament.hostPotUsd = sanitizeHostPotUsd(tournament.hostPotUsd, 0);
 	tournament.payouts = sanitizePayouts(tournament.payouts);
 	const hostUserId = tournament.hostUserId != null ? Number(tournament.hostUserId) : 0;
 	tournament.hostUserId = Number.isFinite(hostUserId) && hostUserId > 0 ? hostUserId : null;
@@ -394,6 +433,17 @@ function normalizeTournament(tournament) {
 	if (!tournament.losersBracket && tournament.format === 'double_elim') tournament.format = 'single_elim';
 	if (tournament.losersBracket) tournament.breakTies = false;
 	tournament.playoffFormat = tournament.losersBracket ? 'double_elim' : 'single_elim';
+	tournament.eventKind = sanitizeEventKind(tournament.eventKind, tournament.name);
+	if (tournament.eventKind === 'duel') {
+		tournament.capPlayers = true;
+		tournament.maxPlayers = 2;
+		tournament.stageType = 'single';
+		tournament.stage = 'main';
+		tournament.losersBracket = false;
+		tournament.breakTies = false;
+		tournament.playoffFormat = 'single_elim';
+		if (tournament.format === 'double_elim') tournament.format = 'single_elim';
+	}
 	return tournament;
 }
 
@@ -443,16 +493,19 @@ function readSettings(body, current) {
 	if (src.advancePerGroup != null) t.advancePerGroup = Math.min(8, Math.max(1, Number(src.advancePerGroup) || 2));
 	if (src.bestOf != null) t.bestOf = normalizeBestOf(src.bestOf, t.bestOf);
 	if (src.roundBestOf) t.roundBestOf = sanitizeRoundBestOf(src.roundBestOf);
+	if (Object.prototype.hasOwnProperty.call(src, 'finalsBestOf')) t.finalsBestOf = sanitizeFinalsBestOf(src.finalsBestOf);
 	if (src.swissRounds != null) t.swissRounds = Math.min(12, Math.max(3, Number(src.swissRounds) || 3));
 	if (src.rewardMode != null) t.rewardMode = src.rewardMode === 'prize' ? 'prize' : 'pot';
+	if (src.hostPotUsd != null) t.hostPotUsd = sanitizeHostPotUsd(src.hostPotUsd, t.hostPotUsd);
 	if (src.payouts != null) t.payouts = sanitizePayouts(src.payouts);
+	if (src.eventKind != null) t.eventKind = src.eventKind;
 	if (t.feeMode === 'free') t.entryFeeUsd = 0;
 	return normalizeTournament(t);
 }
 
 function normalizeMatch(match, tournament) {
 	if (!match || typeof match !== 'object') return match;
-	match.bestOf = normalizeBestOf(match.bestOf, bestOfFor(tournament, match.side, match.round));
+	match.bestOf = normalizeBestOf(match.bestOf, bestOfFor(tournament, match.side, match.round, match));
 	match.games = Array.isArray(match.games) ? match.games : [];
 	return match;
 }
@@ -474,6 +527,417 @@ function paidUsd(entry) {
 	const usd = Number(entry && entry.amountUsd);
 	if (Number.isFinite(usd) && usd > 0) return usd;
 	return 0;
+}
+
+function sanitizeHostPotUsd(value, fallback = 0) {
+	const n = Number(value);
+	const base = Number.isFinite(n) && n >= 0 ? n : Number(fallback);
+	if (!Number.isFinite(base) || base < 0) return 0;
+	return Math.round(Math.min(1_000_000, base) * 100) / 100;
+}
+
+function feeEntries(entries) {
+	return (entries || []).filter((e) => e.paid && (!e.whitelist || e.subbedIn));
+}
+
+function computePrizePool(tournament, entries) {
+	const host = sanitizeHostPotUsd(tournament && tournament.hostPotUsd, 0);
+	const fees = feeEntries(entries).reduce((sum, e) => sum + paidUsd(e), 0);
+	return roundCrypto(host + fees, 2);
+}
+
+function matchHasReportedPlay(match) {
+	if (!match || match.status === 'bye') return false;
+	if (match.status === 'complete') return true;
+	if (Array.isArray(match.games) && match.games.length) return true;
+	if (Number(match.score1) > 0 || Number(match.score2) > 0) return true;
+	return false;
+}
+
+function reshuffleBlockReason(store, tournament, action) {
+	const word = action === 'swap' ? 'swap' : 'shuffle';
+	const gerund = action === 'swap' ? 'swapping' : 'shuffling';
+	if (!tournament || tournament.status !== 'in_progress') {
+		return `Lock the bracket first, then ${word}.`;
+	}
+	if (tournament.stageType === 'two' && tournament.stage === 'playoff') {
+		return `The playoff has already started — ${gerund} would wipe group results.`;
+	}
+	const matches = (store.matches || []).filter((m) => m.tournamentId === tournament.id);
+	if (matches.some(matchHasReportedPlay)) {
+		return `Cannot ${word} after a series has been reported.`;
+	}
+	return null;
+}
+
+function swapBlockReason(tournament) {
+	if (!tournament || tournament.status === 'registration') {
+		return 'Lock the bracket first, then swap.';
+	}
+	return null;
+}
+
+function markBracketOpen(tournament) {
+	if (tournament && tournament.status === 'completed') tournament.status = 'in_progress';
+}
+
+function matchRosterLocked(match) {
+	return Boolean(match && match.status === 'complete');
+}
+
+function slotEntry(match, slot) {
+	if (!match) return null;
+	return Number(slot) === 2 ? match.entry2Id : match.entry1Id;
+}
+
+function setSlotEntry(match, slot, entryId) {
+	if (!match) return;
+	const value = entryId == null || entryId === '' ? null : entryId;
+	if (Number(slot) === 2) match.entry2Id = value;
+	else match.entry1Id = value;
+}
+
+function clearMatchVotes(store, tournament, matchIds) {
+	const hit = new Set((matchIds || []).filter(Boolean));
+	if (!hit.size) return;
+	store.votes = (store.votes || []).filter((v) => v.tournamentId !== tournament.id || !hit.has(v.matchId));
+}
+
+function applyByeAdvance(store, match) {
+	const byeId = match.entry1Id || match.entry2Id;
+	if (!byeId || (match.entry1Id && match.entry2Id)) return;
+	if (!match.entry1Id && match.entry2Id) {
+		match.entry1Id = match.entry2Id;
+		match.entry2Id = null;
+	}
+	match.status = 'bye';
+	match.winnerId = match.entry1Id;
+	match.games = [];
+	match.score1 = null;
+	match.score2 = null;
+	const dest = findMatch(store, match.winnerGoesTo, match.tournamentId);
+	if (dest && match.winnerGoesTo && !destHasProgress(dest)) {
+		seat(dest, match.winnerGoesTo.slot, match.entry1Id);
+	}
+}
+
+function refreshEditedMatch(store, tournament, match) {
+	if (!match) return;
+	match.games = [];
+	match.score1 = null;
+	match.score2 = null;
+	if (match.entry1Id && match.entry2Id) {
+		match.status = 'ready';
+		match.winnerId = null;
+		return;
+	}
+	if ((match.entry1Id || match.entry2Id) && isOpeningMatch(tournament, match)) {
+		applyByeAdvance(store, match);
+		return;
+	}
+	match.status = 'pending';
+	match.winnerId = null;
+}
+
+function prepareMatchForRosterEdit(store, match) {
+	if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
+	if (matchRosterLocked(match)) {
+		throw Object.assign(new Error('Unlock that series first, then move people.'), { status: 400 });
+	}
+	if (match.status === 'bye') {
+		if (!canReverseBye(store, match)) {
+			throw Object.assign(new Error('That bye already advanced too far to edit. Unlock the next match first.'), { status: 400 });
+		}
+		reverseByeAdvance(store, match);
+	}
+}
+
+function liveSeatFor(matches, entryId) {
+	const id = Number(entryId);
+	const seats = [];
+	for (const match of matches || []) {
+		if (matchRosterLocked(match)) continue;
+		if (Number(match.entry1Id) === id) seats.push({ match, slot: 1 });
+		if (Number(match.entry2Id) === id) seats.push({ match, slot: 2 });
+	}
+	if (!seats.length) return null;
+	seats.sort((a, b) => (
+		(Number(b.match.round) || 0) - (Number(a.match.round) || 0)
+		|| (a.match.status === 'bye' ? 1 : 0) - (b.match.status === 'bye' ? 1 : 0)
+	));
+	return seats[0];
+}
+
+function parseSeat(body, suffix) {
+	const key = suffix || '';
+	const matchId = Number(body && (body[`matchId${key}`] ?? body.matchId));
+	const slotRaw = Number(body && (body[`slot${key}`] ?? body.slot));
+	const slot = slotRaw === 2 ? 2 : slotRaw === 1 ? 1 : 0;
+	if (!Number.isFinite(matchId) || matchId <= 0 || !slot) return null;
+	return { matchId, slot };
+}
+
+function retractPlayerFromDest(dest, destRef, entryId) {
+	if (!dest || entryId == null || entryId === '') return;
+	const slot = destRef && Number(destRef.slot);
+	if (slot === 1 && Number(dest.entry1Id) === Number(entryId)) dest.entry1Id = null;
+	else if (slot === 2 && Number(dest.entry2Id) === Number(entryId)) dest.entry2Id = null;
+	else {
+		if (Number(dest.entry1Id) === Number(entryId)) dest.entry1Id = null;
+		if (Number(dest.entry2Id) === Number(entryId)) dest.entry2Id = null;
+	}
+}
+
+function resetMatchOnce(store, tournament, match) {
+	if (!match) return;
+	if (match.status === 'bye') {
+		reverseByeAdvance(store, match);
+		return;
+	}
+	const winnerId = match.winnerId;
+	const loserId = Number(winnerId) === Number(match.entry1Id) ? match.entry2Id : match.entry1Id;
+	if (match.status === 'complete') {
+		retractPlayerFromDest(findMatch(store, match.winnerGoesTo, tournament.id), match.winnerGoesTo, winnerId);
+		retractPlayerFromDest(findMatch(store, match.loserGoesTo, tournament.id), match.loserGoesTo, loserId);
+	}
+	match.games = [];
+	match.score1 = null;
+	match.score2 = null;
+	match.winnerId = null;
+	match.status = (match.entry1Id && match.entry2Id) ? 'ready' : 'pending';
+	for (const destRef of [match.winnerGoesTo, match.loserGoesTo]) {
+		const dest = findMatch(store, destRef, tournament.id);
+		if (!dest || dest.status === 'complete') continue;
+		dest.games = [];
+		dest.score1 = null;
+		dest.score2 = null;
+		if (dest.status !== 'bye') {
+			dest.winnerId = null;
+			dest.status = (dest.entry1Id && dest.entry2Id) ? 'ready' : 'pending';
+		}
+	}
+}
+
+function resetMatchTree(store, tournament, match) {
+	const seen = new Set();
+	const walk = (row) => {
+		if (!row || seen.has(row.id)) return;
+		seen.add(row.id);
+		walk(findMatch(store, row.winnerGoesTo, tournament.id));
+		walk(findMatch(store, row.loserGoesTo, tournament.id));
+		resetMatchOnce(store, tournament, row);
+	};
+	walk(match);
+	markBracketOpen(tournament);
+	clearMatchVotes(store, tournament, [...seen]);
+}
+
+/** Trade two seats in any unlocked round. Does not redraw or wipe other series. */
+function swapSlots(store, tournament, seatA, seatB) {
+	if (!seatA || !seatB) {
+		throw Object.assign(new Error('Pick two seats'), { status: 400 });
+	}
+	if (seatA.matchId === seatB.matchId && seatA.slot === seatB.slot) {
+		throw Object.assign(new Error('Pick two different seats'), { status: 400 });
+	}
+	const matches = (store.matches || []).filter((m) => m.tournamentId === tournament.id);
+	const matchA = matches.find((m) => m.id === seatA.matchId);
+	const matchB = matches.find((m) => m.id === seatB.matchId);
+	if (!matchA || !matchB) throw Object.assign(new Error('Match not found'), { status: 404 });
+	prepareMatchForRosterEdit(store, matchA);
+	if (matchB !== matchA) prepareMatchForRosterEdit(store, matchB);
+	const idA = slotEntry(matchA, seatA.slot);
+	const idB = slotEntry(matchB, seatB.slot);
+	if (idA == null && idB == null) {
+		throw Object.assign(new Error('Both seats are empty'), { status: 400 });
+	}
+	setSlotEntry(matchA, seatA.slot, idB);
+	setSlotEntry(matchB, seatB.slot, idA);
+	refreshEditedMatch(store, tournament, matchA);
+	if (matchB !== matchA) refreshEditedMatch(store, tournament, matchB);
+	clearMatchVotes(store, tournament, [matchA.id, matchB.id]);
+	markBracketOpen(tournament);
+	alignTournamentTree(store, tournament);
+}
+
+function placeEntryInSlot(store, tournament, entry, seat) {
+	if (!seat) throw Object.assign(new Error('Pick a seat'), { status: 400 });
+	const matches = (store.matches || []).filter((m) => m.tournamentId === tournament.id);
+	const match = matches.find((m) => m.id === seat.matchId);
+	if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
+	const from = liveSeatFor(matches, entry.id);
+	if (from && from.match.id === match.id && from.slot === seat.slot) return;
+	if (from) {
+		swapSlots(store, tournament, { matchId: from.match.id, slot: from.slot }, seat);
+		return;
+	}
+	prepareMatchForRosterEdit(store, match);
+	setSlotEntry(match, seat.slot, entry.id);
+	refreshEditedMatch(store, tournament, match);
+	clearMatchVotes(store, tournament, [match.id]);
+	markBracketOpen(tournament);
+	alignTournamentTree(store, tournament);
+}
+
+function tournamentMatches(store, tournament) {
+	return (store.matches || []).filter((m) => m.tournamentId === tournament.id);
+}
+
+function roundMatchesOf(matches, side, round) {
+	return (matches || []).filter((m) => m.side === side && Number(m.round) === Number(round))
+		.sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+}
+
+function matchHasEntry(match, entryId) {
+	const id = Number(entryId);
+	return Number(match.entry1Id) === id || Number(match.entry2Id) === id;
+}
+
+function uniqueEntryIds(ids) {
+	const seen = new Set();
+	const out = [];
+	for (const raw of ids || []) {
+		const id = Number(raw);
+		if (!id || seen.has(id)) continue;
+		seen.add(id);
+		out.push(id);
+	}
+	return out;
+}
+
+/** Highest winners round that already has people in it. Ignores empty Finals TBD so semis stay editable. */
+function defaultPlayRound(matches) {
+	const winners = (matches || []).filter((m) => m.side === 'winners');
+	const maxRound = winners.reduce((n, m) => Math.max(n, Number(m.round) || 0), 0);
+	for (let round = maxRound; round >= 1; round -= 1) {
+		const rows = winners.filter((m) => Number(m.round) === round);
+		const seatedOpen = rows.some((m) => m.status !== 'complete' && (m.entry1Id || m.entry2Id));
+		if (seatedOpen) return { side: 'winners', round };
+	}
+	const open = winners.filter((m) => m.status !== 'complete');
+	if (open.length) {
+		return { side: 'winners', round: open.reduce((n, m) => Math.max(n, Number(m.round) || 0), 1) };
+	}
+	return { side: 'winners', round: Math.max(1, maxRound > 1 ? maxRound - 1 : 1) };
+}
+
+function unlockMatchTree(store, tournament, match) {
+	if (match && match.status === 'complete') resetMatchTree(store, tournament, match);
+}
+
+function alignTournamentTree(store, tournament) {
+	const matches = tournamentMatches(store, tournament);
+	if (!matches.length) return;
+	if (tournament && (tournament.format === 'double_elim' || tournament.losersBracket)) return;
+	restackElimTree(matches);
+}
+
+function pairPlayersTogether(store, tournament, a, b, opts) {
+	if (!a || !b || a.id === b.id) {
+		throw Object.assign(new Error('Pick two different players'), { status: 400 });
+	}
+	const wantedA = Number(a.id);
+	const wantedB = Number(b.id);
+	let matches = tournamentMatches(store, tournament);
+	const homeHint = Number(opts && (opts.matchId || opts.homeId)) || 0;
+	const hinted = homeHint ? matches.find((m) => m.id === homeHint) : null;
+	const fallback = defaultPlayRound(matches);
+	const side = hinted ? hinted.side : (opts && opts.side) || fallback.side;
+	const round = hinted ? Number(hinted.round) : (Number(opts && opts.round) || fallback.round);
+
+	let roundRows = roundMatchesOf(matches, side, round);
+	if (!roundRows.length) {
+		throw Object.assign(new Error('That round has no matches to edit.'), { status: 400 });
+	}
+	if (roundRows.some((m) => matchHasEntry(m, wantedA) && matchHasEntry(m, wantedB))) {
+		alignTournamentTree(store, tournament);
+		return;
+	}
+	const lockedRound = roundRows.every((m) => m.status === 'complete');
+	if (lockedRound) {
+		if (roundRows.length === 2 && reseatCompletePair(roundRows, wantedA, wantedB)) {
+			alignTournamentTree(store, tournament);
+			return;
+		}
+		throw Object.assign(new Error('Unlock those series first to rewrite a locked round.'), { status: 400 });
+	}
+
+	let home = hinted && hinted.side === side && Number(hinted.round) === Number(round)
+		? hinted
+		: (roundRows.find((m) => matchHasEntry(m, wantedA)) || roundRows.find((m) => matchHasEntry(m, wantedB)) || roundRows[0]);
+
+	unlockMatchTree(store, tournament, home);
+	for (const row of roundRows) {
+		if (row.id !== home.id && (matchHasEntry(row, wantedA) || matchHasEntry(row, wantedB))) {
+			unlockMatchTree(store, tournament, row);
+		}
+	}
+
+	matches = tournamentMatches(store, tournament);
+	roundRows = roundMatchesOf(matches, side, round);
+	home = roundRows.find((m) => m.id === home.id) || roundRows[0];
+	if (roundRows.some((m) => matchHasEntry(m, wantedA) && matchHasEntry(m, wantedB))) return;
+
+	const displaced = uniqueEntryIds([home.entry1Id, home.entry2Id])
+		.filter((id) => id !== wantedA && id !== wantedB);
+
+	for (const row of roundRows) {
+		if (Number(row.entry1Id) === wantedA || Number(row.entry1Id) === wantedB) row.entry1Id = null;
+		if (Number(row.entry2Id) === wantedA || Number(row.entry2Id) === wantedB) row.entry2Id = null;
+	}
+	home.entry1Id = wantedA;
+	home.entry2Id = wantedB;
+
+	const holes = [];
+	for (const row of roundRows) {
+		if (row.id === home.id) continue;
+		if (!row.entry1Id) holes.push({ match: row, slot: 1 });
+		if (!row.entry2Id) holes.push({ match: row, slot: 2 });
+	}
+	let holeAt = 0;
+	for (const id of displaced) {
+		if (roundRows.some((m) => matchHasEntry(m, id))) continue;
+		while (holeAt < holes.length && slotEntry(holes[holeAt].match, holes[holeAt].slot)) holeAt += 1;
+		if (holeAt >= holes.length) break;
+		setSlotEntry(holes[holeAt].match, holes[holeAt].slot, id);
+		holeAt += 1;
+	}
+
+	for (const row of matches) {
+		if (row.status === 'complete') continue;
+		if (!(row.side === side && Number(row.round) > Number(round))) continue;
+		let dirty = false;
+		if (Number(row.entry1Id) === wantedA || Number(row.entry1Id) === wantedB) {
+			row.entry1Id = null;
+			dirty = true;
+		}
+		if (Number(row.entry2Id) === wantedA || Number(row.entry2Id) === wantedB) {
+			row.entry2Id = null;
+			dirty = true;
+		}
+		if (dirty) refreshEditedMatch(store, tournament, row);
+	}
+
+	for (const row of roundRows) refreshEditedMatch(store, tournament, row);
+	clearMatchVotes(store, tournament, roundRows.map((m) => m.id));
+	markBracketOpen(tournament);
+	alignTournamentTree(store, tournament);
+}
+
+function swapPlayersInBracket(store, tournament, a, b) {
+	const matches = (store.matches || []).filter((m) => m.tournamentId === tournament.id);
+	const seatA = liveSeatFor(matches, a.id);
+	const seatB = liveSeatFor(matches, b.id);
+	if (!seatA && !seatB) {
+		throw Object.assign(new Error('Those players are not in an open match. Pick a seat on the tree and put them there.'), { status: 400 });
+	}
+	if (!seatA || !seatB) {
+		const missing = seatA ? b : a;
+		const open = seatA || seatB;
+		placeEntryInSlot(store, tournament, missing, { matchId: open.match.id, slot: open.slot });
+		return;
+	}
+	swapSlots(store, tournament, { matchId: seatA.match.id, slot: seatA.slot }, { matchId: seatB.match.id, slot: seatB.slot });
 }
 
 function rewardView(tournament, prizePool) {
@@ -618,6 +1082,50 @@ function isHostRequest(dataDir, request) {
 	const { value: expected } = hostPasswordInfo(dataDir);
 	if (!expected) return false;
 	return timingSafeEqualString(expected, hostSecretFrom(request));
+}
+
+function sessionMatchesEntry(session, entry) {
+	if (!session || !entry) return false;
+	const uid = Number(session.user_id);
+	if (uid && Number(entry.userId) === uid) return true;
+	const aliases = [session.tourney_handle, session.discord_username]
+		.filter(Boolean)
+		.map((value) => String(value).trim().toLowerCase());
+	if (aliases.includes(String(entry.handle || '').trim().toLowerCase())) return true;
+	const linked = entryDiscordUser(entry);
+	if (linked) {
+		if (session.discord_id && linked.discordId && String(session.discord_id) === String(linked.discordId)) return true;
+		const names = [linked.tourneyHandle, linked.discordUsername]
+			.filter(Boolean)
+			.map((value) => String(value).trim().toLowerCase());
+		if (names.some((name) => aliases.includes(name))) return true;
+	}
+	return false;
+}
+
+function parseIrlRoom(room) {
+	const match = String(room || '').match(/^irla(\d+)m(\d+)$/i);
+	if (!match) return null;
+	return { tournamentId: Number(match[1]), matchId: Number(match[2]) };
+}
+
+function createIrlSeatGuard(dataDir) {
+	const storeFile = path.join(dataDir, 'tourney-store.json');
+	return function canClaimIrlSeat(request, room, seat) {
+		if (seat !== 1 && seat !== 2) return false;
+		const parsed = parseIrlRoom(room);
+		if (!parsed) return false;
+		const session = authDex.getTourneySession(request && request.signedCookies);
+		if (!session || !session.discord_id) return false;
+		const store = loadStore(storeFile);
+		const found = (store.matches || []).find((row) => (
+			Number(row.id) === parsed.matchId && Number(row.tournamentId) === parsed.tournamentId
+		));
+		if (!found) return false;
+		const entryId = seat === 2 ? found.entry2Id : found.entry1Id;
+		const entry = (store.entries || []).find((row) => Number(row.id) === Number(entryId));
+		return sessionMatchesEntry(session, entry);
+	};
 }
 
 function resolveAdminPassword(dataDir) {
@@ -836,8 +1344,27 @@ function loadStore(filePath) {
 	}
 }
 
+function storeHasArenas(store) {
+	return Boolean(store && Array.isArray(store.tournaments) && store.tournaments.length);
+}
+
 function saveStore(filePath, store) {
+	if (!storeHasArenas(store) && fs.existsSync(filePath)) {
+		try {
+			const existing = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+			if (storeHasArenas(existing)) {
+				console.error('[tourney] refused to replace a store that has arenas with an empty store');
+				return false;
+			}
+		} catch (_err) {}
+	}
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	if (storeHasArenas(store) && fs.existsSync(filePath)) {
+		try {
+			const bak = `${filePath}.bak`;
+			if (!fs.existsSync(bak)) fs.copyFileSync(filePath, bak);
+		} catch (_err) {}
+	}
 	const tmp = `${filePath}.tmp`;
 	fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
 	try {
@@ -846,6 +1373,7 @@ function saveStore(filePath, store) {
 		fs.copyFileSync(tmp, filePath);
 		try { fs.unlinkSync(tmp); } catch (_e2) {}
 	}
+	return true;
 }
 
 function isDemoTournament(store, tournament) {
@@ -890,7 +1418,7 @@ function draftsToMatches(store, tournament, drafts) {
 			winnerId: isBye ? (d.entry1Id || d.entry2Id) : null,
 			score1: null,
 			score2: null,
-			bestOf: bestOfFor(tournament, d.side, d.round),
+			bestOf: bestOfFor(tournament, d.side, d.round, d),
 			games: [],
 			status: isBye ? 'bye' : (d.entry1Id && d.entry2Id ? 'ready' : 'pending'),
 			winnerGoesTo: d.winnerGoesTo || null,
@@ -898,19 +1426,6 @@ function draftsToMatches(store, tournament, drafts) {
 		});
 	}
 	return created;
-}
-
-function attachPlacement(drafts) {
-	const winners = drafts.filter((d) => d.side === 'winners');
-	const maxRound = winners.reduce((n, d) => Math.max(n, d.round), 0);
-	if (maxRound < 2) return drafts;
-	const semis = winners.filter((d) => d.round === maxRound - 1).sort((a, b) => a.position - b.position);
-	if (semis.length < 2) return drafts;
-	drafts.push({ side: 'placement', round: 1, position: 1, entry1Id: null, entry2Id: null });
-	semis.forEach((m, i) => {
-		m.loserGoesTo = { side: 'placement', round: 1, position: 1, slot: (i % 2) + 1 };
-	});
-	return drafts;
 }
 
 function addMatches(store, tournament, paidEntries) {
@@ -1096,7 +1611,28 @@ function standingsFor(store, tournament, group) {
 		if (m.winnerId === m.entry1Id) { s1.wins += 1; s1.points += 3; s2.losses += 1; }
 		else { s2.wins += 1; s2.points += 3; s1.losses += 1; }
 	}
-	return [...byId.values()].sort((a, b) => b.points - a.points || b.mapDiff - a.mapDiff || (a.seed || 99) - (b.seed || 99));
+	const played = [...byId.values()];
+	if (played.some((row) => row.played > 0 || row.wins > 0)) {
+		return played.sort((a, b) => b.points - a.points || b.mapDiff - a.mapDiff || (a.seed || 99) - (b.seed || 99));
+	}
+	if (pool.some((e) => e.record || e.placement)) {
+		return pool.map((e) => {
+			const rec = parseRecord(e.record);
+			const row = byId.get(e.id);
+			row.wins = rec.wins;
+			row.losses = rec.losses;
+			row.played = rec.wins + rec.losses;
+			row.points = rec.wins * 3;
+			return row;
+		}).sort((a, b) => {
+			const ea = pool.find((e) => e.id === a.entryId);
+			const eb = pool.find((e) => e.id === b.entryId);
+			const pa = Number(ea && ea.placement) || 99;
+			const pb = Number(eb && eb.placement) || 99;
+			return pa - pb || b.points - a.points || String(a.handle).localeCompare(String(b.handle));
+		});
+	}
+	return played.sort((a, b) => b.points - a.points || b.mapDiff - a.mapDiff || (a.seed || 99) - (b.seed || 99));
 }
 
 function maybeFinishOrAdvance(store, t) {
@@ -1186,9 +1722,12 @@ function podiumFor(store, tournament) {
 	const secondId = final && champ ? (final.winnerId === final.entry1Id ? final.entry2Id : final.entry1Id) : null;
 	const place = matches.find((m) => m.side === 'placement' && m.status === 'complete');
 	let third = [];
+	let fourth = null;
 	if (place && place.winnerId) {
 		const bronze = byId(place.winnerId);
 		if (bronze) third = [bronze];
+		const fourthId = place.winnerId === place.entry1Id ? place.entry2Id : place.entry1Id;
+		fourth = byId(fourthId);
 	} else if (wantsLosersBracket(tournament)) {
 		const losersFinal = [...matches]
 			.filter((m) => m.side === 'losers' && m.status === 'complete')
@@ -1211,6 +1750,7 @@ function podiumFor(store, tournament) {
 		first: champ ? { ...champ, record: rec(champ.id) } : null,
 		second: secondId ? { ...byId(secondId), record: rec(secondId) } : null,
 		third: third.map((p) => ({ ...p, record: rec(p.id) })),
+		fourth: fourth ? { ...fourth, record: rec(fourth.id) } : null,
 	};
 }
 
@@ -1258,7 +1798,7 @@ function attachHostIdentity(request, tournament) {
 function summarize(store, t) {
 	const entries = store.entries.filter((e) => e.tournamentId === t.id);
 	const paid = entries.filter((e) => e.paid && !e.noShow && (!e.whitelist || e.subbedIn));
-	const prizePool = entries.filter((e) => e.paid && (!e.whitelist || e.subbedIn)).reduce((sum, e) => sum + paidUsd(e), 0);
+	const prizePool = computePrizePool(t, entries);
 	return {
 		...t,
 		hostUser: hostUserFor(t),
@@ -1291,7 +1831,7 @@ function detail(store, t, isHost) {
 	const entries = store.entries.filter((e) => e.tournamentId === t.id);
 	const matches = store.matches.filter((m) => m.tournamentId === t.id);
 	const paid = entries.filter((e) => e.paid && (!e.whitelist || e.subbedIn));
-	const prizePool = paid.reduce((sum, e) => sum + paidUsd(e), 0);
+	const prizePool = computePrizePool(t, entries);
 	const listed = entries.map((entry) => {
 		const row = isHost ? { ...entry } : publicEntry(entry);
 		row.discordUser = entryDiscordUser(entry);
@@ -1318,15 +1858,60 @@ function detail(store, t, isHost) {
 }
 
 function createRouter(options) {
+	records = require('../lib/tourney-records');
 	const dataDir = options.dataDir;
 	const storeFile = path.join(dataDir, 'tourney-store.json');
+	const bracketDir = options.bracketDir || path.join(__dirname, '..', '..', '..', 'bracket');
+	const assetsDir = path.join(bracketDir, 'og-assets');
 	const router = express.Router();
+	router.use('/rtc', require('./rtc-signaling').createRouter({
+		canClaimSeat: createIrlSeatGuard(dataDir),
+	}));
+
+	async function loadLiveStore() {
+		const store = loadStore(storeFile);
+		stripDemoTournaments(store);
+		let dirty = false;
+		try {
+			const fromSnapshots = restoreMissingArenasFromRecords(store, null);
+			if (fromSnapshots && fromSnapshots.snapshots) dirty = true;
+			let db = records.getDb();
+			if (!db && typeof authDex.openAuthDatabase === 'function') {
+				try {
+					db = await authDex.openAuthDatabase();
+					if (db && typeof records.ensureSchema === 'function') records.ensureSchema(db);
+				} catch (err) {
+					console.error('[tourney] open records db:', err && err.message ? err.message : err);
+				}
+			}
+			if (db) {
+				const recovered = restoreMissingArenasFromRecords(store, db);
+				if (recovered && (recovered.restored || recovered.snapshots)) dirty = true;
+			}
+		} catch (err) {
+			console.error('[tourney] restore:', err && err.message ? err.message : err);
+		}
+		try {
+			if (repairKnownBracketHistory(store)) dirty = true;
+		} catch (err) {
+			console.error('[tourney] repair:', err && err.message ? err.message : err);
+		}
+		store._persist = dirty;
+		return store;
+	}
+
+	function persistStore(store) {
+		const persist = store && store._persist;
+		if (store) delete store._persist;
+		if (!persist) return;
+		saveStore(storeFile, store);
+	}
 
 	function withStore(mutate) {
 		return async (request, response) => {
 			try {
-				const store = loadStore(storeFile);
-				stripDemoTournaments(store);
+				const store = await loadLiveStore();
+				delete store._persist;
 				const result = await mutate(store, request);
 				saveStore(storeFile, store);
 				response.json(result);
@@ -1337,17 +1922,51 @@ function createRouter(options) {
 	}
 
 	function readOnly(fn) {
-		return (request, response) => {
+		return async (request, response) => {
 			try {
-				const store = loadStore(storeFile);
-				stripDemoTournaments(store);
-				saveStore(storeFile, store);
+				const store = await loadLiveStore();
+				try {
+					persistStore(store);
+				} catch (err) {
+					console.error('[tourney] persist:', err && err.message ? err.message : err);
+				}
+				response.set('Cache-Control', 'no-store, private');
 				response.json(fn(store, request));
 			} catch (err) {
 				response.status(err.status || 400).json({ error: err.message || 'Request failed' });
 			}
 		};
 	}
+
+	router.get(['/share', '/share.jpg', '/share.png', '/og', '/og.jpg', '/og.png'], (request, response) => {
+		const slug = String(request.query.t || request.query.slug || '').trim();
+		const found = shareMetaForSlug(dataDir, slug);
+		const image = tourneyOg.tryRender({
+			assetsDir,
+			cacheDir: path.join(dataDir, 'og-cache'),
+			kicker: 'DDL Tourney',
+			title: found ? found.title : 'Legends Bracket',
+			slug: found ? found.slug : 'home',
+		});
+		if (image && image.buffer) {
+			response.set({
+				'Content-Type': image.type || 'image/jpeg',
+				'Cache-Control': 'public, max-age=3600',
+			});
+			response.send(image.buffer);
+			return;
+		}
+		const fallback = path.join(bracketDir, 'share.jpg');
+		if (fs.existsSync(fallback)) {
+			response.set({
+				'Content-Type': 'image/jpeg',
+				'Cache-Control': 'public, max-age=3600',
+			});
+			response.sendFile(fallback);
+			return;
+		}
+		response.status(404).type('txt').send('Share image missing');
+	});
 
 	router.get('/quote', async (request, response) => {
 		try {
@@ -1360,6 +1979,8 @@ function createRouter(options) {
 	});
 
 	router.get('/status', (_request, response) => {
+		const stored = loadStore(storeFile);
+		response.set('Cache-Control', 'no-store, private');
 		response.json({
 			ok: true,
 			mode: 'static',
@@ -1370,6 +1991,7 @@ function createRouter(options) {
 			payTo: PAY_TO,
 			discordOAuth: authDex.discordOAuthConfigured(),
 			requireAccountDefault: true,
+			arenaCount: Array.isArray(stored.tournaments) ? stored.tournaments.length : 0,
 		});
 	});
 
@@ -1701,12 +2323,175 @@ function createRouter(options) {
 		}
 		t.bestOf = normalizeBestOf(body.bestOf, t.bestOf);
 		if (body.roundBestOf) t.roundBestOf = sanitizeRoundBestOf(body.roundBestOf);
+		if (Object.prototype.hasOwnProperty.call(body, 'finalsBestOf')) {
+			t.finalsBestOf = sanitizeFinalsBestOf(body.finalsBestOf);
+		}
+		if (body.breakTies != null && !wantsLosersBracket(t) && t.eventKind !== 'duel') {
+			t.breakTies = Boolean(body.breakTies);
+		}
+		if (body.hostPotUsd != null) t.hostPotUsd = sanitizeHostPotUsd(body.hostPotUsd, t.hostPotUsd);
 		if (body.shuffle) paid = shuffleList(paid);
 		else paid = [...paid].sort((a, b) => (a.seed || a.id) - (b.seed || b.id));
 		paid.forEach((e, i) => { e.seed = i + 1; });
 		store.matches = store.matches.filter((m) => m.tournamentId !== t.id);
 		addMatches(store, t, paid);
 		t.status = 'in_progress';
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/reshuffle', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const blocked = reshuffleBlockReason(store, t);
+		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
+		const field = store.entries.filter((e) => (
+			e.tournamentId === t.id && e.paid && !e.noShow && (!e.whitelist || e.subbedIn)
+		));
+		if (field.length < 2) {
+			throw Object.assign(new Error('Need at least 2 confirmed players to shuffle'), { status: 400 });
+		}
+		const shuffled = shuffleList(field);
+		shuffled.forEach((e, i) => { e.seed = i + 1; });
+		store.matches = store.matches.filter((m) => m.tournamentId !== t.id);
+		store.votes = (store.votes || []).filter((v) => v.tournamentId !== t.id);
+		addMatches(store, t, shuffled);
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/swap-seeds', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const blocked = swapBlockReason(t);
+		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
+		const idA = Number(request.body && request.body.entryIdA);
+		const idB = Number(request.body && request.body.entryIdB);
+		if (!Number.isFinite(idA) || !Number.isFinite(idB) || idA === idB) {
+			throw Object.assign(new Error('Pick two different players to swap'), { status: 400 });
+		}
+		const field = store.entries.filter((e) => (
+			e.tournamentId === t.id && e.paid && !e.noShow && (!e.whitelist || e.subbedIn)
+		));
+		const a = field.find((e) => e.id === idA);
+		const b = field.find((e) => e.id === idB);
+		if (!a || !b) {
+			throw Object.assign(new Error('Those players are not in this bracket'), { status: 400 });
+		}
+		swapPlayersInBracket(store, t, a, b);
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/pair-players', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const blocked = swapBlockReason(t);
+		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
+		const idA = Number(request.body && request.body.entryIdA);
+		const idB = Number(request.body && request.body.entryIdB);
+		if (!Number.isFinite(idA) || !Number.isFinite(idB) || idA === idB) {
+			throw Object.assign(new Error('Pick two different players'), { status: 400 });
+		}
+		const field = store.entries.filter((e) => (
+			e.tournamentId === t.id && e.paid && !e.noShow && (!e.whitelist || e.subbedIn)
+		));
+		const a = field.find((e) => e.id === idA);
+		const b = field.find((e) => e.id === idB);
+		if (!a || !b) {
+			throw Object.assign(new Error('Those players are not in this bracket'), { status: 400 });
+		}
+		const body = request.body || {};
+		pairPlayersTogether(store, t, a, b, {
+			matchId: Number(body.matchId) || 0,
+			side: body.side,
+			round: Number(body.round) || 0,
+		});
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/they-play', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const blocked = swapBlockReason(t);
+		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
+		const idA = Number(request.body && request.body.entryIdA);
+		const idB = Number(request.body && request.body.entryIdB);
+		if (!Number.isFinite(idA) || !Number.isFinite(idB) || idA === idB) {
+			throw Object.assign(new Error('Pick two different players'), { status: 400 });
+		}
+		const field = store.entries.filter((e) => (
+			e.tournamentId === t.id && e.paid && !e.noShow && (!e.whitelist || e.subbedIn)
+		));
+		const a = field.find((e) => e.id === idA);
+		const b = field.find((e) => e.id === idB);
+		if (!a || !b) {
+			throw Object.assign(new Error('Those players are not in this bracket'), { status: 400 });
+		}
+		const body = request.body || {};
+		pairPlayersTogether(store, t, a, b, {
+			matchId: Number(body.matchId) || 0,
+			side: body.side,
+			round: Number(body.round) || 0,
+		});
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/swap-slots', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const blocked = swapBlockReason(t);
+		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
+		const body = request.body || {};
+		const seatA = parseSeat(body, 'A') || parseSeat({ matchId: body.matchIdA, slot: body.slotA }, '');
+		const seatB = parseSeat(body, 'B') || parseSeat({ matchId: body.matchIdB, slot: body.slotB }, '');
+		swapSlots(store, t, seatA, seatB);
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/place-entry', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const blocked = swapBlockReason(t);
+		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
+		const body = request.body || {};
+		const seat = parseSeat(body, '') || parseSeat(body, 'A');
+		if (!seat) throw Object.assign(new Error('Pick a seat'), { status: 400 });
+		const rawId = body.entryId;
+		const clear = rawId == null || rawId === '' || Number(rawId) === 0;
+		if (clear) {
+			const match = store.matches.find((m) => m.tournamentId === t.id && m.id === seat.matchId);
+			if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
+			prepareMatchForRosterEdit(store, match);
+			setSlotEntry(match, seat.slot, null);
+			refreshEditedMatch(store, t, match);
+			clearMatchVotes(store, t, [match.id]);
+			markBracketOpen(t);
+			return detail(store, t, true);
+		}
+		const entryId = Number(rawId);
+		const field = store.entries.filter((e) => (
+			e.tournamentId === t.id && e.paid && !e.noShow && (!e.whitelist || e.subbedIn)
+		));
+		const entry = field.find((e) => e.id === entryId);
+		if (!entry) throw Object.assign(new Error('That player is not in this bracket'), { status: 400 });
+		placeEntryInSlot(store, t, entry, seat);
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/reset-match', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const blocked = swapBlockReason(t);
+		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
+		const matchId = Number(request.body && request.body.matchId);
+		const match = store.matches.find((m) => m.tournamentId === t.id && m.id === matchId);
+		if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
+		resetMatchTree(store, t, match);
 		return detail(store, t, true);
 	}));
 
@@ -1717,9 +2502,12 @@ function createRouter(options) {
 		const body = request.body || {};
 		if (body.bestOf != null) t.bestOf = normalizeBestOf(body.bestOf, t.bestOf);
 		if (body.roundBestOf) t.roundBestOf = { ...t.roundBestOf, ...sanitizeRoundBestOf(body.roundBestOf) };
+		if (Object.prototype.hasOwnProperty.call(body, 'finalsBestOf')) {
+			t.finalsBestOf = sanitizeFinalsBestOf(body.finalsBestOf);
+		}
 		for (const match of store.matches.filter((m) => m.tournamentId === t.id)) {
 			if (match.status === 'complete' || match.status === 'bye') continue;
-			match.bestOf = bestOfFor(t, match.side, match.round);
+			match.bestOf = bestOfFor(t, match.side, match.round, match);
 		}
 		return detail(store, t, true);
 	}));
@@ -1754,6 +2542,39 @@ function createRouter(options) {
 		);
 		maybeFinishOrAdvance(store, t);
 		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/table-lock', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const matchId = Number(request.body && request.body.matchId);
+		const match = store.matches.find((m) => m.tournamentId === t.id && m.id === matchId);
+		if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
+		const body = request.body || {};
+		const s1 = Number(body.score1);
+		const s2 = Number(body.score2);
+		if (body.bestOf && match.status !== 'complete' && match.status !== 'bye') {
+			match.bestOf = normalizeBestOf(body.bestOf, match.bestOf);
+		}
+		if (Number.isFinite(s1) && Number.isFinite(s2)) {
+			reportMatch(store, match, s1, s2, body.games);
+			maybeFinishOrAdvance(store, t);
+			return detail(store, t, isHostRequest(dataDir, request));
+		}
+		const winnerId = Number(body.winnerId);
+		if (winnerId !== match.entry1Id && winnerId !== match.entry2Id) {
+			throw Object.assign(new Error('Pick a player in this match'), { status: 400 });
+		}
+		if (request.body && request.body.bestOf && match.status !== 'complete' && match.status !== 'bye') {
+			match.bestOf = normalizeBestOf(request.body.bestOf, match.bestOf);
+		}
+		const need = winsNeeded(match.bestOf);
+		const winnerSlot = winnerId === match.entry1Id ? 1 : 2;
+		const games = Array.from({ length: need }, () => ({ winnerSlot }));
+		reportMatch(store, match, winnerSlot === 1 ? need : 0, winnerSlot === 2 ? need : 0, games);
+		maybeFinishOrAdvance(store, t);
+		return detail(store, t, isHostRequest(dataDir, request));
 	}));
 
 	router.post('/arenas/:slug/settings', withStore((store, request) => {
@@ -1861,10 +2682,12 @@ function createRouter(options) {
 			ok: true,
 			events: [],
 			champions: [],
+			duelists: [],
 			mentions: [],
 			ledgers: [],
 			badges: [],
 			awards: [],
+			stats: { total: 0, duels: 0, tournaments: 0, official: 0 },
 			warning: 'The records ledger is offline right now.',
 		};
 	}
@@ -1891,7 +2714,7 @@ function createRouter(options) {
 			response.json(emptyHall());
 			return;
 		}
-		response.json({ ok: true, ...records.hallOfFame(db, 40) });
+		response.json({ ok: true, ...records.hallOfFame(db, 80) });
 	});
 
 	router.get('/records/awards', (_request, response) => {
@@ -1902,6 +2725,22 @@ function createRouter(options) {
 		}
 		response.json({ ok: true, awards: records.listAwards(db) });
 	});
+
+	router.post('/records/restore-arenas', withStore((store, request) => {
+		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const db = records.getDb();
+		if (!db) {
+			throw Object.assign(new Error('Records database unavailable'), { status: 503 });
+		}
+		const recovered = restoreMissingArenasFromRecords(store, db);
+		repairKnownBracketHistory(store);
+		return {
+			ok: true,
+			restored: recovered.restored || 0,
+			snapshots: recovered.snapshots || 0,
+			arenas: (store.tournaments || []).length,
+		};
+	}));
 
 	router.post('/records/host', (request, response) => {
 		try {
@@ -2086,8 +2925,13 @@ function shareMetaForSlug(dataDir, slug) {
 	const tournament = (store.tournaments || []).find((row) => String(row.slug) === wanted);
 	if (!tournament) return null;
 	const name = String(tournament.name || '').trim() || TOOL_TITLE;
+	const kind = sanitizeEventKind(tournament.eventKind, tournament.name);
 	const extra = String(tournament.description || '').trim()
-		|| `${name} — ${tournament.game || 'Doginal Dogs Legends TCG'} on ${TOOL_TITLE}.`;
+		|| (kind === 'grand'
+			? (looksLikeGrandTournament(tournament.name)
+				? `${name} — inaugural Grand Tournament and first official IRL event for Doginal Dogs Legends TCG.`
+				: `${name} — Grand Tournament on ${TOOL_TITLE}.`)
+			: `${name} — ${tournament.game || 'Doginal Dogs Legends TCG'} on ${TOOL_TITLE}.`);
 	return {
 		title: name,
 		description: extra.slice(0, 200),
@@ -2143,11 +2987,14 @@ function sendAppPage(options) {
 	const url = found
 		? `${origin}/tourney/?t=${encodeURIComponent(found.slug)}`
 		: `${origin}/tourney/`;
+	const image = found
+		? `${origin}/tourney-api/share?t=${encodeURIComponent(found.slug)}&v=2`
+		: `${origin}/bracket/share.jpg?v=2`;
 	html = applyShareMeta(html, {
 		title,
 		description,
 		url,
-		image: `${origin}/bracket/og.jpg`,
+		image,
 	});
 	response.set({
 		'Cache-Control': 'no-store, private',
@@ -2158,5 +3005,6 @@ function sendAppPage(options) {
 
 createRouter.sendAppPage = sendAppPage;
 createRouter.TOOL_TITLE = TOOL_TITLE;
+createRouter.createIrlSeatGuard = createIrlSeatGuard;
 
 module.exports = createRouter;

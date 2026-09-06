@@ -265,6 +265,9 @@ input[type="search"] { width: 100%; }
 }
 
 .chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font: inherit;
   font-size: 0.86rem;
   font-weight: 700;
@@ -274,6 +277,13 @@ input[type="search"] { width: 100%; }
   border-radius: 999px;
   padding: 0.28rem 0.7rem;
   cursor: pointer;
+}
+
+.class-mark {
+  width: 1.45rem;
+  height: 1.45rem;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .chip-btn.active {

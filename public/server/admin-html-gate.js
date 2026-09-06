@@ -22,11 +22,43 @@ const RESERVED_ADMIN_PATHS = new Set([
 	'/nail-designer',
 ]);
 
+function stripWrappingQuotes(value) {
+	const trimmed = String(value || '').trim();
+	if (
+		(trimmed.startsWith('"') && trimmed.endsWith('"'))
+		|| (trimmed.startsWith("'") && trimmed.endsWith("'"))
+	) {
+		return trimmed.slice(1, -1).trim();
+	}
+	return trimmed;
+}
+
+function firstNonEmptyEnv(keys) {
+	for (const key of keys) {
+		const value = stripWrappingQuotes(process.env[key]);
+		if (value) return value;
+	}
+	return '';
+}
+
+function pathFromAdminEnvValue(raw) {
+	let value = stripWrappingQuotes(raw);
+	if (!value) return '';
+	if (/^https?:\/\//i.test(value)) {
+		try {
+			value = new URL(value).pathname || '';
+		} catch (_err) {
+			return '';
+		}
+	}
+	const withSlash = value.startsWith('/') ? value : `/${value}`;
+	return withSlash.replace(/\/+$/, '');
+}
+
 function resolveAdminPath() {
-	const raw = String(process.env.ADMIN_PATH || '').trim();
-	if (!raw) return '';
-	const withSlash = raw.startsWith('/') ? raw : `/${raw}`;
-	const normalized = withSlash.replace(/\/+$/, '');
+	// ADMIN_URL is an alias (cPanel often stores a full https://… URL).
+	const normalized = pathFromAdminEnvValue(firstNonEmptyEnv(['ADMIN_PATH', 'ADMIN_URL']));
+	if (!normalized) return '';
 	if (!/^\/[A-Za-z0-9][A-Za-z0-9._~-]{7,63}$/.test(normalized)) return '';
 	if (RESERVED_ADMIN_PATHS.has(normalized.toLowerCase())) return '';
 	return normalized;

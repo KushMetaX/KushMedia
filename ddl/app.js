@@ -5,6 +5,14 @@ if (!D) {
 }
 
 const $ = (id) => document.getElementById(id);
+function pricesTabOpen() {
+  return !document.getElementById("ddl-hide-prices") && document.body.dataset.hidePrices !== "1";
+}
+function tabIds() {
+  return pricesTabOpen()
+    ? ["cards", "mechanics", "decks", "builder", "prices"]
+    : ["cards", "mechanics", "decks", "builder"];
+}
 const CLASSES = ["Crown", "Bow", "Wizard", "Zombie", "Pirate", "Neutral", "All"];
 const CLASS_COLOR = {
   Crown: "class-crown",
@@ -84,6 +92,12 @@ const fRevealed = $("f-revealed");
 const fSort = $("f-sort");
 fillClassSelect(fClass, true);
 
+function classMark(c) {
+  const key = String(c || "").toLowerCase();
+  if (!["crown", "bow", "wizard", "zombie", "pirate", "neutral"].includes(key)) return "";
+  return `<img class="class-mark" src="/bracket/badges/class-${key}.png?v=cut2" alt="" width="28" height="28">`;
+}
+
 function renderClassChips() {
   const chipsEl = $("class-chips");
   if (!chipsEl) return;
@@ -91,7 +105,7 @@ function renderClassChips() {
   const label = (c) => c === "" ? "All classes" : c === "All" ? "All-class" : c;
   chipsEl.innerHTML = opts.map((c) => `
     <button type="button" class="chip-btn ${CLASS_COLOR[c] || ""} ${fClass.value === c ? "active" : ""}" data-class="${c}">
-      ${label(c)}
+      ${classMark(c)}${label(c)}
     </button>`).join("");
 }
 
@@ -166,7 +180,9 @@ function openModal(id) {
     .filter(Boolean);
   const rarity = c.scarcity != null
     ? `${c.rarity} · shows up in about ${c.rarity_pct}% of pack slots${c.tier ? " · " + c.tier : ""}`
-    : "Rarity is not in the gallery yet, so the price page uses a simple estimate.";
+    : pricesTabOpen()
+      ? "Rarity is not in the gallery yet, so the price page uses a simple estimate."
+      : "Rarity is not in the gallery yet.";
   $("modal-card").innerHTML = `
     <button type="button" class="modal-close" id="modal-close" aria-label="Close">×</button>
     <div class="modal-layout">
@@ -1556,7 +1572,7 @@ document.addEventListener("click", (e) => {
   const a = e.target.closest("a[href^='#']");
   if (!a) return;
   const id = a.getAttribute("href").slice(1);
-  if (!["cards", "mechanics", "decks", "builder", "prices"].includes(id)) return;
+  if (!tabIds().includes(id)) return;
   e.preventDefault();
   showTab(id);
   history.replaceState(null, "", "#" + id);
@@ -1566,6 +1582,11 @@ initCardPeek();
 renderCards();
 renderMechanics();
 renderDecks();
-renderPrices();
+if (pricesTabOpen()) {
+  renderPrices();
+} else {
+  document.querySelectorAll("[data-tab='prices']").forEach((b) => { b.hidden = true; });
+}
 const startTab = (location.hash || "#cards").slice(1);
-if (["cards", "mechanics", "decks", "builder", "prices"].includes(startTab)) showTab(startTab);
+if (tabIds().includes(startTab)) showTab(startTab);
+else showTab("cards");

@@ -11,6 +11,7 @@ let hostMode = hostPassword !== '' && sessionStorage.getItem('ddl-host-mode') ==
 let adminPassword = sessionStorage.getItem('ddl-admin-password') || '';
 let serverStatus = null;
 let playerUser = null;
+let irlUnmount = null;
 
 const AUTH_API_BASES = ['/kmx-auth', '/kk-auth', '/dd-evaluator/auth'];
 
@@ -92,6 +93,9 @@ function arenaShareHref(slug) {
 
 function tourneyReturnPath() {
   const parts = routeParts();
+  if (parts[0] === 't' && parts[1] && parts[2] === 'table' && parts[3]) {
+    return `/tourney/#/t/${encodeURIComponent(parts[1])}/table/${encodeURIComponent(parts[3])}`;
+  }
   if (parts[0] === 't' && parts[1]) return arenaShareHref(parts[1]);
   if (parts[0] === 'player' && parts[1]) return `/tourney/#/player/${encodeURIComponent(parts[1])}`;
   if (parts[0] === 'records') return '/tourney/#/records';
@@ -273,6 +277,50 @@ const FORMAT_LABEL = {
   swiss: 'Swiss',
 };
 
+function isDuelArena(t, fieldSize) {
+  if (t && t.eventKind === 'duel') return true;
+  if (t && t.kind === 'duel') return true;
+  if (fieldSize != null) return Number(fieldSize) === 2;
+  if (t && t.fieldSize != null) return Number(t.fieldSize) === 2;
+  return Boolean(t && t.status === 'completed' && Number(t.paidCount) === 2);
+}
+
+function looksLikeGrandTournament(name) {
+  const n = String(name || '');
+  return /\bddnyc\b/i.test(n) && /\b2026\b/.test(n) && /\birl\b/i.test(n);
+}
+
+function sanitizeEventKind(value, name) {
+  if (value === 'duel') return 'duel';
+  if (value === 'grand' || looksLikeGrandTournament(name)) return 'grand';
+  return 'tournament';
+}
+
+function isGrandArena(t) {
+  if (!t) return false;
+  return sanitizeEventKind(t.eventKind || t.kind, t.name) === 'grand';
+}
+
+function kindLabel(t, fieldSize) {
+  if (isDuelArena(t, fieldSize)) return 'Duel';
+  if (isGrandArena(t)) return 'Grand Tournament';
+  return 'Tournament';
+}
+
+function kindTagHtml(t, fieldSize) {
+  const duel = isDuelArena(t, fieldSize);
+  const grand = !duel && isGrandArena(t);
+  const cls = duel ? 'kind-tag duel' : (grand ? 'kind-tag grand' : 'kind-tag');
+  return `<span class="${cls}">${esc(kindLabel(t, fieldSize))}</span>`;
+}
+
+function shortDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 const MARK_ICONS = ['crown', 'flame', 'shield', 'star', 'laurel', 'crest'];
 const BADGE_ICONS = MARK_ICONS.concat((typeof DDL_BADGES !== 'undefined' && DDL_BADGES.ART_ICONS) || []);
 const BADGE_MOTIFS = ['gold', 'ember', 'cream', 'copper', 'verdant'];
@@ -424,10 +472,18 @@ function namedHandleHtml(handle, badges, size) {
   return `<span class="named-handle">${esc(name)}${medalsInlineHtml(badgesFor(name, badges), size)}</span>`;
 }
 
-function medalsRowHtml(badges) {
+function medalsRowHtml(badges, canRevoke) {
   const list = Array.isArray(badges) ? badges : [];
   if (!list.length) return '';
-  return `<div class="medal-row">${list.map((b) => `${medalHtml(b, 'md')}<span class="medal-meta"><strong>${esc(b.title)}</strong><span class="muted">${esc(b.blurb || '')}</span></span>`).join('')}</div>`;
+  return `<div class="medal-row">${list.map((b) => `
+    <div class="medal-award">
+      ${medalHtml(b, 'md')}
+      <span class="medal-meta">
+        <strong>${esc(b.title)}</strong>
+        <span class="muted">${esc(b.note || b.blurb || '')}</span>
+      </span>
+      ${canRevoke && b.id ? `<button type="button" class="mini bad" data-revoke="${b.id}">Remove</button>` : ''}
+    </div>`).join('')}</div>`;
 }
 
 function standingSpec(place) {
@@ -548,7 +604,7 @@ function marksGalleryHtml() {
     </figure>`).join('');
   return `<section class="marks-gallery">
     <h2 class="section-title">Standings badges</h2>
-    <p class="muted">Official finishes pin these on a handle. 1st through 5th land automatically when an arena closes.</p>
+    <p class="muted">Official tournament finishes pin these on a handle. 1st through 5th land when a field of 3+ closes. Duels do not pin standing badges.</p>
     <div class="mark-grid standing">${standings}</div>
     <h2 class="section-title">Class badges</h2>
     <p class="muted">These marks are for people who podium with a class. Registering a deck does not pin one on your handle.</p>
@@ -604,39 +660,60 @@ function podiumPersonHtml(person) {
   </div>`;
 }
 
-function prestigePodiumHtml(podium, rewards) {
-  if (!podium || !podium.first || !podium.first.handle) return '';
+function duelResultHtml(podium, rewards) {
   const first = podium.first;
+  const second = podium.second;
   const prize = (n) => {
     const text = prizeForPlace(rewards, n);
     return text ? `<p class="prize-won">${esc(text)}</p>` : '';
   };
-  const banner = `<section class="champ-banner" ${tip('Crowned from the finals. This name is written on the Hall of records.')}>
-    <p class="champ-banner-kicker">Tournament Champion</p>
-    ${championCrestSvg()}
-    <h2>${playerLink(first.handle)}</h2>
-    ${matchRecordHtml(first.record)}
-    ${prize(1)}
+  const side = (person, tone, kicker, n) => `<article class="duel-side ${tone}">
+    <p class="rank-kicker">${kicker}</p>
+    ${podiumPersonHtml(person)}
+    ${prize(n)}
+  </article>`;
+  return `<section class="duel-result" ${tip('1v1 result. Winner and runner-up — no third place.')}>
+    ${side(first, 'gold', 'Winner', 1)}
+    <div class="duel-vs" aria-hidden="true">vs</div>
+    ${second && second.handle ? side(second, 'silver', 'Runner-up', 2) : '<article class="duel-side muted-side"><p class="muted">Waiting on result</p></article>'}
   </section>`;
+}
+
+function tournamentPodiumHtml(podium, rewards) {
+  const first = podium.first;
   const second = podium.second;
-  const thirds = Array.isArray(podium.third) ? podium.third : [];
-  if (!second && !thirds.length) return banner;
-  const side = (tone, kicker, rank, inner, n) => `<article class="place ${tone}">
+  const thirds = Array.isArray(podium.third) ? podium.third.filter((p) => p && p.handle) : [];
+  const prize = (n) => {
+    const text = prizeForPlace(rewards, n);
+    return text ? `<p class="prize-won">${esc(text)}</p>` : '';
+  };
+  const card = (tone, kicker, rank, inner, n) => `<article class="place ${tone}">
     ${standingBadgeHtml(n, 'md')}
-    <div class="rank-kicker">${kicker}</div>
-    <div class="rank">${rank}</div>
-    <div class="rank-sub">Place</div>
+    <p class="rank-kicker">${kicker}</p>
+    <p class="rank">${rank}</p>
     ${inner}
     ${prize(n)}
   </article>`;
-  const secondInner = podiumPersonHtml(second);
-  const thirdInner = thirds.length
-    ? thirds.map(podiumPersonHtml).join('')
-    : '<strong class="muted">—</strong>';
-  return `${banner}<section class="podium prestige" ${tip('Final results. 3rd place uses the placement match when that option is on.')}>
-    ${side('silver', 'Runner-up', '2nd', secondInner, 2)}
-    ${side('copper', 'Bronze', '3rd', thirdInner, 3)}
+  const gold = card('gold', 'Champion', '1st', podiumPersonHtml(first), 1);
+  if (!second && !thirds.length) {
+    return `<section class="podium prestige has-1" ${tip('Final results.')}>${gold}</section>`;
+  }
+  const silver = second && second.handle
+    ? card('silver', 'Runner-up', '2nd', podiumPersonHtml(second), 2)
+    : '';
+  const bronze = thirds.length
+    ? card('copper', thirds.length > 1 ? 'Tied 3rd' : 'Bronze', '3rd', thirds.map(podiumPersonHtml).join(''), 3)
+    : '';
+  const count = 1 + (silver ? 1 : 0) + (bronze ? 1 : 0);
+  return `<section class="podium prestige has-${count}" ${tip('Final results. 3rd place uses the placement match when that option is on.')}>
+    ${silver}${gold}${bronze}
   </section>`;
+}
+
+function prestigePodiumHtml(podium, rewards, t, confirmedCount) {
+  if (!podium || !podium.first || !podium.first.handle) return '';
+  if (isDuelArena(t, confirmedCount)) return duelResultHtml(podium, rewards);
+  return tournamentPodiumHtml(podium, rewards);
 }
 
 function arenaCardHref(event) {
@@ -671,7 +748,9 @@ let tipTarget = null;
 let lastPointer = 'mouse';
 
 function setTreeMode(on) {
-  document.body.classList.toggle('has-tree', Boolean(on));
+  const active = Boolean(on);
+  document.body.classList.toggle('has-tree', active);
+  document.documentElement.classList.toggle('has-tree', active);
 }
 
 const KICK_RESERVED = new Set([
@@ -1288,26 +1367,79 @@ function wantsLosers(t) {
   return t.format === 'double_elim' || t.playoffFormat === 'double_elim';
 }
 
+function canHaveThirdPlace(t) {
+  if (!t || isDuelArena(t)) return false;
+  if (wantsLosers(t)) return false;
+  if (t.stageType === 'two') return true;
+  return t.format === 'single_elim';
+}
+
+function hasFinalsSeries(t) {
+  if (!t || isDuelArena(t)) return false;
+  if (t.stageType === 'two' || wantsLosers(t)) return true;
+  return t.format === 'single_elim';
+}
+
+function seriesBlurb(t) {
+  const def = BEST_OF.includes(Number(t && t.bestOf)) ? Number(t.bestOf) : 3;
+  const finals = BEST_OF.includes(Number(t && t.finalsBestOf)) ? Number(t.finalsBestOf) : null;
+  if (finals && finals !== def) return `${bestOfLabel(def)}, ${bestOfLabel(finals)} finals`;
+  return bestOfLabel(def);
+}
+
 function formatTitle(t) {
+  if (isDuelArena(t, t && t.fieldSize)) {
+    const bo = t && BEST_OF.includes(Number(t.bestOf)) ? bestOfLabel(t.bestOf) : '';
+    return bo ? `Duel · ${bo}` : 'Duel';
+  }
   const key = t && t.format === 'double_elim' ? 'single_elim' : (t && t.format);
   const base = FORMAT_LABEL[key] || key || 'Tournament';
   const bits = [];
   if (t && t.stageType === 'two') bits.push('two stage');
   if (wantsLosers(t)) bits.push('losers bracket');
+  else if (t && t.breakTies) bits.push('3rd place');
+  const series = seriesBlurb(t);
+  if (series) bits.push(series);
   return bits.length ? `${base} · ${bits.join(' · ')}` : base;
 }
 
 function formatBlurb(t) {
   const key = t && t.format === 'double_elim' ? 'single_elim' : (t && t.format);
   const base = FORMAT_LABEL[key] || key || 'bracket';
-  if (!wantsLosers(t)) return `${base} bracket`;
-  if (key === 'swiss' || key === 'round_robin') return `${base} with a losers-bracket playoff after standings`;
-  return `${base} with a losers bracket`;
+  const extras = [];
+  if (wantsLosers(t)) {
+    extras.push(key === 'swiss' || key === 'round_robin'
+      ? 'a losers-bracket playoff after standings'
+      : 'a losers bracket');
+  } else if (t && t.breakTies && canHaveThirdPlace(t)) {
+    extras.push('a 3rd place match');
+  }
+  const series = seriesBlurb(t);
+  if (series) extras.push(series);
+  if (!extras.length) return `${base} bracket`;
+  return `${base} with ${extras.join(', ')}`;
 }
 
 function nextPowerOfTwo(n) {
   if (n < 2) return 2;
   return 2 ** Math.ceil(Math.log2(n));
+}
+
+function byeNote(t, n) {
+  if (!usesElimTree(t) || n < 2) return '';
+  const size = nextPowerOfTwo(n);
+  const byes = size - n;
+  if (!byes) return '';
+  return ` ${n} players fill a ${size}-slot tree, so ${byes} top seed${byes === 1 ? '' : 's'} get a first-round bye.`;
+}
+
+function bracketHasPlay(matches) {
+  return (matches || []).some((m) => (
+    m.status === 'complete'
+    || (Array.isArray(m.games) && m.games.length)
+    || Number(m.score1) > 0
+    || Number(m.score2) > 0
+  ));
 }
 
 function winsNeeded(bestOf) {
@@ -1338,7 +1470,7 @@ function roundLabel(format, side, round, maxRound) {
   return `Round ${round}`;
 }
 
-function expectedRounds(format, playerCount, swissRounds, losersBracket) {
+function expectedRounds(format, playerCount, swissRounds, losersBracket, breakTies) {
   const n = Math.max(2, playerCount);
   const rows = [];
   const tree = losersBracket || format === 'double_elim';
@@ -1352,6 +1484,7 @@ function expectedRounds(format, playerCount, swissRounds, losersBracket) {
     } else {
       const max = Math.log2(nextPowerOfTwo(n));
       for (let r = 1; r <= max; r++) rows.push({ side: 'winners', round: r, label: roundLabel(format, 'winners', r, max) });
+      if (breakTies && n >= 4) rows.push({ side: 'placement', round: 1, label: '3rd place match' });
     }
   } else if (format === 'round_robin') {
     const rounds = n % 2 === 0 ? n - 1 : n;
@@ -1367,6 +1500,9 @@ function expectedRounds(format, playerCount, swissRounds, losersBracket) {
     for (let r = 1; r <= lb; r++) rows.push({ side: 'losers', round: r, label: `Playoff · Losers R${r}` });
     rows.push({ side: 'grand', round: 1, label: 'Playoff · Grand Final' });
   }
+  if (breakTies && !tree && format !== 'single_elim' && format !== 'double_elim') {
+    rows.push({ side: 'placement', round: 1, label: '3rd place match' });
+  }
   return rows;
 }
 
@@ -1374,10 +1510,158 @@ function entryOf(entries, id) {
   return entries.find((e) => e.id === id) || null;
 }
 
+function fieldEntries(entries) {
+  return (entries || []).filter((e) => e.paid && !e.noShow && (!e.whitelist || e.subbedIn))
+    .sort((a, b) => (Number(a.seed) || 99) - (Number(b.seed) || 99)
+      || String(a.handle || '').localeCompare(String(b.handle || '')));
+}
+
+function swapSelectHtml(id, field, selected) {
+  const current = String(selected || '');
+  return `<select id="${esc(id)}">
+    <option value="">Choose a player</option>
+    ${field.map((e) => {
+      const value = String(e.id);
+      return `<option value="${esc(value)}" ${current === value ? 'selected' : ''}>${esc(`#${e.seed || '–'} ${e.handle}`)}</option>`;
+    }).join('')}
+  </select>`;
+}
+
+function seatKey(matchId, slot) {
+  return `${matchId}:${slot}`;
+}
+
+function parseSeatKey(value) {
+  const parts = String(value || '').split(':');
+  const matchId = Number(parts[0]);
+  const slot = Number(parts[1]) === 2 ? 2 : Number(parts[1]) === 1 ? 1 : 0;
+  if (!Number.isFinite(matchId) || matchId <= 0 || !slot) return null;
+  return { matchId, slot };
+}
+
+function matchEditable(match) {
+  return Boolean(match && match.status !== 'complete');
+}
+
+function editableSeats(t, matches, entries) {
+  const fmt = wantsLosers(t) ? 'double_elim' : (t && t.format);
+  const rows = [];
+  for (const match of matches || []) {
+    if (!matchEditable(match)) continue;
+    const maxRound = (matches || []).filter((m) => m.side === match.side).reduce((n, m) => Math.max(n, Number(m.round) || 0), 0);
+    const round = roundLabel(fmt, match.side, match.round, maxRound);
+    for (const slot of [1, 2]) {
+      const entry = entryOf(entries, slot === 1 ? match.entry1Id : match.entry2Id);
+      const who = entry ? `#${entry.seed || '–'} ${entry.handle}` : (match.status === 'bye' ? 'BYE' : 'TBD');
+      rows.push({
+        key: seatKey(match.id, slot),
+        matchId: match.id,
+        slot,
+        label: `${round} · M${match.position} · ${slot === 1 ? 'top' : 'bottom'} · ${who}`,
+      });
+    }
+  }
+  return rows;
+}
+
+function swapBlockedReason(t, seats) {
+  if (!t || t.status === 'registration') return 'Lock the bracket first, then edit.';
+  if (!seats.length) return 'Unlock a locked series to edit that round.';
+  return '';
+}
+
+function hostRoundOptions(t, matches) {
+  const fmt = wantsLosers(t) ? 'double_elim' : (t && t.format);
+  const seen = new Set();
+  const rows = [];
+  for (const match of matches || []) {
+    const side = match && match.side;
+    if (!['winners', 'losers', 'grand', 'placement'].includes(side)) continue;
+    const key = `${side}:${match.round}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const maxRound = (matches || []).filter((m) => m.side === side).reduce((n, m) => Math.max(n, Number(m.round) || 0), 0);
+    const group = (matches || []).filter((m) => m.side === side && Number(m.round) === Number(match.round));
+    rows.push({
+      key,
+      side,
+      round: Number(match.round) || 1,
+      label: roundLabel(fmt, side, match.round, maxRound),
+      seated: group.some((m) => m.entry1Id || m.entry2Id),
+      open: group.some((m) => m.status !== 'complete'),
+    });
+  }
+  return rows;
+}
+
+function parseRoundKey(value) {
+  const parts = String(value || '').split(':');
+  const side = parts[0];
+  const round = Number(parts[1]);
+  if (!side || !Number.isFinite(round) || round <= 0) return null;
+  return { side, round };
+}
+
+function defaultPairRoundKey(options) {
+  const list = options || [];
+  const semi = list.find((o) => o.label === 'Semi Finals' || String(o.label).endsWith('Semi Finals'));
+  if (semi && semi.seated) return semi.key;
+  const winners = list.filter((o) => o.side === 'winners' && o.seated && o.open);
+  if (winners.length) return winners.reduce((a, b) => (a.round >= b.round ? a : b)).key;
+  const seatedOpen = list.find((o) => o.seated && o.open);
+  return (seatedOpen || list[0] || {}).key || '';
+}
+
+function swapFormHtml(seats, field, canEdit, opts) {
+  if (!canEdit) {
+    return `<p class="muted">${esc((opts && opts.reason) || 'Editing is not available.')}</p>
+      <p class="err" id="swap-err" hidden></p>`;
+  }
+  const rounds = (opts && opts.rounds) || [];
+  const currentRound = String((opts && opts.pairRound) || '');
+  return `<p class="muted">Set the round to Semi Finals, pick two players, press the gold button. They play each other in that round.</p>
+    <div class="swap-picks">
+      <div><label for="pair-round">Round</label>
+        <select id="pair-round">${rounds.map((r) => `<option value="${esc(r.key)}" ${r.key === currentRound ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="swap-picks">
+      <div><label for="pair-a">Player A</label>${swapSelectHtml('pair-a', field, opts && opts.pairA)}</div>
+      <div><label for="pair-b">Player B</label>${swapSelectHtml('pair-b', field, opts && opts.pairB)}</div>
+    </div>
+    <div class="row wrap">
+      <button class="btn" type="button" id="pair-btn">They play each other</button>
+    </div>
+    <p class="err" id="swap-err" hidden></p>`;
+}
+
+function seatSelectHtml(id, seats, selected) {
+  const current = String(selected || '');
+  return `<select id="${esc(id)}">
+    <option value="">Choose a seat</option>
+    ${(seats || []).map((s) => `<option value="${esc(s.key)}" ${current === s.key ? 'selected' : ''}>${esc(s.label)}</option>`).join('')}
+  </select>`;
+}
+
 function bestOfSelect(id, value) {
   return `<select id="${esc(id)}" data-bestof>
     ${BEST_OF.map((n) => `<option value="${n}" ${Number(value) === n ? 'selected' : ''}>${esc(bestOfLabel(n))}</option>`).join('')}
   </select>`;
+}
+
+function finalsBestOfSelect(id, value) {
+  const selected = BEST_OF.includes(Number(value)) ? Number(value) : '';
+  return `<select id="${esc(id)}">
+    <option value="" ${selected === '' ? 'selected' : ''}>Same as default</option>
+    ${BEST_OF.map((n) => `<option value="${n}" ${selected === n ? 'selected' : ''}>${esc(bestOfLabel(n))}</option>`).join('')}
+  </select>`;
+}
+
+function isFinalsRuleRow(row) {
+  if (!row) return false;
+  if (row.side === 'grand') return true;
+  if (row.side !== 'winners') return false;
+  return row.label === 'Finals' || String(row.label).endsWith('· Finals');
 }
 
 function k9swapCard() {
@@ -1430,6 +1714,143 @@ function bindCopy(rootEl) {
   });
 }
 
+function bindBracketViewport(scope) {
+  (scope || document).querySelectorAll('.bracket-stage').forEach((stage) => {
+    if (stage.dataset.bound === '1') return;
+    const port = stage.querySelector('.bracket-port');
+    const sizer = stage.querySelector('.bracket-sizer');
+    const tree = stage.querySelector('.bracket-tree');
+    if (!port || !sizer || !tree) return;
+    stage.dataset.bound = '1';
+
+    const MIN = 0.28;
+    const MAX = 1.85;
+    let scale = 1;
+    const pointers = new Map();
+    let pinch = null;
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const measure = () => {
+      const prev = tree.style.transform;
+      tree.style.transform = 'none';
+      const w = Math.max(tree.scrollWidth, tree.offsetWidth, 1);
+      const h = Math.max(tree.scrollHeight, tree.offsetHeight, 1);
+      tree.style.transform = prev;
+      return { w, h };
+    };
+
+    const apply = (nextScale, originX, originY) => {
+      const prev = scale;
+      scale = Math.min(MAX, Math.max(MIN, nextScale));
+      const { w, h } = measure();
+      sizer.style.width = `${Math.round(w * scale)}px`;
+      sizer.style.height = `${Math.round(h * scale)}px`;
+      tree.style.transform = scale === 1 ? '' : `scale(${scale})`;
+      if (originX != null && prev > 0 && scale !== prev) {
+        const ratio = scale / prev;
+        port.scrollLeft = (port.scrollLeft + originX) * ratio - originX;
+        port.scrollTop = (port.scrollTop + originY) * ratio - originY;
+      }
+    };
+
+    const fit = () => {
+      const { w, h } = measure();
+      const availW = Math.max(48, port.clientWidth - 12);
+      const availH = Math.max(48, port.clientHeight - 12);
+      apply(Math.min(1, availW / w, availH / h), 0, 0);
+      port.scrollLeft = 0;
+      port.scrollTop = 0;
+    };
+
+    const zoomAt = (next, clientX, clientY) => {
+      const rect = port.getBoundingClientRect();
+      apply(next, clientX - rect.left, clientY - rect.top);
+    };
+
+    apply(1);
+
+    stage.querySelectorAll('[data-bracket-zoom]').forEach((btn) => {
+      btn.onclick = () => {
+        const op = btn.getAttribute('data-bracket-zoom');
+        if (op === 'fit') fit();
+        else if (op === 'in') apply(scale * 1.18, port.clientWidth / 2, port.clientHeight / 2);
+        else apply(scale / 1.18, port.clientWidth / 2, port.clientHeight / 2);
+      };
+    });
+
+    port.addEventListener('wheel', (event) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      zoomAt(scale * (event.deltaY < 0 ? 1.1 : 1 / 1.1), event.clientX, event.clientY);
+    }, { passive: false });
+
+    const interactive = (node) => node.closest('button, a, input, select, textarea, label, .match-card-hit, .slot, .mini');
+
+    port.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (interactive(event.target)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 1) {
+        dragging = true;
+        lastX = event.clientX;
+        lastY = event.clientY;
+        port.classList.add('is-panning');
+      } else if (pointers.size === 2) {
+        dragging = false;
+        const pts = [...pointers.values()];
+        pinch = {
+          dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+          scale,
+        };
+      }
+      try { port.setPointerCapture(event.pointerId); } catch (_err) { /* ignore */ }
+    });
+
+    port.addEventListener('pointermove', (event) => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinch && pointers.size >= 2) {
+        const pts = [...pointers.values()];
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (pinch.dist > 8) {
+          const cx = (pts[0].x + pts[1].x) / 2;
+          const cy = (pts[0].y + pts[1].y) / 2;
+          zoomAt(pinch.scale * (dist / pinch.dist), cx, cy);
+        }
+        event.preventDefault();
+        return;
+      }
+      if (!dragging) return;
+      port.scrollLeft -= event.clientX - lastX;
+      port.scrollTop -= event.clientY - lastY;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      event.preventDefault();
+    }, { passive: false });
+
+    const endPointer = (event) => {
+      pointers.delete(event.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (pointers.size === 0) {
+        dragging = false;
+        port.classList.remove('is-panning');
+      }
+    };
+    port.addEventListener('pointerup', endPointer);
+    port.addEventListener('pointercancel', endPointer);
+
+    port.addEventListener('gesturestart', (event) => event.preventDefault());
+    port.addEventListener('gesturechange', (event) => event.preventDefault());
+
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(() => apply(scale));
+      ro.observe(port);
+    }
+  });
+}
+
 function groupRounds(matches, side) {
   const ofSide = matches.filter((m) => m.side === side);
   const max = ofSide.reduce((n, m) => Math.max(n, m.round), 0);
@@ -1438,7 +1859,98 @@ function groupRounds(matches, side) {
     const list = ofSide.filter((m) => m.round === r).sort((a, b) => a.position - b.position);
     if (list.length) rounds.push(list);
   }
+  if (side === 'winners') return layoutElimRounds(rounds);
   return rounds;
+}
+
+function matchHasPlayer(match, entryId) {
+  const id = Number(entryId);
+  return Number(match.entry1Id) === id || Number(match.entry2Id) === id || Number(match.winnerId) === id;
+}
+
+function layoutPrevRound(prev, later) {
+  const used = new Set();
+  const next = [];
+  for (const dest of later || []) {
+    const ids = [dest.entry1Id, dest.entry2Id].filter((id) => Number(id));
+    const pair = [];
+    for (const id of ids) {
+      const src = (prev || []).find((m) => !used.has(m.id) && matchHasPlayer(m, id));
+      if (src) {
+        used.add(src.id);
+        pair.push(src);
+      }
+    }
+    if (pair.length < 2) {
+      for (const src of prev || []) {
+        const d = src.winnerGoesTo;
+        if (used.has(src.id) || !d || d.side !== dest.side || Number(d.round) !== Number(dest.round) || Number(d.position) !== Number(dest.position)) continue;
+        used.add(src.id);
+        pair.push(src);
+        if (pair.length >= 2) break;
+      }
+    }
+    next.push(...pair);
+  }
+  for (const match of prev || []) {
+    if (!used.has(match.id)) next.push(match);
+  }
+  return next;
+}
+
+function layoutElimRounds(rounds) {
+  if (!rounds || rounds.length < 2) return rounds;
+  const ordered = rounds.map((list) => list.slice());
+  for (let r = ordered.length - 1; r >= 1; r -= 1) {
+    const later = ordered[r];
+    const prev = ordered[r - 1];
+    if (!later.length || later.some((m) => !m.entry1Id || !m.entry2Id)) continue;
+    ordered[r - 1] = layoutPrevRound(prev, later);
+  }
+  return ordered;
+}
+
+function reseatCompletePair(roundRows, wantedA, wantedB) {
+  const idA = Number(wantedA);
+  const idB = Number(wantedB);
+  if (!idA || !idB || idA === idB || !roundRows || roundRows.length !== 2) return false;
+  if (roundRows.some((m) => matchHasPlayer(m, idA) && matchHasPlayer(m, idB) && Number(m.entry1Id) && Number(m.entry2Id) && (Number(m.entry1Id) === idA || Number(m.entry1Id) === idB) && (Number(m.entry2Id) === idA || Number(m.entry2Id) === idB))) return false;
+  if (!roundRows.every((m) => m.status === 'complete' && m.entry1Id && m.entry2Id)) return false;
+  const home = roundRows.find((m) => Number(m.entry1Id) === idA || Number(m.entry2Id) === idA)
+    || roundRows.find((m) => Number(m.entry1Id) === idB || Number(m.entry2Id) === idB);
+  const other = roundRows.find((m) => m !== home);
+  if (!home || !other) return false;
+  const homeKeep = Number(home.entry1Id) === idA || Number(home.entry2Id) === idA ? idA : idB;
+  const wantIn = homeKeep === idA ? idB : idA;
+  if (!(Number(other.entry1Id) === wantIn || Number(other.entry2Id) === wantIn)) return false;
+  const homeLeave = Number(home.entry1Id) === homeKeep ? home.entry2Id : home.entry1Id;
+  const swapId = (match, fromId, toId) => {
+    if (Number(match.entry1Id) === Number(fromId)) match.entry1Id = toId;
+    else if (Number(match.entry2Id) === Number(fromId)) match.entry2Id = toId;
+    if (Number(match.winnerId) === Number(fromId)) match.winnerId = toId;
+  };
+  swapId(home, homeLeave, wantIn);
+  swapId(other, wantIn, homeLeave);
+  return true;
+}
+
+function applyBracketLayoutFixes(data) {
+  if (!data || !Array.isArray(data.matches)) return data;
+  const t = data.tournament;
+  const slug = String(t && t.slug || '');
+  const named = /ddnyc 2026/i.test(String(t && t.name || ''));
+  if (slug === 'doginal-dogs-legends-tcg-ddnyc-2026-irl-to-xdvs' || named) {
+    const entries = data.entries || [];
+    const idOf = (handle) => {
+      const row = entries.find((e) => String(e.handle || '').toLowerCase() === handle);
+      return row ? row.id : 0;
+    };
+    const winners = data.matches.filter((m) => m.side === 'winners');
+    const max = winners.reduce((n, m) => Math.max(n, Number(m.round) || 0), 0);
+    const semis = winners.filter((m) => Number(m.round) === max - 1).sort((a, b) => a.position - b.position);
+    reseatCompletePair(semis, idOf('dickthedev'), idOf('hofer'));
+  }
+  return data;
 }
 
 function matchResultLine(match, entries) {
@@ -1780,6 +2292,10 @@ function resolveHostUser(t, apiHostUser) {
 // Bracket rendering
 // ---------------------------------------------------------------------------
 
+function tableHref(slug, matchId) {
+  return `/tourney/#/t/${encodeURIComponent(slug)}/table/${encodeURIComponent(String(matchId))}`;
+}
+
 function matchTip(match) {
   if (match.status === 'ready' && (match.games || []).length) {
     const running = `In progress ${match.score1 ?? 0}–${match.score2 ?? 0}.`;
@@ -1789,63 +2305,133 @@ function matchTip(match) {
     return hostMode ? 'Ready match. Open the scorecard and report each game.' : 'Ready to play — the host reports the result here.';
   }
   if (match.status === 'bye') return 'Bye — this player advances because the other slot is empty.';
-  if (match.status === 'complete') return 'Series locked. Gold check marks the winner.';
+  if (match.status === 'complete') return hostMode ? 'Series locked. Open to unlock and edit this round.' : 'Series locked. Gold check marks the winner.';
   return 'Waiting for a player from the previous round.';
 }
 
 function matchCardHtml(match, entries, votes, opts) {
   const p1 = entryOf(entries, match.entry1Id);
   const p2 = entryOf(entries, match.entry2Id);
-  const clickable = match.status === 'ready' && hostMode;
+  const hostEdit = Boolean(opts && opts.hostEdit);
+  const swapPick = Boolean(opts && opts.swapPick);
+  const picked = new Set((opts && opts.swapSelected || []).map((id) => String(id)));
+  const pairPicked = new Set((opts && opts.pairSelected || []).map((id) => String(id)));
+  const canEdit = hostEdit && matchEditable(match);
+  const clickable = !hostEdit && !swapPick && hostMode && (match.status === 'ready' || match.status === 'complete');
   const empty = match.status === 'bye' ? 'BYE' : 'TBD';
+  const field = fieldEntries(entries);
   const v1 = (votes || []).filter((v) => v.matchId === match.id && v.winnerId === match.entry1Id).length;
   const v2 = (votes || []).filter((v) => v.matchId === match.id && v.winnerId === match.entry2Id).length;
-  const slot = (entry, score, won, fallback) => `<div class="slot ${won ? 'winner' : ''}">
-      ${entry ? `<em>${entry.seed || ''}</em>${avatarHtml(entry.handle)}<span class="who"><span class="who-name">${esc(entry.handle)}</span>${entryMarksHtml(entry)}</span>` : `<span class="who tbd">${fallback}</span>`}
+  const slotInner = (entry, score, fallback) => `${entry
+    ? `<em>${entry.seed || ''}</em>${avatarHtml(entry.handle)}<span class="who"><span class="who-name">${esc(entry.handle)}</span>${entryMarksHtml(entry)}</span>`
+    : `<span class="who tbd">${fallback}</span>`}
       <span class="pts">${score ?? ''}</span>
-      <span class="mark">✓</span>
-    </div>`;
+      <span class="mark">✓</span>`;
+  const slotPicker = (entry, slotNum) => {
+    const current = entry ? String(entry.id) : '';
+    return `<select class="slot-edit" data-place-match="${match.id}" data-place-slot="${slotNum}" aria-label="${entry ? `Who should play ${entry.handle}` : `Seat ${slotNum}`}">
+      <option value="">TBD</option>
+      ${field.map((e) => `<option value="${esc(String(e.id))}" ${String(e.id) === current ? 'selected' : ''}>${esc(`#${e.seed || '–'} ${e.handle}`)}</option>`).join('')}
+    </select>`;
+  };
+  const slot = (entry, score, won, fallback, slotNum) => {
+    if (canEdit) {
+      const key = seatKey(match.id, slotNum);
+      const pairId = entry ? String(entry.id) : '';
+      const pickedClass = (swapPick ? picked.has(key) : pairId && pairPicked.has(pairId)) ? ' picked' : '';
+      const emptyClass = entry ? '' : ' empty';
+      const pickBtn = swapPick
+        ? `<button type="button" class="slot swap-slot${won ? ' winner' : ''}${pickedClass}${emptyClass}" data-swap-seat="${esc(key)}" ${tip(entry ? `Select ${entry.handle}` : 'Select empty seat')}>${slotInner(entry, score, fallback)}</button>`
+        : `<button type="button" class="slot swap-slot${won ? ' winner' : ''}${pickedClass}${emptyClass}" ${pairId ? `data-pair-entry="${esc(pairId)}"` : 'disabled'} ${tip(entry ? `Tap ${entry.handle}, then tap who they should play` : 'Empty seat — use the list below to fill it')}>${slotInner(entry, score, fallback)}</button>`;
+      return `${pickBtn}${slotPicker(entry, slotNum)}`;
+    }
+    return `<div class="slot ${won ? 'winner' : ''}">${slotInner(entry, score, fallback)}</div>`;
+  };
   const live = match.status === 'ready' && (match.games || []).length > 0;
-  const finals = opts && opts.finals ? ' finals' : '';
-  return `<button type="button" class="match-card ${clickable ? 'ready' : ''} ${live ? 'live' : ''} ${match.status}${finals}" data-match="${match.id}" ${tip(matchTip(match))} ${clickable ? '' : 'disabled'}>
-    ${slot(p1, match.score1, match.winnerId === match.entry1Id && match.status === 'complete', empty)}
-    ${slot(p2, match.score2, match.winnerId === match.entry2Id && match.status === 'complete', empty)}
+  const slug = opts && opts.slug;
+  const twoSeated = Boolean(match.entry1Id && match.entry2Id);
+  const tableOk = twoSeated && (match.status === 'ready' || match.status === 'complete');
+  const tableLink = slug && tableOk
+    ? `<a class="table-link" href="${esc(tableHref(slug, match.id))}" ${tip('Open the IRL table. Sit as your handle, then link your hand cam.')}>Table</a>`
+    : '';
+  const classes = [
+    'match-card',
+    clickable || (hostEdit && match.status === 'ready') ? 'ready' : '',
+    hostEdit || swapPick ? 'swap-mode' : '',
+    canEdit ? 'host-edit' : '',
+    live ? 'live' : '',
+    match.status,
+    opts && opts.finals ? 'finals' : '',
+  ].filter(Boolean).join(' ');
+  const actions = hostEdit ? [
+    match.status === 'ready' ? `<button type="button" class="mini go" data-match="${match.id}">Report series</button>` : '',
+    match.status === 'complete' ? `<button type="button" class="mini" data-reset-match="${match.id}" ${tip('Unlock this series and later matches that used it, so you can edit this round.')}>Unlock series</button>` : '',
+  ].filter(Boolean).join('') : (swapPick && match.status === 'complete'
+    ? `<button type="button" class="mini" data-reset-match="${match.id}">Unlock series</button>`
+    : '');
+  const body = `${slot(p1, match.score1, match.winnerId === match.entry1Id && match.status === 'complete', empty, 1)}
+    ${slot(p2, match.score2, match.winnerId === match.entry2Id && match.status === 'complete', empty, 2)}
     ${v1 + v2 ? `<div class="votes">Votes ${v1}–${v2}</div>` : ''}
-  </button>`;
+    ${actions}`;
+  if (hostEdit || swapPick) return `<div class="${classes}">${body}${tableLink}</div>`;
+  const hit = clickable
+    ? `<button type="button" class="match-card-hit" data-match="${match.id}" ${tip(matchTip(match))}>${body}</button>`
+    : `<div class="match-card-hit">${body}</div>`;
+  return `<div class="${classes}">${hit}${tableLink}</div>`;
 }
 
-function bracketColumnsHtml(matches, entries, side, format, votes) {
+function bracketColumnsHtml(matches, entries, side, format, votes, opts) {
   const rounds = groupRounds(matches, side);
   if (!rounds.length) return '';
   const maxRound = rounds.length;
-  return `<div class="bracket-board"><div class="bracket-tree" style="--slots:${rounds[0].length}">
-    ${rounds.map((roundMatches, i) => {
-      const next = rounds[i + 1];
-      const feed = !next ? 'end' : (next.length === roundMatches.length ? 'line' : 'pair');
-      const label = roundLabel(format, side, roundMatches[0].round, maxRound);
-      const bo = bestOfLabel(roundMatches[0].bestOf);
-      const finals = /final/i.test(label);
-      return `<div class="bracket-round feed-${feed}${finals ? ' is-final' : ''}">
-        <header ${tip(`${label} is ${bo}.`)}>
-          <span>${esc(label)}</span>
-          <span class="round-tag">${esc(bo)}</span>
-        </header>
-        <div class="bracket-slots">
-          ${roundMatches.map((m) => `<div class="bracket-slot">
-            <i class="in-line" aria-hidden="true"></i>
-            ${matchCardHtml(m, entries, votes, { finals })}
-            <i class="out-h" aria-hidden="true"></i>
-            <i class="out-v" aria-hidden="true"></i>
-          </div>`).join('')}
+  return `<div class="bracket-stage">
+    <div class="bracket-stage-bar">
+      <span class="bracket-stage-hint">Pan the tree</span>
+      <div class="bracket-stage-acts">
+        <button type="button" class="mini" data-bracket-zoom="out" aria-label="Zoom out">−</button>
+        <button type="button" class="mini" data-bracket-zoom="fit" aria-label="Fit bracket in view">Fit</button>
+        <button type="button" class="mini" data-bracket-zoom="in" aria-label="Zoom in">+</button>
+      </div>
+    </div>
+    <div class="bracket-port" tabindex="0" aria-label="Tournament bracket. Drag or scroll to pan.">
+      <div class="bracket-sizer">
+        <div class="bracket-tree" style="--slots:${rounds[0].length}">
+          ${rounds.map((roundMatches, i) => {
+            const next = rounds[i + 1];
+            const feed = !next ? 'end' : (next.length === roundMatches.length ? 'line' : 'pair');
+            const label = roundLabel(format, side, roundMatches[0].round, maxRound);
+            const bo = bestOfLabel(roundMatches[0].bestOf);
+            const finals = /final/i.test(label);
+            return `<div class="bracket-round feed-${feed}${finals ? ' is-final' : ''}">
+              <header ${tip(`${label} is ${bo}.`)}>
+                <span>${esc(label)}</span>
+                <span class="round-tag">${esc(bo)}</span>
+              </header>
+              <div class="bracket-slots">
+                ${roundMatches.map((m) => `<div class="bracket-slot">
+                  <i class="in-line" aria-hidden="true"></i>
+                  ${matchCardHtml(m, entries, votes, { ...opts, finals })}
+                  <i class="out-h" aria-hidden="true"></i>
+                  <i class="out-v" aria-hidden="true"></i>
+                </div>`).join('')}
+              </div>
+            </div>`;
+          }).join('')}
         </div>
-      </div>`;
-    }).join('')}
-  </div></div>`;
+      </div>
+    </div>
+  </div>`;
 }
 
-function bracketHtml(data) {
+function bracketHtml(data, opts) {
   const { tournament: t, entries, matches, votes } = data;
-  if (!matches.length) return '';
+  const nextOpts = { ...(opts || {}), slug: t.slug };
+  if (!matches.length) {
+    if (t && t.restoredFromRecords) {
+      return `<p class="muted">This arena was rebuilt from official records. The live match tree was not in the archive, so the roster and standings are the source of truth.</p>`;
+    }
+    return '';
+  }
   const treeMatches = matches.filter((m) => m.side === 'winners' || m.side === 'losers' || m.side === 'grand' || m.side === 'placement');
   const tree = treeMatches.length > 0 || t.format === 'single_elim' || t.format === 'double_elim' || t.stage === 'playoff';
   const playoffFormat = wantsLosers(t) ? 'double_elim' : 'single_elim';
@@ -1855,7 +2441,7 @@ function bracketHtml(data) {
     body += groups.map((g) => `
       <section class="bracket-section">
         <h2>Group ${g}</h2>
-        <div class="grid cards">${matches.filter((m) => m.group === g).map((m) => matchCardHtml(m, entries, votes)).join('')}</div>
+        <div class="grid cards">${matches.filter((m) => m.group === g).map((m) => matchCardHtml(m, entries, votes, nextOpts)).join('')}</div>
       </section>`).join('');
   }
   const groupSide = matches.filter((m) => m.side === 'group' && !m.group);
@@ -1865,17 +2451,17 @@ function bracketHtml(data) {
         <h2>${esc(roundLabel(t.format, 'group', roundMatches[0].round, t.swissRounds))}
           <small>${esc(bestOfLabel(roundMatches[0].bestOf))}</small>
         </h2>
-        <div class="grid cards">${roundMatches.map((m) => matchCardHtml(m, entries, votes)).join('')}</div>
+        <div class="grid cards">${roundMatches.map((m) => matchCardHtml(m, entries, votes, nextOpts)).join('')}</div>
       </section>`).join('');
   }
   if (tree && playoffFormat === 'double_elim' && matches.some((m) => m.side === 'losers' || m.side === 'grand')) {
-    body += `<section class="bracket-section"><h2>Winners</h2>${bracketColumnsHtml(matches, entries, 'winners', playoffFormat, votes)}</section>
-      <section class="bracket-section"><h2>Losers</h2>${bracketColumnsHtml(matches, entries, 'losers', playoffFormat, votes)}</section>
-      <section class="bracket-section"><h2>Grand Final</h2>${bracketColumnsHtml(matches, entries, 'grand', playoffFormat, votes)}</section>`;
+    body += `<section class="bracket-section"><h2>Winners</h2>${bracketColumnsHtml(matches, entries, 'winners', playoffFormat, votes, nextOpts)}</section>
+      <section class="bracket-section"><h2>Losers</h2>${bracketColumnsHtml(matches, entries, 'losers', playoffFormat, votes, nextOpts)}</section>
+      <section class="bracket-section"><h2>Grand Final</h2>${bracketColumnsHtml(matches, entries, 'grand', playoffFormat, votes, nextOpts)}</section>`;
   } else if (tree && treeMatches.length) {
-    body += bracketColumnsHtml(matches.filter((m) => !m.group && m.side !== 'group'), entries, 'winners', playoffFormat, votes);
+    body += bracketColumnsHtml(matches.filter((m) => !m.group && m.side !== 'group'), entries, 'winners', playoffFormat, votes, nextOpts);
     if (matches.some((m) => m.side === 'placement')) {
-      body += `<section class="bracket-section"><h2>3rd place</h2>${bracketColumnsHtml(matches, entries, 'placement', playoffFormat, votes)}</section>`;
+      body += `<section class="bracket-section"><h2>3rd place</h2>${bracketColumnsHtml(matches, entries, 'placement', playoffFormat, votes, nextOpts)}</section>`;
     }
   }
   return body;
@@ -1889,13 +2475,14 @@ function readRoundBestOf(panel) {
   return out;
 }
 
-function roundRulesHtml(format, count, swissRounds, bestOf, roundBestOf, losersBracket) {
-  const rows = expectedRounds(format, count, swissRounds, losersBracket);
+function roundRulesHtml(format, count, swissRounds, bestOf, roundBestOf, losersBracket, breakTies, finalsBestOf) {
+  const rows = expectedRounds(format, count, swissRounds, losersBracket, breakTies);
   if (!rows.length) return '';
   return `<div class="round-rules">
     ${rows.map((row) => {
       const key = roundKey(row.side, row.round);
-      const value = (roundBestOf && roundBestOf[key]) || bestOf || 3;
+      const finals = BEST_OF.includes(Number(finalsBestOf)) ? Number(finalsBestOf) : null;
+      const value = (roundBestOf && roundBestOf[key]) || (isFinalsRuleRow(row) && finals) || bestOf || 3;
       return `<label class="rule-row"><span>${esc(row.label)}</span>
         <select data-round-bestof="${esc(key)}">
           ${BEST_OF.map((n) => `<option value="${n}" ${Number(value) === n ? 'selected' : ''}>${esc(bestOfLabel(n))}</option>`).join('')}
@@ -1912,6 +2499,7 @@ function roundRulesHtml(format, count, swissRounds, bestOf, roundBestOf, losersB
 function defaultsFrom(t) {
   const d = t || {};
   return {
+    eventKind: sanitizeEventKind(d.eventKind, d.name),
     hostName: d.hostName || (playerUser && (playerUser.tourneyHandle || playerUser.discordUsername)) || 'KushMetaX',
     name: d.name || '',
     slug: d.slug || '',
@@ -1929,6 +2517,7 @@ function defaultsFrom(t) {
     feeMode: d.feeMode || (Number(d.entryFeeUsd) > 0 ? 'paid' : 'free'),
     entryFeeUsd: Number(d.entryFeeUsd) || 0,
     rewardMode: d.rewardMode === 'prize' ? 'prize' : 'pot',
+    hostPotUsd: Number(d.hostPotUsd) || 0,
     payouts: Array.isArray(d.payouts) ? d.payouts : [],
     requireTeams: Boolean(d.requireTeams),
     capPlayers: d.capPlayers !== false,
@@ -1949,6 +2538,7 @@ function defaultsFrom(t) {
     groupSize: d.groupSize || 4,
     advancePerGroup: d.advancePerGroup || 2,
     bestOf: BEST_OF.includes(Number(d.bestOf)) ? Number(d.bestOf) : 3,
+    finalsBestOf: BEST_OF.includes(Number(d.finalsBestOf)) ? Number(d.finalsBestOf) : null,
   };
 }
 
@@ -2005,7 +2595,13 @@ function settingsFormHtml(t, opts) {
             <input type="hidden" id="s-reward" value="${esc(d.rewardMode)}">
             <p class="hint" id="reward-hint">${d.rewardMode === 'prize'
               ? 'Type what each place wins. Entry fees stay the entry — this list is the prize, not the pot.'
-              : 'Paid entries fill the pot. Set a percent per place to show how it splits. Leave percents blank to show only the running total, like today.'}</p>
+              : 'Set a prize pot in dollars, or let paid entries fill it. Percents split that total by place. Leave percents blank to show only the running total.'}</p>
+          </div>
+        </div>
+        <div class="form-row" id="hostpot-row" style="${d.rewardMode === 'prize' ? 'display:none' : ''}"><label for="s-hostpot">Prize pot (USD)</label>
+          <div>
+            <input id="s-hostpot" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(d.hostPotUsd || 0)}" ${tip('House money for this arena. Added on top of paid entries. For a free list you add yourself, this is the whole pot — set it before you lock.')}>
+            <p class="hint">Shows as Pot on the public page. Paid entries add on top. $0 means entry fees only.</p>
           </div>
         </div>
         <div class="form-row"><span class="lbl">By place</span>
@@ -2030,16 +2626,23 @@ function settingsFormHtml(t, opts) {
           <datalist id="game-list">${GAMES.map((g) => `<option value="${esc(g)}">`).join('')}</datalist></div>
         </div>
         <div class="form-row"><span class="lbl">Type</span>
+          <div class="choice" ${tip('A tournament is a field of 3+. A Grand Tournament is a flagship IRL event. A duel is a 1v1 series — winner and runner-up only.')}>
+            ${radio('s-kind', 'tournament', d.eventKind !== 'duel' && d.eventKind !== 'grand', 'Tournament')}
+            ${radio('s-kind', 'grand', d.eventKind === 'grand', 'Grand Tournament — flagship IRL events.')}
+            ${radio('s-kind', 'duel', d.eventKind === 'duel', 'Duel — two players, one series.')}
+          </div>
+        </div>
+        <div class="form-row tourney-only"><span class="lbl">Stages</span>
           <div class="choice" ${tip('Single stage is one bracket. Two stage runs groups first, then a playoff.')}>
             ${radio('s-stage', 'single', d.stageType !== 'two', 'Single stage tournament')}
             ${radio('s-stage', 'two', d.stageType === 'two', 'Two stage tournament — groups compete separately, winners proceed to a final stage.')}
           </div>
         </div>
-        <div class="form-row two-only"><label for="s-group">Group size</label>
+        <div class="form-row two-only tourney-only"><label for="s-group">Group size</label>
           <input id="s-group" type="number" min="2" max="16" value="${d.groupSize}"></div>
-        <div class="form-row two-only"><label for="s-advance">Advance per group</label>
+        <div class="form-row two-only tourney-only"><label for="s-advance">Advance per group</label>
           <input id="s-advance" type="number" min="1" max="8" value="${d.advancePerGroup}"></div>
-        <div class="form-row"><label for="s-format">Format <span class="req">*</span></label>
+        <div class="form-row tourney-only"><label for="s-format">Format <span class="req">*</span></label>
           <div><select id="s-format" ${tip('Single elim is a knockout tree. Swiss and round robin use standings. Losers bracket is a separate switch.')}>
             <option value="single_elim" ${d.format === 'single_elim' || d.format === 'double_elim' ? 'selected' : ''}>Single Elimination</option>
             <option value="round_robin" ${d.format === 'round_robin' ? 'selected' : ''}>Round Robin</option>
@@ -2047,9 +2650,21 @@ function settingsFormHtml(t, opts) {
           </select>
           <label class="check"><input type="checkbox" id="s-losers" ${d.losersBracket ? 'checked' : ''}> Losers bracket</label>
           <p class="hint" id="s-losers-hint">One loss drops a player into a losers bracket instead of eliminating them. On Swiss and round robin this seeds a double-elim playoff after standings.</p>
-          <label class="check" id="s-break-row"><input type="checkbox" id="s-break" ${d.breakTies && !d.losersBracket ? 'checked' : ''}> Break ties with a 3rd place match</label></div>
+          <div id="s-break-row">
+            <label class="check"><input type="checkbox" id="s-break" ${d.breakTies && !d.losersBracket ? 'checked' : ''}> 3rd place match</label>
+            <p class="hint">The two semi-final losers play for bronze. Needs at least 4 players. 1st and 2nd still come from the final.</p>
+          </div></div>
         </div>
-        <div class="form-row"><label for="s-bestof">Default series</label>${bestOfSelect('s-bestof', d.bestOf)}</div>
+        <div class="form-row"><label for="s-bestof">Default series</label>
+          <div>${bestOfSelect('s-bestof', d.bestOf)}
+            <p class="hint">Every round uses this unless Finals is set differently.</p>
+          </div>
+        </div>
+        <div class="form-row" id="s-finals-row"><label for="s-finalsbestof">Finals series</label>
+          <div>${finalsBestOfSelect('s-finalsbestof', d.finalsBestOf)}
+            <p class="hint">Championship match only. Example: Best of 1 for the bracket, Best of 3 in the final.</p>
+          </div>
+        </div>
       </div>
     </section>
     <section class="panel">
@@ -2061,7 +2676,7 @@ function settingsFormHtml(t, opts) {
             ${radio('s-reg', 'signup', d.registrationMode !== 'list', 'Host a sign-up page — players register with handle.')}
           </div>
         </div>
-        <div class="form-row"><span class="lbl">Whitelist</span>
+        <div class="form-row tourney-only"><span class="lbl">Whitelist</span>
           <div>
             <label class="check"><input type="checkbox" id="s-wl" ${d.whitelistOn ? 'checked' : ''}> Reserve whitelist spots for first-round no-shows</label>
             <div id="wl-spots-row" style="${d.whitelistOn ? '' : 'display:none'}">
@@ -2100,7 +2715,7 @@ function settingsFormHtml(t, opts) {
           <div>
             <label class="check"><input type="checkbox" id="s-account" ${d.requireAccount ? 'checked' : ''}> Require Discord sign-in to register (walk-ins can still be added by the host)</label>
             <label class="check"><input type="checkbox" id="s-official" ${d.official ? 'checked' : ''}> Count this arena toward records and accolades</label>
-            <p class="hint">A completed finals, or any arena with at least two confirmed players, can crown an official champion. Uncheck this for a scrim.</p>
+            <p class="hint">Completed tournaments (3+ players) crown a champion. Completed duels count as 1v1 wins. Uncheck this for a scrim.</p>
           </div>
         </div>
       </div>
@@ -2141,15 +2756,36 @@ function bindSettingsChrome(form) {
   };
   form.querySelectorAll('input[name="s-stage"]').forEach((el) => { el.onchange = stageSync; });
   stageSync();
+  const kindSync = () => {
+    const duel = form.querySelector('input[name="s-kind"]:checked')?.value === 'duel';
+    form.querySelectorAll('.tourney-only').forEach((el) => { el.style.display = duel ? 'none' : ''; });
+    if (duel) {
+      const cap = form.querySelector('#s-cap');
+      const max = form.querySelector('#s-max');
+      if (cap) cap.checked = true;
+      if (max) max.value = 2;
+      const losers = form.querySelector('#s-losers');
+      if (losers) losers.checked = false;
+    }
+    stageSync();
+    losersSync();
+  };
+  form.querySelectorAll('input[name="s-kind"]').forEach((el) => { el.onchange = kindSync; });
   const losers = form.querySelector('#s-losers');
   const breakRow = form.querySelector('#s-break-row');
+  const finalsRow = form.querySelector('#s-finals-row');
   const losersHint = form.querySelector('#s-losers-hint');
   const formatSel = form.querySelector('#s-format');
   const losersSync = () => {
     const on = Boolean(losers && losers.checked);
-    if (breakRow) breakRow.style.display = on ? 'none' : '';
+    const duel = form.querySelector('input[name="s-kind"]:checked')?.value === 'duel';
+    const two = form.querySelector('input[name="s-stage"]:checked')?.value === 'two';
+    const fmt = formatSel ? formatSel.value : 'single_elim';
+    const canBronze = !duel && !on && (two || fmt === 'single_elim');
+    const canFinals = !duel && (two || on || fmt === 'single_elim');
+    if (breakRow) breakRow.style.display = canBronze ? '' : 'none';
+    if (finalsRow) finalsRow.style.display = canFinals ? '' : 'none';
     if (losersHint && formatSel) {
-      const fmt = formatSel.value;
       losersHint.textContent = fmt === 'swiss' || fmt === 'round_robin'
         ? 'After standings, the field is seeded into a winners / losers / grand-final playoff.'
         : 'One loss drops a player into a losers bracket. Two losses and they are out. Grand final crowns the pack.';
@@ -2157,7 +2793,12 @@ function bindSettingsChrome(form) {
   };
   if (losers) losers.onchange = losersSync;
   if (formatSel) formatSel.onchange = losersSync;
+  form.querySelectorAll('input[name="s-stage"]').forEach((el) => {
+    const prev = el.onchange;
+    el.onchange = () => { if (prev) prev(); losersSync(); };
+  });
   losersSync();
+  kindSync();
   const shuffle = form.querySelector('#slug-shuffle');
   if (shuffle) shuffle.onclick = () => {
     form.querySelector('#s-slug').value = Math.random().toString(36).slice(2, 10);
@@ -2173,8 +2814,10 @@ function bindSettingsChrome(form) {
     if (rewardHint) {
       rewardHint.textContent = mode === 'prize'
         ? 'Type what each place wins. Entry fees stay the entry — this list is the prize, not the pot.'
-        : 'Paid entries fill the pot. Set a percent per place to show how it splits. Leave percents blank to show only the running total, like today.';
+        : 'Set a prize pot in dollars, or let paid entries fill it. Percents split that total by place. Leave percents blank to show only the running total.';
     }
+    const hostpotRow = form.querySelector('#hostpot-row');
+    if (hostpotRow) hostpotRow.style.display = mode === 'prize' ? 'none' : '';
     updatePayoutSum();
   };
   const renumberPayouts = () => {
@@ -2291,20 +2934,38 @@ function collectSettings(form) {
     description: form.querySelector('#s-desc')?.value,
     streamUrl: form.querySelector('#s-stream')?.value,
     game: form.querySelector('#s-game')?.value,
-    stageType: form.querySelector('input[name="s-stage"]:checked')?.value,
-    format: form.querySelector('#s-format')?.value,
-    losersBracket: form.querySelector('#s-losers')?.checked,
-    playoffFormat: form.querySelector('#s-losers')?.checked ? 'double_elim' : 'single_elim',
-    breakTies: form.querySelector('#s-losers')?.checked ? false : form.querySelector('#s-break')?.checked,
+    eventKind: sanitizeEventKind(form.querySelector('input[name="s-kind"]:checked')?.value, form.querySelector('#s-name')?.value),
+    stageType: form.querySelector('input[name="s-kind"]:checked')?.value === 'duel'
+      ? 'single'
+      : form.querySelector('input[name="s-stage"]:checked')?.value,
+    format: form.querySelector('input[name="s-kind"]:checked')?.value === 'duel'
+      ? 'single_elim'
+      : form.querySelector('#s-format')?.value,
+    losersBracket: form.querySelector('input[name="s-kind"]:checked')?.value === 'duel'
+      ? false
+      : form.querySelector('#s-losers')?.checked,
+    playoffFormat: form.querySelector('input[name="s-kind"]:checked')?.value === 'duel' || !form.querySelector('#s-losers')?.checked
+      ? 'single_elim'
+      : 'double_elim',
+    breakTies: form.querySelector('input[name="s-kind"]:checked')?.value === 'duel' || form.querySelector('#s-losers')?.checked || (form.querySelector('#s-format')?.value !== 'single_elim' && form.querySelector('input[name="s-stage"]:checked')?.value !== 'two')
+      ? false
+      : Boolean(form.querySelector('#s-break')?.checked),
+    finalsBestOf: (() => {
+      const raw = form.querySelector('#s-finalsbestof')?.value;
+      if (raw === '' || raw == null) return null;
+      const n = Number(raw);
+      return BEST_OF.includes(n) ? n : null;
+    })(),
     registrationMode: form.querySelector('input[name="s-reg"]:checked')?.value === 'list' ? 'list' : 'signup',
     whitelistSpots: form.querySelector('#s-wl')?.checked ? Number(form.querySelector('#s-wl-spots')?.value || 2) : 0,
     feeMode,
     entryFeeUsd: usd,
     rewardMode,
+    hostPotUsd: Number(form.querySelector('#s-hostpot')?.value || 0),
     payouts,
     requireTeams: form.querySelector('#s-teams')?.checked,
-    capPlayers: form.querySelector('#s-cap')?.checked,
-    maxPlayers: Number(form.querySelector('#s-max')?.value || 16),
+    capPlayers: form.querySelector('input[name="s-kind"]:checked')?.value === 'duel' ? true : form.querySelector('#s-cap')?.checked,
+    maxPlayers: form.querySelector('input[name="s-kind"]:checked')?.value === 'duel' ? 2 : Number(form.querySelector('#s-max')?.value || 16),
     startAt: form.querySelector('#s-start')?.value || null,
     startTentative: form.querySelector('#s-tentative')?.checked,
     timezone: form.querySelector('#s-tz')?.value,
@@ -2329,44 +2990,135 @@ function collectSettings(form) {
 // ---------------------------------------------------------------------------
 
 function route() {
+  if (irlUnmount) {
+    try { irlUnmount(); } catch (_err) {}
+    irlUnmount = null;
+  }
   const parts = routeParts();
   if (!(parts[0] === 't' && parts[1])) hideKickStream();
   if (parts[0] === 'create') return renderCreate();
   if (parts[0] === 'records') return renderRecords();
   if (parts[0] === 'ledger') return renderLedger();
   if (parts[0] === 'player' && parts[1]) return renderPlayer(parts[1]);
+  if (parts[0] === 't' && parts[1] && parts[2] === 'table' && parts[3]) return renderIrlTable(parts[1], parts[3]);
   if (parts[0] === 't' && parts[1]) return renderArena(parts[1]);
   return renderHome();
 }
 
+async function renderIrlTable(slug, matchId) {
+  hideKickStream();
+  setTreeMode(false);
+  root.innerHTML = `<p class="muted">Opening table…</p>`;
+  let data;
+  try {
+    data = await api.get(`/arenas/${encodeURIComponent(slug)}`);
+    applyBracketLayoutFixes(data);
+  } catch (err) {
+    root.innerHTML = `<p class="err">${esc(err.message)}</p>`;
+    return;
+  }
+  const match = (data.matches || []).find((m) => String(m.id) === String(matchId));
+  if (!match) {
+    root.innerHTML = `<p class="err">That match is not on this arena. <a href="${esc(arenaHref(slug))}">Back to bracket</a></p>`;
+    return;
+  }
+  const p1 = entryOf(data.entries, match.entry1Id);
+  const p2 = entryOf(data.entries, match.entry2Id);
+  if (typeof DdlIrlTable === 'undefined' || !DdlIrlTable.mount) {
+    root.innerHTML = `<p class="err">Table scripts failed to load. Upload <code>bracket/irl-table.js</code>.</p>`;
+    return;
+  }
+  root.innerHTML = '';
+  irlUnmount = DdlIrlTable.mount(root, {
+    tableId: `a${data.tournament.id}m${match.id}`,
+    eventName: data.tournament.name,
+    backHref: arenaHref(slug),
+    player1: p1 ? { id: p1.id, handle: p1.handle, userId: p1.userId, discordUser: p1.discordUser } : null,
+    player2: p2 ? { id: p2.id, handle: p2.handle, userId: p2.userId, discordUser: p2.discordUser } : null,
+    viewer: playerUser,
+    discordHref: discordStartHref(),
+    matchOpen: match.status === 'ready',
+    matchComplete: match.status === 'complete',
+    bestOf: match.bestOf,
+    canReport: () => Boolean(hostMode && hostPassword),
+    onHostGate: () => openHostSignIn(),
+    onResult: async ({ score1, score2, bestOf }) => {
+      if (!hostMode || !hostPassword) {
+        const ok = await openHostSignIn();
+        if (!ok) throw new Error('Host sign-in is required to lock this series');
+      }
+      await api.post(`/arenas/${encodeURIComponent(slug)}/table-lock`, {
+        hostPassword,
+        matchId: match.id,
+        score1,
+        score2,
+        bestOf,
+      });
+      location.hash = `#/t/${encodeURIComponent(slug)}`;
+    },
+  });
+}
+
 const HERO = `<section class="hero">
-  <div class="hero-crest">
-    <img src="/bracket/crest.jpg" alt="">
+  <div class="hero-lockup">
+    <div class="hero-crest">
+      <img src="/bracket/crest.jpg" alt="">
+    </div>
+    <div class="hero-copy">
+      <p class="hero-kicker">DDL Tourney</p>
+      <h1>Legends Bracket</h1>
+    </div>
   </div>
-  <div class="hero-copy">
-    <p class="hero-kicker">Doginal Dogs Legends</p>
-    <h1>Legends<br>Bracket</h1>
-    <i class="ornament" aria-hidden="true"><span></span></i>
-    <p class="hero-lead">Pick an arena, sign in with Discord, and send the entry if there is one. The host confirms payments and runs the bracket. Wins are stored as records you can carry into a grand tournament.</p>
-  </div>
+  <i class="ornament" aria-hidden="true"><span></span></i>
+  <p class="hero-lead">Pick an arena, sign in with Discord, and send the entry if there is one. The host confirms payments and runs the bracket. Wins are stored as records you can carry into a grand tournament.</p>
 </section>`;
+
+function recordEventToArena(event) {
+  const field = Number(event && event.fieldSize) || 0;
+  return {
+    slug: event.slug,
+    name: event.name,
+    status: 'completed',
+    format: event.format || 'single_elim',
+    eventKind: event.kind || event.eventKind,
+    maxPlayers: field,
+    paidCount: field,
+    entryCount: field,
+    capPlayers: true,
+    entryFeeUsd: 0,
+    champion: event.champion || null,
+    restoredFromRecords: true,
+  };
+}
+
+async function arenasFromRecordsFallback() {
+  const pack = await api.get('/records');
+  return (pack.events || []).filter((event) => event && event.slug).map(recordEventToArena);
+}
 
 async function renderHome() {
   setTreeMode(false);
   root.innerHTML = `${HERO}<p class="muted">Loading arenas…</p>`;
   try {
-    const arenas = await api.get('/arenas');
+    let arenas = await api.get('/arenas');
+    if (!Array.isArray(arenas)) arenas = [];
+    if (!arenas.length) {
+      try { arenas = await arenasFromRecordsFallback(); } catch (_err) {}
+    }
     root.innerHTML = `${HERO}
-    <p class="muted"><a href="/tourney/#/records">Hall of records</a> — champions, leaderboards, badges, and past results.${hostMode ? ` <a href="/tourney/#/ledger">Write the ledger</a>.` : ''}</p>
-    <h2 class="section-title">Tournaments</h2>
+    <p class="muted"><a href="/tourney/#/records">Records</a> — tournament titles, duel boards, and past results.${hostMode ? ` <a href="/tourney/#/ledger">Write the ledger</a>.` : ''}</p>
+    <h2 class="section-title">Arenas</h2>
     <div class="grid cards">${arenas.map((t) => `
       <a class="card plaque" data-status="${esc(t.status)}" href="${arenaHref(t.slug)}">
-        <div class="row"><h3>${esc(t.name)}</h3>${badge(t.status)}</div>
+        <div class="card-top">
+          <h3>${esc(t.name)}</h3>
+          <div class="card-tags">${kindTagHtml(t)}${badge(t.status)}</div>
+        </div>
         <p class="muted">${esc(formatTitle(t))} · ${feeUsd(t) > 0 ? `${formatUsd(feeUsd(t))} entry` : 'Free entry'}</p>
-        <p class="muted">${t.paidCount}${t.capPlayers !== false ? ` / ${t.maxPlayers}` : ''} players in${hostMode && Math.max(0, (t.entryCount || 0) - t.paidCount) ? ` · ${Math.max(0, (t.entryCount || 0) - t.paidCount)} awaiting payment` : ''}</p>
+        <p class="muted">${t.paidCount}${t.capPlayers !== false ? ` / ${t.maxPlayers}` : ''} ${isDuelArena(t) ? 'duelists' : 'players'} in${hostMode && Math.max(0, (t.entryCount || 0) - t.paidCount) ? ` · ${Math.max(0, (t.entryCount || 0) - t.paidCount)} awaiting payment` : ''}</p>
         ${rewardCardHtml(t)}
-        ${t.status === 'completed' && t.champion && t.champion.handle ? `<p class="muted">Champion: ${namedHandleHtml(t.champion.handle)}</p>` : ''}
-      </a>`).join('') || '<p class="muted">No tournaments yet.</p>'}</div>
+        ${t.status === 'completed' && t.champion && t.champion.handle ? `<p class="muted">${isDuelArena(t, t.paidCount) ? 'Winner' : 'Champion'}: ${namedHandleHtml(t.champion.handle)}</p>` : ''}
+      </a>`).join('') || '<p class="muted">No arenas yet.</p>'}</div>
     ${hostMode ? `<section class="host-panel" style="margin-top:36px">
       <div class="host-flag">Host only</div>
       <h2>Host</h2>
@@ -2448,6 +3200,7 @@ async function renderCreate() {
 function openScorecard(data, slug, match, onSaved) {
   const p1 = entryOf(data.entries, match.entry1Id);
   const p2 = entryOf(data.entries, match.entry2Id);
+  const closed = match.status === 'complete';
   let bestOf = BEST_OF.includes(Number(match.bestOf)) ? Number(match.bestOf) : 3;
   const games = (match.games || []).map((g) => Number(g.winnerSlot));
   const overlay = document.createElement('div');
@@ -2460,12 +3213,12 @@ function openScorecard(data, slug, match, onSaved) {
     overlay.innerHTML = `<div class="scorecard" role="dialog" aria-modal="true">
       <div class="row">
         <div>
-          <p class="muted">${esc(bestOfLabel(bestOf))} · first to ${need}</p>
+          <p class="muted">${esc(bestOfLabel(bestOf))} · first to ${need}${closed ? ' · locked' : ''}</p>
           <h2>${esc(p1?.handle || 'TBD')} vs ${esc(p2?.handle || 'TBD')}</h2>
         </div>
         <button type="button" class="copy" id="sc-close">Close</button>
       </div>
-      <label>This round
+      ${closed ? '' : `<label>This round
         <select id="sc-bestof">
           ${BEST_OF.map((n) => `<option value="${n}" ${n === bestOf ? 'selected' : ''}>${esc(bestOfLabel(n))}</option>`).join('')}
         </select>
@@ -2480,23 +3233,30 @@ function openScorecard(data, slug, match, onSaved) {
             <button type="button" class="${winner === 2 ? 'on' : ''}" data-game="${i}" data-slot="2" ${locked ? 'disabled' : ''}>${esc(p2?.handle || 'P2')}</button>
           </div>`;
         }).join('')}
-      </div>
+      </div>`}
       <p class="series">${s1} — ${s2}</p>
-      <p class="muted">${done
-        ? `${esc((s1 > s2 ? p1 : p2)?.handle || 'Winner')} wins the series — lock it to advance them.`
-        : `Tap each game as it finishes. Locking needs a series winner: ${need - Math.max(s1, s2)} more game${need - Math.max(s1, s2) === 1 ? '' : 's'}.`}</p>
+      <p class="muted">${closed
+        ? 'Series locked. Unlock it to move people in this round. Later matches that used this result unlock too.'
+        : done
+          ? `${esc((s1 > s2 ? p1 : p2)?.handle || 'Winner')} wins the series — lock it to advance them.`
+          : `Tap each game as it finishes. Locking needs a series winner: ${need - Math.max(s1, s2)} more game${need - Math.max(s1, s2) === 1 ? '' : 's'}.`}</p>
       <p class="err" id="sc-err" hidden></p>
       <div class="sc-actions">
-        <button class="btn ghost" type="button" id="sc-save" ${games.length ? '' : 'disabled'} ${tip('Save game wins so far. The match stays open and the bracket keeps the running score.')}>Save progress</button>
-        <button class="btn" type="button" id="sc-lock" ${done ? '' : 'disabled'} ${tip('Locks the series and advances the winner.')}>Lock series</button>
+        ${closed
+          ? `<button class="btn" type="button" id="sc-unlock" ${tip('Unlock this series and later matches that used it.')}>Unlock series</button>`
+          : `<button class="btn ghost" type="button" id="sc-save" ${games.length ? '' : 'disabled'} ${tip('Save game wins so far. The match stays open and the bracket keeps the running score.')}>Save progress</button>
+        <button class="btn" type="button" id="sc-lock" ${done ? '' : 'disabled'} ${tip('Locks the series and advances the winner.')}>Lock series</button>`}
       </div>
     </div>`;
     overlay.querySelector('#sc-close').onclick = () => overlay.remove();
-    overlay.querySelector('#sc-bestof').onchange = (event) => {
-      bestOf = Number(event.target.value);
-      games.length = 0;
-      paintCard();
-    };
+    const bestOfEl = overlay.querySelector('#sc-bestof');
+    if (bestOfEl) {
+      bestOfEl.onchange = (event) => {
+        bestOf = Number(event.target.value);
+        games.length = 0;
+        paintCard();
+      };
+    }
     overlay.querySelectorAll('[data-game]').forEach((btn) => {
       btn.onclick = () => {
         const idx = Number(btn.getAttribute('data-game'));
@@ -2533,8 +3293,29 @@ function openScorecard(data, slug, match, onSaved) {
         errEl.textContent = err.message;
       }
     };
-    overlay.querySelector('#sc-save').onclick = () => send('games');
-    overlay.querySelector('#sc-lock').onclick = () => send('report');
+    const saveBtn = overlay.querySelector('#sc-save');
+    if (saveBtn) saveBtn.onclick = () => send('games');
+    const lockBtn = overlay.querySelector('#sc-lock');
+    if (lockBtn) lockBtn.onclick = () => send('report');
+    const unlockBtn = overlay.querySelector('#sc-unlock');
+    if (unlockBtn) {
+      unlockBtn.onclick = async () => {
+        if (!window.confirm('Unlock this series? Later matches that already used this result will unlock too.')) return;
+        const errEl = overlay.querySelector('#sc-err');
+        errEl.hidden = true;
+        try {
+          const next = await api.post(`/arenas/${encodeURIComponent(slug)}/reset-match`, {
+            hostPassword,
+            matchId: match.id,
+          });
+          overlay.remove();
+          onSaved(next);
+        } catch (err) {
+          errEl.hidden = false;
+          errEl.textContent = err.message;
+        }
+      };
+    }
   };
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) overlay.remove();
@@ -2553,6 +3334,7 @@ async function renderArena(slug) {
   let data;
   try {
     data = await api.get(`/arenas/${encodeURIComponent(slug)}`);
+    applyBracketLayoutFixes(data);
   } catch (err) {
     root.innerHTML = `<p class="err">${esc(err.message)}</p>`;
     return;
@@ -2562,12 +3344,22 @@ async function renderArena(slug) {
   let tab = openForSignup() && !hostMode ? 'enter' : 'bracket';
   let quoteTimer = 0;
   let shuffle = false;
+  let swapA = '';
+  let swapB = '';
+  let pairA = '';
+  let pairB = '';
+  let pairRound = '';
+  let swapPick = false;
+  let placeEntry = '';
   let hostSavedMsg = '';
   let bestOf = BEST_OF.includes(Number(data.tournament.bestOf)) ? Number(data.tournament.bestOf) : 3;
+  let finalsBestOf = BEST_OF.includes(Number(data.tournament.finalsBestOf)) ? Number(data.tournament.finalsBestOf) : null;
+  let breakTies = Boolean(data.tournament.breakTies) && canHaveThirdPlace(data.tournament);
   let roundBestOf = { ...(data.tournament.roundBestOf || {}) };
 
   const reload = async () => {
     data = await api.get(`/arenas/${encodeURIComponent(slug)}`);
+    applyBracketLayoutFixes(data);
   };
 
   /** Runs a host request, signing in first if needed, then repaints with the fresh arena. */
@@ -2580,7 +3372,10 @@ async function renderArena(slug) {
     }
     try {
       const next = await run();
-      if (next && next.tournament) data = next;
+      if (next && next.tournament) {
+        applyBracketLayoutFixes(next);
+        data = next;
+      }
       else await reload();
       paint();
     } catch (err) {
@@ -2619,7 +3414,7 @@ async function renderArena(slug) {
     if (!nav.some(([id]) => id === tab)) tab = 'bracket';
     const rewards = rewardsOf(data, t);
     const podium = data.podium && t.status === 'completed' && data.podium.first
-      ? prestigePodiumHtml(data.podium, rewards)
+      ? prestigePodiumHtml(data.podium, rewards, t, confirmed.length)
       : '';
     root.innerHTML = `<div class="arena-shell">
       <nav class="arena-nav">
@@ -2627,21 +3422,26 @@ async function renderArena(slug) {
       </nav>
       <div>
         <header class="arena-head">
-          <div>
-            <p class="form-kicker">${esc(t.game || 'Doginal Dogs Legends TCG')}</p>
-            <h1>${esc(t.name)} ${badge(t.status)}</h1>
-            <i class="ornament tight" aria-hidden="true"><span></span></i>
-            <p class="share-line">
-              <span class="mono muted">${esc(location.origin)}${arenaShareHref(slug)}</span>
-              <button type="button" class="copy" data-copy="${esc(`${location.origin}${arenaShareHref(slug)}`)}" ${tip('Share this link on X. The preview title is this tournament name.')}>Copy link</button>
-            </p>
-            <dl class="meta">
-              <div><dt>Players</dt><dd>${confirmed.length}${t.capPlayers !== false ? ` / ${t.maxPlayers}` : ''}</dd></div>
-              <div><dt>Format</dt><dd>${esc(formatTitle(t))}</dd></div>
-              <div><dt>Entry</dt><dd>${feeUsd(t) > 0 ? `${formatUsd(feeUsd(t))} USD` : 'Free'}</dd></div>
-              <div><dt>Start</dt><dd>${esc(start)}</dd></div>
-              ${rewardMetaHtml(rewards)}
-            </dl>
+          <div class="arena-lockup">
+            <div class="hero-crest arena-crest">
+              <img src="/bracket/crest.jpg" alt="">
+            </div>
+            <div class="arena-copy">
+              <p class="hero-kicker">${isGrandArena(t) ? 'Grand Tournament' : 'DDL Tourney'}</p>
+              <h1>${esc(t.name)} ${kindTagHtml(t)} ${badge(t.status)}</h1>
+              <i class="ornament tight" aria-hidden="true"><span></span></i>
+              <p class="share-line">
+                <span class="mono muted">${esc(location.origin)}${arenaShareHref(slug)}</span>
+                <button type="button" class="copy" data-copy="${esc(`${location.origin}${arenaShareHref(slug)}`)}" ${tip('Share this link on X. The preview card shows this tournament name beside the crest.')}>Copy link</button>
+              </p>
+              <dl class="meta">
+                <div><dt>Players</dt><dd>${confirmed.length}${t.capPlayers !== false ? ` / ${t.maxPlayers}` : ''}</dd></div>
+                <div><dt>Format</dt><dd>${esc(formatTitle(t))}</dd></div>
+                <div><dt>Entry</dt><dd>${feeUsd(t) > 0 ? `${formatUsd(feeUsd(t))} USD` : 'Free'}</dd></div>
+                <div><dt>Start</dt><dd>${esc(start)}</dd></div>
+                ${rewardMetaHtml(rewards)}
+              </dl>
+            </div>
           </div>
           ${organizerHtml(t, resolveHostUser(t, data.hostUser))}
         </header>
@@ -2934,6 +3734,238 @@ async function renderArena(slug) {
     };
   }
 
+  const bindSwapControls = (root) => {
+    const aEl = root.querySelector('#swap-a');
+    const bEl = root.querySelector('#swap-b');
+    const pairRoundEl = root.querySelector('#pair-round');
+    const pairAEl = root.querySelector('#pair-a');
+    const pairBEl = root.querySelector('#pair-b');
+    const pairBtn = root.querySelector('#pair-btn');
+    const pickEl = root.querySelector('#swap-pick');
+    const btn = root.querySelector('#swap-btn');
+    const placeEl = root.querySelector('#place-entry');
+    const placeBtn = root.querySelector('#place-btn');
+    const errEl = root.querySelector('#swap-err');
+    const playerName = (id) => {
+      const entry = entryOf(data.entries, id);
+      return entry ? entry.handle : 'that player';
+    };
+    const runPair = (idA, idB, matchId) => {
+      const a = Number(idA);
+      const b = Number(idB);
+      if (!a || !b || a === b) {
+        const msg = 'Pick two different players.';
+        if (errEl) {
+          errEl.hidden = false;
+          errEl.textContent = msg;
+        }
+        window.alert(msg);
+        return;
+      }
+      if (pairRoundEl) pairRound = pairRoundEl.value;
+      const roundRef = parseRoundKey(pairRound);
+      if (!window.confirm(`${playerName(a)} will play ${playerName(b)}.`)) {
+        pairA = '';
+        pairB = '';
+        paint();
+        return;
+      }
+      hostAction(errEl, async () => {
+        try {
+          const next = await api.post(`/arenas/${encodeURIComponent(slug)}/they-play`, {
+            hostPassword,
+            entryIdA: a,
+            entryIdB: b,
+            matchId: Number(matchId) || undefined,
+            side: roundRef && roundRef.side,
+            round: roundRef && roundRef.round,
+          });
+          pairA = '';
+          pairB = '';
+          return next;
+        } catch (err) {
+          window.alert(err.message);
+          throw err;
+        }
+      });
+    };
+    const seatName = (key) => {
+      const seat = parseSeatKey(key);
+      if (!seat) return 'that seat';
+      const match = (data.matches || []).find((m) => m.id === seat.matchId);
+      if (!match) return 'that seat';
+      const entry = entryOf(data.entries, seat.slot === 2 ? match.entry2Id : match.entry1Id);
+      return entry ? entry.handle : 'empty seat';
+    };
+    const runSwap = (aKey, bKey) => {
+      const a = parseSeatKey(aKey);
+      const b = parseSeatKey(bKey);
+      if (!a || !b || (a.matchId === b.matchId && a.slot === b.slot)) {
+        if (errEl) {
+          errEl.hidden = false;
+          errEl.textContent = 'Pick two different seats.';
+        }
+        return;
+      }
+      if (!window.confirm(`Swap ${seatName(aKey)} and ${seatName(bKey)}?`)) return;
+      hostAction(errEl, async () => {
+        const next = await api.post(`/arenas/${encodeURIComponent(slug)}/swap-slots`, {
+          hostPassword,
+          matchIdA: a.matchId,
+          slotA: a.slot,
+          matchIdB: b.matchId,
+          slotB: b.slot,
+        });
+        swapA = '';
+        swapB = '';
+        return next;
+      });
+    };
+    if (aEl) aEl.onchange = () => { swapA = aEl.value; };
+    if (bEl) bEl.onchange = () => { swapB = bEl.value; };
+    if (pairAEl) pairAEl.onchange = () => { pairA = pairAEl.value; };
+    if (pairBEl) pairBEl.onchange = () => { pairB = pairBEl.value; };
+    if (pairRoundEl) pairRoundEl.onchange = () => { pairRound = pairRoundEl.value; };
+    if (placeEl) placeEl.onchange = () => { placeEntry = placeEl.value; };
+    if (pairBtn) pairBtn.onclick = () => runPair(pairAEl && pairAEl.value, pairBEl && pairBEl.value);
+    if (pickEl) {
+      pickEl.onchange = () => {
+        swapPick = pickEl.checked;
+        paint();
+      };
+    }
+    if (btn) btn.onclick = () => runSwap(aEl && aEl.value, bEl && bEl.value);
+    if (placeBtn) {
+      placeBtn.onclick = () => {
+        const a = parseSeatKey(aEl && aEl.value);
+        const entryId = Number(placeEl && placeEl.value);
+        if (!a || !entryId) {
+          if (errEl) {
+            errEl.hidden = false;
+            errEl.textContent = 'Pick a seat and a player.';
+          }
+          return;
+        }
+        const who = fieldEntries(data.entries).find((e) => e.id === entryId);
+        if (!window.confirm(`Put ${who ? who.handle : 'that player'} in ${seatName(aEl.value)}?`)) return;
+        hostAction(errEl, async () => {
+          const next = await api.post(`/arenas/${encodeURIComponent(slug)}/place-entry`, {
+            hostPassword,
+            entryId,
+            matchId: a.matchId,
+            slot: a.slot,
+          });
+          placeEntry = '';
+          return next;
+        });
+      };
+    }
+    root.querySelectorAll('[data-place-match]').forEach((sel) => {
+      sel.onclick = (event) => event.stopPropagation();
+      sel.onchange = () => {
+        const matchId = Number(sel.getAttribute('data-place-match'));
+        const slot = Number(sel.getAttribute('data-place-slot'));
+        const entryId = Number(sel.value) || 0;
+        const match = (data.matches || []).find((m) => m.id === matchId);
+        const occupantId = match ? (slot === 2 ? match.entry2Id : match.entry1Id) : null;
+        const otherId = match ? (slot === 2 ? match.entry1Id : match.entry2Id) : null;
+        const who = entryId ? fieldEntries(data.entries).find((e) => e.id === entryId) : null;
+        const label = who ? who.handle : 'TBD';
+        if (!entryId) {
+          if (!window.confirm('Clear this seat?')) {
+            paint();
+            return;
+          }
+          hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/place-entry`, {
+            hostPassword,
+            matchId,
+            slot,
+            entryId: null,
+          }));
+          return;
+        }
+        if (occupantId && Number(occupantId) === entryId) return;
+        if (otherId && Number(otherId) === entryId) {
+          paint();
+          return;
+        }
+        if (occupantId) {
+          runPair(occupantId, entryId, matchId);
+          return;
+        }
+        if (!window.confirm(`Put ${label} in this empty seat?`)) {
+          paint();
+          return;
+        }
+        hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/place-entry`, {
+          hostPassword,
+          matchId,
+          slot,
+          entryId,
+        }));
+      };
+    });
+    root.querySelectorAll('[data-pair-entry]').forEach((el) => {
+      el.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const id = String(el.getAttribute('data-pair-entry') || '');
+        if (!id) return;
+        if (pairA === id) {
+          pairA = '';
+          paint();
+          return;
+        }
+        if (!pairA) {
+          pairA = id;
+          paint();
+          return;
+        }
+        if (pairA && id !== pairA) {
+          pairB = id;
+          paint();
+          runPair(pairA, id);
+        }
+      };
+    });
+    root.querySelectorAll('[data-swap-seat]').forEach((el) => {
+      el.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const key = String(el.getAttribute('data-swap-seat') || '');
+        if (!key) return;
+        if (swapA === key) {
+          swapA = '';
+          paint();
+          return;
+        }
+        if (!swapA) {
+          swapA = key;
+          paint();
+          return;
+        }
+        if (swapA && key !== swapA) {
+          swapB = key;
+          paint();
+          runSwap(swapA, key);
+        }
+      };
+    });
+    root.querySelectorAll('[data-reset-match]').forEach((el) => {
+      el.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const matchId = Number(el.getAttribute('data-reset-match'));
+        if (!matchId) return;
+        if (!window.confirm('Unlock this series? Later matches that already used this result will unlock too.')) return;
+        hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/reset-match`, {
+          hostPassword,
+          matchId,
+        }));
+      };
+    });
+  };
+
   /** Registration-stage bracket tab: a waiting notice for visitors, one lock card for the host. */
   function paintPreLock(panel, t) {
     const confirmed = data.entries.filter((e) => e.paid && !e.whitelist && !e.noShow);
@@ -2953,19 +3985,34 @@ async function renderArena(slug) {
       return;
     }
     const ready = confirmed.length >= 2;
+    const lockT = { ...t, bestOf, finalsBestOf, breakTies };
+    const showBronze = canHaveThirdPlace(t);
+    const showFinals = hasFinalsSeries(t);
     panel.innerHTML = `<div class="host-panel">
       <div class="host-flag">Host only</div>
       <p><strong>Lock the bracket</strong></p>
       <p class="muted">${ready
-        ? `${confirmed.length} confirmed ${confirmed.length === 1 ? 'player' : 'players'} will be seeded into a ${esc(formatBlurb(t))}. Locking closes registration.`
+        ? `${confirmed.length} confirmed ${confirmed.length === 1 ? 'player' : 'players'} will be seeded into a ${esc(formatBlurb(lockT))}. Locking closes registration.${esc(byeNote(t, confirmed.length))}${showBronze && confirmed.length < 4 ? ' A 3rd place match needs 4 players, so it is skipped for this field.' : ''}`
         : `You need at least 2 confirmed players. ${confirmed.length} so far.`}</p>
       ${pending.length ? `<p class="muted">${pending.length} ${pending.length === 1 ? 'entry has' : 'entries have'} not paid and will be left out — <button type="button" class="linkish" data-go="players">confirm payments</button> first if that is wrong.</p>` : ''}
       ${confirmed.length ? `<p class="chips">${confirmed.map((e) => `<span class="chip named-handle">${esc(e.handle)}${classLabelHtml(e.ddlClass)}${medalsInlineHtml(badgesFor(e.handle, e.badges))}</span>`).join('')}</p>` : ''}
+      ${t.rewardMode !== 'prize' ? `<div>
+        <label for="lock-pot">Prize pot (USD)</label>
+        <div class="host-money">
+          <input id="lock-pot" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(Number(t.hostPotUsd) || 0)}" ${tip('House money for this arena. Added on top of paid entries. For a free list, this is the whole pot.')}>
+          <button type="button" class="btn ghost" id="save-pot">Save pot</button>
+        </div>
+        <p class="hint">Shows on the public page as Pot. Paid entries add on top. You can still change this after lock.</p>
+      </div>` : ''}
       <label class="check"><input type="checkbox" id="shuffle" ${shuffle ? 'checked' : ''}> Shuffle seeds for a random draw</label>
-      <div style="max-width:16rem"><label for="lock-bestof">Series length</label>${bestOfSelect('lock-bestof', bestOf)}</div>
+      ${showBronze ? `<label class="check"><input type="checkbox" id="lock-break" ${breakTies ? 'checked' : ''}> 3rd place match — semi-final losers play for bronze</label>` : ''}
+      <div style="max-width:16rem"><label for="lock-bestof">Default series</label>${bestOfSelect('lock-bestof', bestOf)}</div>
+      ${showFinals ? `<div style="max-width:16rem"><label for="lock-finalsbestof">Finals series</label>${finalsBestOfSelect('lock-finalsbestof', finalsBestOf)}
+        <p class="hint">Championship only. Set Best of 1 above and Best of 3 here for a BO1 bracket with a BO3 final.</p>
+      </div>` : ''}
       <details class="advanced">
         <summary>Different series length per round</summary>
-        ${roundRulesHtml(t.format, Math.max(2, confirmed.length), t.swissRounds, bestOf, roundBestOf, wantsLosers(t))}
+        ${roundRulesHtml(t.format, Math.max(2, confirmed.length), t.swissRounds, bestOf, roundBestOf, wantsLosers(t), showBronze && breakTies, finalsBestOf)}
       </details>
       <div class="row wrap">
         <button class="btn" type="button" id="lock-btn" ${ready ? '' : 'disabled'}>Lock bracket &amp; start</button>
@@ -2980,14 +4027,29 @@ async function renderArena(slug) {
     const readLocal = () => {
       shuffle = panel.querySelector('#shuffle').checked;
       bestOf = Number(panel.querySelector('#lock-bestof').value);
+      const finalsEl = panel.querySelector('#lock-finalsbestof');
+      finalsBestOf = finalsEl && finalsEl.value !== '' ? Number(finalsEl.value) : null;
+      const breakEl = panel.querySelector('#lock-break');
+      if (breakEl) breakTies = breakEl.checked;
       roundBestOf = readRoundBestOf(panel);
     };
     panel.querySelector('#lock-bestof').onchange = () => {
       readLocal();
       paint();
     };
+    const finalsEl = panel.querySelector('#lock-finalsbestof');
+    if (finalsEl) finalsEl.onchange = () => { readLocal(); paint(); };
+    const breakEl = panel.querySelector('#lock-break');
+    if (breakEl) breakEl.onchange = () => { readLocal(); paint(); };
     panel.querySelector('#shuffle').onchange = readLocal;
     panel.querySelectorAll('[data-round-bestof]').forEach((el) => { el.onchange = readLocal; });
+    const savePot = panel.querySelector('#save-pot');
+    if (savePot) {
+      savePot.onclick = () => hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/settings`, {
+        hostPassword,
+        hostPotUsd: Number(panel.querySelector('#lock-pot').value || 0),
+      }));
+    }
     panel.querySelector('#lock-btn').onclick = () => {
       readLocal();
       hostAction(errEl, async () => {
@@ -2998,7 +4060,10 @@ async function renderArena(slug) {
           checkInSelected: true,
           entryIds: data.entries.filter((e) => e.paid && !e.whitelist && !e.noShow).map((e) => e.id),
           bestOf,
+          finalsBestOf,
           roundBestOf,
+          ...(panel.querySelector('#lock-break') ? { breakTies } : {}),
+          hostPotUsd: Number(panel.querySelector('#lock-pot')?.value ?? t.hostPotUsd ?? 0),
         });
         tab = 'bracket';
         return next;
@@ -3012,7 +4077,40 @@ async function renderArena(slug) {
       return;
     }
     const kickChannel = kickChannelOf(t.streamUrl);
-    panel.innerHTML = `${hostMode ? `<p class="muted host-hint">Host mode: tap any glowing match to report games and lock the series. Add a late player from the Players tab.${Number(t.whitelistSpots) > 0 ? ' First-round no-shows also go on the Whitelist tab.' : ''}</p>
+    const canShuffle = hostMode && t.status === 'in_progress' && !bracketHasPlay(data.matches);
+    const field = fieldEntries(data.entries);
+    const seats = editableSeats(t, data.matches, data.entries);
+    const canEdit = hostMode && t.status !== 'registration';
+    const rounds = hostRoundOptions(t, data.matches);
+    if (!pairRound || !rounds.some((r) => r.key === pairRound)) pairRound = defaultPairRoundKey(rounds);
+    const swapOpts = canEdit ? {
+      hostEdit: true,
+      swapPick: Boolean(swapPick),
+      swapSelected: [swapA, swapB].filter(Boolean),
+      pairSelected: [pairA, pairB].filter(Boolean),
+    } : null;
+    panel.innerHTML = `${hostMode ? `<p class="muted host-hint">Round should say Semi Finals. Pick DickTheDev and hofer, then press They play each other.</p>
+      <div class="host-panel">
+        <div class="host-flag">Host only</div>
+        <p><strong>Shuffle bracket</strong></p>
+        <p class="muted">${t.status !== 'in_progress'
+          ? 'This arena is finished.'
+          : canShuffle
+            ? 'Redraws every matchup from a random seed order. This is blocked once any series has been reported.'
+            : 'Shuffle is locked because a series has already been reported.'}</p>
+        <div class="row wrap">
+          <button class="btn ghost" type="button" id="reshuffle-btn" ${canShuffle ? '' : 'disabled'}>Shuffle bracket</button>
+        </div>
+        <p class="err" id="reshuffle-err" hidden></p>
+        <p><strong>They play each other</strong></p>
+        ${swapFormHtml(seats, field, canEdit, {
+          rounds,
+          pairRound,
+          pairA,
+          pairB,
+          reason: swapBlockedReason(t, seats),
+        })}
+      </div>
       <div class="host-panel kick-host">
         <div class="host-flag">Host only</div>
         <p><strong>Kick livestream</strong></p>
@@ -3029,7 +4127,7 @@ async function renderArena(slug) {
       <div class="row wrap bracket-toolbar">
         <button class="btn ghost" type="button" id="export-rounds" ${tip('Copy or download this round’s scores as text, like Shock vs Dick 1/0.')}>Export round results</button>
       </div>
-      ${bracketHtml(data)}`;
+      ${bracketHtml(data, swapOpts)}`;
     const kickForm = panel.querySelector('#kick-form');
     if (kickForm) {
       const kickErr = panel.querySelector('#kick-err');
@@ -3050,11 +4148,23 @@ async function renderArena(slug) {
     }
     const exportBtn = panel.querySelector('#export-rounds');
     if (exportBtn) exportBtn.onclick = () => openExportSheet(roundResultsText(data), slug);
+    const reshuffleBtn = panel.querySelector('#reshuffle-btn');
+    if (reshuffleBtn) {
+      const reshuffleErr = panel.querySelector('#reshuffle-err');
+      reshuffleBtn.onclick = () => {
+        if (!window.confirm('Shuffle redraws every matchup from a random seed order. You can only do this before any series is reported. Continue?')) return;
+        hostAction(reshuffleErr, () => api.post(`/arenas/${encodeURIComponent(slug)}/reshuffle`, { hostPassword }));
+      };
+    }
+    bindSwapControls(panel);
+    bindBracketViewport(panel);
     panel.querySelectorAll('[data-match]').forEach((btn) => {
       btn.onclick = () => {
         const match = data.matches.find((m) => String(m.id) === btn.getAttribute('data-match'));
-        if (!match || match.status !== 'ready' || !hostMode) return;
+        if (!match || !hostMode) return;
+        if (match.status !== 'ready' && match.status !== 'complete') return;
         openScorecard(data, slug, match, (next) => {
+          applyBracketLayoutFixes(next);
           data = next;
           paint();
         });
@@ -3196,6 +4306,11 @@ async function renderArena(slug) {
 
   function paintHostTools(panel, t) {
     const live = t.status !== 'registration';
+    const field = fieldEntries(data.entries);
+    const seats = editableSeats(t, data.matches, data.entries);
+    const canEdit = t.status !== 'registration';
+    const rounds = hostRoundOptions(t, data.matches);
+    if (!pairRound || !rounds.some((r) => r.key === pairRound)) pairRound = defaultPairRoundKey(rounds);
     panel.innerHTML = `<div class="host-steps">
       <article>
         <div class="host-flag">Host only</div>
@@ -3228,9 +4343,29 @@ async function renderArena(slug) {
         <p class="err" id="claim-err" hidden></p>
       </article>` : ''}
       ${live ? `<article>
+        <h3>Shuffle bracket</h3>
+        <p class="muted">${t.status === 'in_progress' && !bracketHasPlay(data.matches)
+          ? 'Redraws every matchup from a random seed order. Blocked once a series has been reported.'
+          : 'Shuffle is locked because a series has already been reported, or this arena is finished.'}</p>
+        <div class="row wrap">
+          <button class="btn ghost" type="button" id="reshuffle-btn" ${t.status === 'in_progress' && !bracketHasPlay(data.matches) ? '' : 'disabled'}>Shuffle bracket</button>
+        </div>
+        <p class="err" id="reshuffle-err" hidden></p>
+      </article>
+      <article>
+        <h3>They play each other</h3>
+        ${swapFormHtml(seats, field, canEdit, {
+          rounds,
+          pairRound,
+          pairA,
+          pairB,
+          reason: swapBlockedReason(t, seats),
+        })}
+      </article>` : ''}
+      ${live ? `<article>
         <h3>Series length per round</h3>
         <p class="muted">Applies to matches that have not been locked yet.</p>
-        ${roundRulesHtml(t.format, Math.max(2, data.entries.filter((e) => e.paid).length), t.swissRounds, t.bestOf, t.roundBestOf, wantsLosers(t))}
+        ${roundRulesHtml(t.format, Math.max(2, data.entries.filter((e) => e.paid).length), t.swissRounds, t.bestOf, t.roundBestOf, wantsLosers(t), t.breakTies, t.finalsBestOf)}
         <button class="btn ghost" type="button" id="rules-btn">Save series lengths</button>
       </article>` : ''}
       <article>
@@ -3270,9 +4405,11 @@ async function renderArena(slug) {
         assertRewardsSaved(payload, next);
         hostSavedMsg = payload.rewardMode === 'prize'
           ? 'Prizes saved. The header now says Prizes instead of Pot.'
-          : filledPayouts(payload).length
-            ? 'Pot split saved. The header still shows the running pot; Payout lists the place breakdown.'
-            : 'Options saved.';
+          : Number(payload.hostPotUsd) > 0
+            ? 'Prize pot saved. The header shows this amount plus any paid entries.'
+            : filledPayouts(payload).length
+              ? 'Pot split saved. The header still shows the running pot; Payout lists the place breakdown.'
+              : 'Options saved.';
         return next;
       });
     };
@@ -3280,8 +4417,18 @@ async function renderArena(slug) {
     if (rulesBtn) rulesBtn.onclick = () => hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/round-rules`, {
       hostPassword,
       bestOf: t.bestOf,
+      finalsBestOf: t.finalsBestOf,
       roundBestOf: readRoundBestOf(panel),
     }));
+    const reshuffleBtn = document.getElementById('reshuffle-btn');
+    if (reshuffleBtn) {
+      const reshuffleErr = document.getElementById('reshuffle-err');
+      reshuffleBtn.onclick = () => {
+        if (!window.confirm('Shuffle redraws every matchup from a random seed order. You can only do this before any series is reported. Continue?')) return;
+        hostAction(reshuffleErr, () => api.post(`/arenas/${encodeURIComponent(slug)}/reshuffle`, { hostPassword }));
+      };
+    }
+    bindSwapControls(panel);
     document.getElementById('del-btn').onclick = async () => {
       const adminErr = document.getElementById('admin-err');
       adminErr.hidden = true;
@@ -3349,23 +4496,56 @@ async function renderArena(slug) {
   paint();
 }
 
-function eventCardHtml(event) {
+function eventPlacesHtml(event) {
+  const duel = isDuelArena(event, event.fieldSize);
+  const first = event.champion && event.champion.handle ? namedHandleHtml(event.champion.handle) : '';
+  const second = event.runnerUp && event.runnerUp.handle ? namedHandleHtml(event.runnerUp.handle) : '';
+  if (duel) {
+    if (first && second) {
+      return `<p class="result-places">${first} <span class="duel-def">def.</span> ${second}${event.champion.record ? ` · ${esc(formatRecord(event.champion.record))}` : ''}</p>`;
+    }
+    return first ? `<p class="result-places">Winner ${first}</p>` : '<p class="muted">No result recorded</p>';
+  }
+  const thirds = Array.isArray(event.third) ? event.third.filter((p) => p && p.handle) : [];
+  const bits = [];
+  if (first) bits.push(`<span><em>1st</em> ${first}</span>`);
+  if (second) bits.push(`<span><em>2nd</em> ${second}</span>`);
+  if (thirds.length) bits.push(`<span><em>3rd</em> ${thirds.map((p) => namedHandleHtml(p.handle)).join(', ')}</span>`);
+  return bits.length ? `<p class="result-places">${bits.join('')}</p>` : '<p class="muted">No podium recorded</p>';
+}
+
+function resultRowHtml(event) {
   const href = arenaCardHref(event);
-  const tag = event.official
-    ? '<span class="badge ok">Official</span>'
-    : '<span class="badge">Scrim</span>';
-  const champ = event.champion && event.champion.handle ? `Champion: ${namedHandleHtml(event.champion.handle)}` : 'No champion recorded';
-  const inner = `<div class="row"><h3>${esc(event.name)}</h3>${event.manual ? '<span class="badge ok">Recorded</span>' : tag}</div>
-    <p class="muted">${esc(FORMAT_LABEL[event.format] || event.format || 'Record')} · ${event.manual ? 'Handwritten title' : `${event.fieldSize} players`}</p>
-    <p class="muted">${champ}</p>`;
-  return href ? `<a class="card plaque" href="${href}">${inner}</a>` : `<div class="card plaque">${inner}</div>`;
+  const duel = isDuelArena(event, event.fieldSize);
+  const tag = event.manual
+    ? '<span class="badge ok">Recorded</span>'
+    : (event.official ? '<span class="badge ok">Official</span>' : '<span class="badge">Scrim</span>');
+  const title = href
+    ? `<h3><a href="${href}">${esc(event.name)}</a></h3>`
+    : `<h3>${esc(event.name)}</h3>`;
+  return `<article class="result-row">
+    <time datetime="${esc(event.completedAt || '')}">${esc(shortDate(event.completedAt) || '—')}</time>
+    <div class="result-main">
+      <div class="result-title">
+        ${title}
+        ${kindTagHtml(event, event.fieldSize)}
+        ${tag}
+      </div>
+      <p class="muted">${esc(duel ? 'Duel' : (FORMAT_LABEL[event.format] || event.format || 'Record'))}${event.manual ? ' · Handwritten title' : ` · ${event.fieldSize} players`}</p>
+      ${eventPlacesHtml(event)}
+    </div>
+  </article>`;
+}
+
+function eventCardHtml(event) {
+  return resultRowHtml(event);
 }
 
 async function renderRecords() {
   setTreeMode(false);
-  root.innerHTML = `<div class="form-page">
+  root.innerHTML = `<div class="records-page">
     <p class="form-kicker">DDL Tourney</p>
-    <h1>Hall of records</h1>
+    <h1>Records</h1>
     <p class="muted">Loading…</p>
   </div>`;
   try {
@@ -3373,54 +4553,51 @@ async function renderRecords() {
     ingestAwards(pack.awards);
     const events = pack.events || [];
     const champions = pack.champions || [];
+    const duelists = pack.duelists || [];
     const mentions = pack.mentions || [];
     const ledgers = pack.ledgers || [];
-    root.innerHTML = `<div class="form-page">
-      <p class="form-kicker">DDL Tourney</p>
-      <h1>Hall of records</h1>
-      <p class="muted">Official results across every completed arena. A finals winner is crowned champion. Use these names when you seed a grand tournament.</p>
-      ${marksGalleryHtml()}
-      ${hostMode ? `<p class="muted">Host: Remove on a card takes that name off the hall. Real arenas become scrims. Handwritten titles are deleted. <a href="/tourney/#/ledger">Write the ledger</a>.</p>` : ''}
-      ${pack.warning ? `<p class="err">${esc(pack.warning)}</p>` : ''}
-      <h2 class="section-title">Champions</h2>
-      <div class="grid cards">${champions.map((c) => {
-        const inner = `<div class="row"><h3>${hostMode ? `<a href="/tourney/#/player/${encodeURIComponent(c.handle)}">${namedHandleHtml(c.handle, c.badges)}</a>` : namedHandleHtml(c.handle, c.badges)}</h3><span class="rank-seal gold">${c.titles} title${c.titles === 1 ? '' : 's'}</span></div>
-          ${hostMode ? `<div class="hall-acts"><button type="button" class="mini bad" data-remove-champ="${esc(c.handle)}">Remove</button></div>` : ''}`;
-        return hostMode
-          ? `<article class="card plaque champ-card">${inner}</article>`
-          : `<a class="card plaque champ-card" href="/tourney/#/player/${encodeURIComponent(c.handle)}">${inner}</a>`;
-      }).join('') || '<p class="muted">No official champions yet.</p>'}</div>
-      <h2 class="section-title">Honourable mentions</h2>
-      <div class="grid cards">${mentions.map((m) => {
-        const inner = `<div class="row"><h3>${hostMode ? `<a href="/tourney/#/player/${encodeURIComponent(m.handle)}">${namedHandleHtml(m.handle, m.badges)}</a>` : namedHandleHtml(m.handle, m.badges)}</h3><span class="rank-seal honour">Mention</span></div>
-          <p class="muted">${esc(m.title)}</p>
-          ${m.blurb ? `<p class="muted">${esc(m.blurb)}</p>` : ''}
-          ${hostMode ? `<div class="hall-acts"><button type="button" class="mini bad" data-del-mention="${m.id}">Remove</button></div>` : ''}`;
-        return hostMode
-          ? `<article class="card plaque honour-card">${inner}</article>`
-          : `<a class="card plaque honour-card" href="/tourney/#/player/${encodeURIComponent(m.handle)}">${inner}</a>`;
-      }).join('') || '<p class="muted">No honourable mentions recorded yet.</p>'}</div>
-      ${ledgers.map((board) => `
-        <h2 class="section-title">${esc(board.name)}</h2>
-        ${board.blurb ? `<p class="muted">${esc(board.blurb)}</p>` : ''}
-        <div class="card">
-          <ol class="rank-list">${(board.entries || []).map((row) => `
-            <li>
-              <span class="place">${row.rank != null ? esc(placeLabel(row.rank)) : '—'}</span>
-              <div><a class="named-handle" href="/tourney/#/player/${encodeURIComponent(row.handle)}">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}</a>${row.note ? `<p class="muted" style="margin:2px 0 0">${esc(row.note)}</p>` : ''}</div>
-              <span></span>
-            </li>`).join('') || '<li><span></span><p class="muted">No names on this board yet.</p><span></span></li>'}</ol>
-          ${(board.mentions || []).length ? `<p class="muted" style="margin:14px 0 8px">Honourable mentions</p>
-            <div class="chips">${board.mentions.map((row) => `<a class="chip named-handle" href="/tourney/#/player/${encodeURIComponent(row.handle)}">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}${row.note ? ` · ${esc(row.note)}` : ''}</a>`).join('')}</div>` : ''}
-        </div>`).join('')}
-      <h2 class="section-title">Recent arenas</h2>
-      <div class="grid cards">${events.map(eventCardHtml).join('') || '<p class="muted">No completed arenas on the ledger yet.</p>'}</div>
-    </div>`;
-    if (hostMode) {
+    const stats = pack.stats || {};
+    let tab = 'results';
+    let kind = 'all';
+    let format = 'all';
+    let officialOnly = true;
+    let query = '';
+
+    const formats = [...new Set(events.map((e) => e.format).filter(Boolean))];
+
+    const bindHost = () => {
+      if (!hostMode) return;
+      const restoreBtn = root.querySelector('#restore-arenas-btn');
+      if (restoreBtn) {
+        restoreBtn.onclick = async () => {
+          const errEl = document.getElementById('restore-arenas-err');
+          const okEl = document.getElementById('restore-arenas-ok');
+          if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+          if (okEl) { okEl.hidden = true; okEl.textContent = ''; }
+          try {
+            const next = await api.post('/records/restore-arenas', { hostPassword });
+            const added = Number(next && next.restored) || 0;
+            const snaps = Number(next && next.snapshots) || 0;
+            if (okEl) {
+              okEl.hidden = false;
+              okEl.textContent = added || snaps
+                ? `Restored ${added} arena${added === 1 ? '' : 's'} from records${snaps ? ' and rebuilt the DDNYC bracket' : ''}. Open Arenas to view them.`
+                : 'Nothing missing — every recorded arena is already on the list.';
+            }
+          } catch (err) {
+            if (errEl) {
+              errEl.hidden = false;
+              errEl.textContent = err.message;
+            } else {
+              window.alert(err.message);
+            }
+          }
+        };
+      }
       root.querySelectorAll('[data-remove-champ]').forEach((btn) => {
         btn.onclick = async () => {
           const handle = btn.getAttribute('data-remove-champ');
-          if (!window.confirm(`Remove ${handle} from the Hall of records? Official arenas they won become scrims. Handwritten titles are deleted.`)) return;
+          if (!window.confirm(`Remove ${handle} from tournament titles? Official arenas they won become scrims. Handwritten titles are deleted.`)) return;
           try {
             await api.post('/records/host', { hostPassword, op: 'removeChampion', handle });
             renderRecords();
@@ -3440,9 +4617,149 @@ async function renderRecords() {
           }
         };
       });
-    }
+    };
+
+    const filteredEvents = () => events.filter((event) => {
+      if (kind === 'duel' && event.kind !== 'duel') return false;
+      if (kind === 'tournament' && event.kind === 'duel') return false;
+      if (format !== 'all' && event.format !== format) return false;
+      if (officialOnly && !event.official && !event.manual) return false;
+      if (query) {
+        const hay = `${event.name} ${event.champion && event.champion.handle || ''} ${event.runnerUp && event.runnerUp.handle || ''}`.toLowerCase();
+        if (!hay.includes(query)) return false;
+      }
+      return true;
+    });
+
+    const resultsPanel = () => {
+      const rows = filteredEvents();
+      return `<div class="records-filters">
+        <div class="seg" role="group" aria-label="Kind">
+          ${[['all', 'All'], ['tournament', 'Tournaments'], ['duel', 'Duels']].map(([id, label]) => `<button type="button" data-kind="${id}" class="${kind === id ? 'on' : ''}">${label}</button>`).join('')}
+        </div>
+        <label class="records-search"><span class="lbl">Search</span>
+          <input id="records-q" type="search" placeholder="Name or handle" value="${esc(query)}">
+        </label>
+        <label class="records-format"><span class="lbl">Format</span>
+          <select id="records-format">
+            <option value="all" ${format === 'all' ? 'selected' : ''}>All formats</option>
+            ${formats.map((f) => `<option value="${esc(f)}" ${format === f ? 'selected' : ''}>${esc(FORMAT_LABEL[f] || f)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="records-official" ${officialOnly ? 'checked' : ''}> Official only</label>
+      </div>
+      <div class="result-list">${rows.map(resultRowHtml).join('') || '<p class="muted">No matching results on the ledger yet.</p>'}</div>`;
+    };
+
+    const titlesPanel = () => `<p class="muted">Tournament titles only — 1st place in a field of 3 or more. Duel wins live on the Duel board.</p>
+      ${hostMode ? '<p class="muted">Host: Remove takes that name off titles. Real arenas become scrims. <a href="/tourney/#/ledger">Write the ledger</a>.</p>' : ''}
+      <ol class="rank-list title-list">${champions.map((c, i) => `
+        <li>
+          <span class="place">${i + 1}</span>
+          <div>${hostMode
+            ? `<a class="named-handle" href="/tourney/#/player/${encodeURIComponent(c.handle)}">${namedHandleHtml(c.handle, c.badges)}</a>`
+            : `<a class="named-handle" href="/tourney/#/player/${encodeURIComponent(c.handle)}">${namedHandleHtml(c.handle, c.badges)}</a>`}
+            ${hostMode ? `<div class="hall-acts"><button type="button" class="mini bad" data-remove-champ="${esc(c.handle)}">Remove</button></div>` : ''}</div>
+          <span class="rank-seal gold">${c.titles} title${c.titles === 1 ? '' : 's'}</span>
+        </li>`).join('') || '<li><span></span><p class="muted">No tournament champions yet.</p><span></span></li>'}</ol>`;
+
+    const duelsPanel = () => `<p class="muted">Official 1v1 results. A completed arena with two confirmed players counts as a duel.</p>
+      <div class="table-scroll"><table class="results-table">
+        <thead><tr><th>#</th><th>Player</th><th>W–L</th><th>Win %</th></tr></thead>
+        <tbody>${duelists.map((d, i) => {
+          const played = Number(d.played) || ((Number(d.wins) || 0) + (Number(d.losses) || 0));
+          const pct = played ? Math.round((Number(d.wins) || 0) * 100 / played) : 0;
+          return `<tr>
+            <td>${i + 1}</td>
+            <td><a class="named-handle" href="/tourney/#/player/${encodeURIComponent(d.handle)}">${namedHandleHtml(d.handle, d.badges)}</a></td>
+            <td class="record-cell">${esc(formatRecord(d.record) || '0–0')}</td>
+            <td>${played ? `${pct}%` : '—'}</td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="4" class="muted">No official duels yet.</td></tr>'}</tbody>
+      </table></div>
+      <h2 class="section-title">Recent duels</h2>
+      <div class="result-list">${events.filter((e) => e.kind === 'duel').map(resultRowHtml).join('') || '<p class="muted">No completed duels on the ledger.</p>'}</div>`;
+
+    const honoursPanel = () => `${marksGalleryHtml()}
+      <h2 class="section-title">Honourable mentions</h2>
+      <div class="grid cards">${mentions.map((m) => {
+        const inner = `<div class="row"><h3>${namedHandleHtml(m.handle, m.badges)}</h3><span class="rank-seal honour">Mention</span></div>
+          <p class="muted">${esc(m.title)}</p>
+          ${m.blurb ? `<p class="muted">${esc(m.blurb)}</p>` : ''}
+          ${hostMode ? `<div class="hall-acts"><button type="button" class="mini bad" data-del-mention="${m.id}">Remove</button></div>` : ''}`;
+        return hostMode
+          ? `<article class="card plaque honour-card">${inner}</article>`
+          : `<a class="card plaque honour-card" href="/tourney/#/player/${encodeURIComponent(m.handle)}">${inner}</a>`;
+      }).join('') || '<p class="muted">No honourable mentions recorded yet.</p>'}</div>
+      ${ledgers.map((board) => `
+        <h2 class="section-title">${esc(board.name)}</h2>
+        ${board.blurb ? `<p class="muted">${esc(board.blurb)}</p>` : ''}
+        <div class="card">
+          <ol class="rank-list">${(board.entries || []).map((row) => `
+            <li>
+              <span class="place">${row.rank != null ? esc(placeLabel(row.rank)) : '—'}</span>
+              <div><a class="named-handle" href="/tourney/#/player/${encodeURIComponent(row.handle)}">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}</a>${row.note ? `<p class="muted" style="margin:2px 0 0">${esc(row.note)}</p>` : ''}</div>
+              <span></span>
+            </li>`).join('') || '<li><span></span><p class="muted">No names on this board yet.</p><span></span></li>'}</ol>
+          ${(board.mentions || []).length ? `<p class="muted" style="margin:14px 0 8px">Honourable mentions</p>
+            <div class="chips">${board.mentions.map((row) => `<a class="chip named-handle" href="/tourney/#/player/${encodeURIComponent(row.handle)}">${esc(row.handle)}${medalsInlineHtml(badgesFor(row.handle))}${row.note ? ` · ${esc(row.note)}` : ''}</a>`).join('')}</div>` : ''}
+        </div>`).join('')}`;
+
+    const paint = () => {
+      const panelHtml = tab === 'titles' ? titlesPanel() : tab === 'duels' ? duelsPanel() : tab === 'honours' ? honoursPanel() : resultsPanel();
+      root.innerHTML = `<div class="records-page">
+        <header class="records-head">
+          <p class="form-kicker">DDL Tourney</p>
+          <h1>Records</h1>
+          <p class="muted">Tournaments crown a field of three or more. Grand Tournaments are flagship IRL events. Duels are 1v1 series. Official finishes land here; scrims stay off the boards unless you ask to see them.</p>
+          ${hostMode ? `<p class="muted">Host: titles can be removed from the Titles tab. If the arena list is empty, restore it from this ledger. <a href="/tourney/#/ledger">Write the ledger</a>.</p>
+            <div class="row wrap" style="margin-top:12px">
+              <button class="btn ghost" type="button" id="restore-arenas-btn">Restore arenas from records</button>
+            </div>
+            <p class="err" id="restore-arenas-err" hidden></p>
+            <p class="ok" id="restore-arenas-ok" hidden></p>` : ''}
+          ${pack.warning ? `<p class="err">${esc(pack.warning)}</p>` : ''}
+          <ul class="stat-strip">
+            <li><strong>${Number(stats.tournaments) || 0}</strong><span>Tournaments</span></li>
+            <li><strong>${Number(stats.duels) || 0}</strong><span>Duels</span></li>
+            <li><strong>${champions.length}</strong><span>Champions</span></li>
+            <li><strong>${duelists.length}</strong><span>Duelists</span></li>
+          </ul>
+        </header>
+        <nav class="records-tabs" aria-label="Records sections">
+          ${[['results', 'Results'], ['titles', 'Titles'], ['duels', 'Duel board'], ['honours', 'Honours']].map(([id, label]) => `<button type="button" data-rtab="${id}" class="${tab === id ? 'on' : ''}">${label}</button>`).join('')}
+        </nav>
+        <div id="records-panel">${panelHtml}</div>
+      </div>`;
+      root.querySelectorAll('[data-rtab]').forEach((btn) => {
+        btn.onclick = () => { tab = btn.getAttribute('data-rtab'); paint(); };
+      });
+      root.querySelectorAll('[data-kind]').forEach((btn) => {
+        btn.onclick = () => { kind = btn.getAttribute('data-kind'); paint(); };
+      });
+      const qEl = document.getElementById('records-q');
+      if (qEl) {
+        qEl.oninput = () => { query = String(qEl.value || '').trim().toLowerCase(); };
+        qEl.onchange = () => { query = String(qEl.value || '').trim().toLowerCase(); paint(); };
+        qEl.onkeydown = (ev) => {
+          if (ev.key === 'Enter') {
+            query = String(qEl.value || '').trim().toLowerCase();
+            paint();
+            const next = document.getElementById('records-q');
+            if (next) next.focus();
+          }
+        };
+      }
+      const fmtEl = document.getElementById('records-format');
+      if (fmtEl) fmtEl.onchange = () => { format = fmtEl.value || 'all'; paint(); };
+      const offEl = document.getElementById('records-official');
+      if (offEl) offEl.onchange = () => { officialOnly = offEl.checked; paint(); };
+      bindHost();
+    };
+
+    paint();
   } catch (err) {
-    root.innerHTML = `<div class="form-page"><h1>Hall of records</h1><p class="err">${esc(err.message)}</p></div>`;
+    root.innerHTML = `<div class="records-page"><h1>Records</h1><p class="err">${esc(err.message)}</p></div>`;
   }
 }
 
@@ -3460,35 +4777,41 @@ async function renderPlayer(handle) {
         unclaimed = u.results || [];
       } catch (_err) {}
     }
-    const place = (n) => {
+    const place = (n, kind) => {
       if (!n) return 'Played';
+      if (kind === 'duel') return Number(n) === 1 ? 'Won' : (Number(n) === 2 ? 'Lost' : esc(placeLabel(n)));
       return `<span class="place-cell">${standingBadgeHtml(n)}${esc(placeLabel(n))}</span>`;
     };
+    const duelBits = Number(pack.duelWins) > 0 || String(pack.duelRecord || '') !== '0-0'
+      ? ` · Duel ${esc(formatRecord(pack.duelRecord) || '0–0')}`
+      : '';
     root.innerHTML = `<div class="form-page">
       <p class="form-kicker">Player</p>
       <div class="organizer" style="margin-bottom:16px">
         ${pfpHtml(pack.user, pack.handle, 48)}
         <div>
           <h1 style="margin:0" class="named-handle">${esc(pack.handle)}${medalsInlineHtml(pack.badges)}</h1>
-          <p class="muted">${pack.titles} title${pack.titles === 1 ? '' : 's'} · ${pack.appearances} official appearance${pack.appearances === 1 ? '' : 's'}</p>
+          <p class="muted">${pack.titles} tournament title${pack.titles === 1 ? '' : 's'} · ${pack.appearances} official appearance${pack.appearances === 1 ? '' : 's'}${duelBits}</p>
         </div>
       </div>
       ${(pack.badges || []).length ? `<h2>Badges</h2>
-      ${medalsRowHtml(pack.badges)}` : ''}
+      ${hostMode ? '<p class="muted">Host: remove a mark that was pinned by mistake.</p>' : ''}
+      ${medalsRowHtml(pack.badges, hostMode)}` : ''}
       <h2>Accolades</h2>
       <div class="chips">${(pack.accolades || []).map((a) => `<span class="chip" title="${esc(a.blurb)}">${esc(a.title)}</span>`).join('') || '<p class="muted">No official accolades yet.</p>'}</div>
       ${pack.mention ? `<p class="muted" style="margin-top:12px">Honourable mention — ${esc(pack.mention.title)}${pack.mention.blurb ? `: ${esc(pack.mention.blurb)}` : ''}</p>` : ''}
       <h2>Results</h2>
-      <div class="table-scroll"><table class="results-table"><thead><tr><th>Arena</th><th>Format</th><th>Place</th><th>Record</th></tr></thead>
+      <div class="table-scroll"><table class="results-table"><thead><tr><th>Arena</th><th>Type</th><th>Format</th><th>Place</th><th>Record</th></tr></thead>
       <tbody>${(pack.results || []).map((r) => `
         <tr>
           <td>${String(r.slug || '').startsWith('manual-') || Number(r.tournamentId) < 0
             ? esc(r.name)
             : `<a href="${arenaHref(r.slug)}">${esc(r.name)}</a>`}${r.official ? '' : ' <span class="muted">scrim</span>'}</td>
-          <td>${esc(FORMAT_LABEL[r.format] || r.format)}</td>
-          <td>${place(r.placement)}</td>
+          <td>${esc(kindLabel(r, r.fieldSize))}</td>
+          <td>${esc(r.kind === 'duel' ? '1v1' : (FORMAT_LABEL[r.format] || r.format || '—'))}</td>
+          <td>${place(r.placement, r.kind)}</td>
           <td class="record-cell">${esc(formatRecord(r.record) || '—')}</td>
-        </tr>`).join('') || '<tr><td colspan="4" class="muted">No results on the ledger.</td></tr>'}</tbody></table></div>
+        </tr>`).join('') || '<tr><td colspan="5" class="muted">No results on the ledger.</td></tr>'}</tbody></table></div>
       ${unclaimed.length ? `<h2>Claim a walk-in result</h2>
         <p class="muted">These finishes used your handle but were not linked to Discord. Ask the host to approve.</p>
         ${unclaimed.map((r) => `<div class="roster-row">
@@ -3498,6 +4821,25 @@ async function renderPlayer(handle) {
         <p class="err" id="claim-self-err" hidden></p>
         <p class="ok" id="claim-self-ok" hidden></p>` : ''}
     </div>`;
+    if (hostMode) {
+      root.querySelectorAll('[data-revoke]').forEach((btn) => {
+        btn.onclick = async () => {
+          if (!window.confirm('Remove this badge from this handle?')) return;
+          try {
+            const next = await api.post('/records/host', {
+              hostPassword,
+              op: 'revokeAward',
+              id: Number(btn.getAttribute('data-revoke')),
+            });
+            ingestAwards(next.awards);
+            applyPlayerChrome();
+            renderPlayer(handle);
+          } catch (err) {
+            window.alert(err.message);
+          }
+        };
+      });
+    }
     root.querySelectorAll('[data-claim-entry]').forEach((btn) => {
       btn.onclick = async () => {
         const errEl = document.getElementById('claim-self-err');
@@ -3664,10 +5006,16 @@ async function renderLedger() {
         <button type="button" data-icon="${icon}" class="${badgeDraft.icon === icon ? 'on' : ''}" title="${icon}">${medalHtml({ title: icon, icon, motif: badgeDraft.motif }, 'md')}</button>`).join('')}
       </div>
     </div>` : '';
+    const playedClassAwards = allAwards.filter((a) => String(a.slug || '').startsWith('class-') && /^Played /i.test(a.note || ''));
     const badgesTab = `<section class="host-panel wide">
       <div class="host-flag">Host only</div>
       <h2 style="margin:0">Badge builder</h2>
-      <p class="muted">Standings and class marks are already in the hall. Award them here, or forge a custom medallion.</p>
+      <p class="muted">Standings and class marks are already in the hall. Award them here, or forge a custom medallion. Revoke a chip if it was pinned by mistake.</p>
+      ${playedClassAwards.length ? `<div class="notice">
+        <p><strong>${playedClassAwards.length} class medal${playedClassAwards.length === 1 ? '' : 's'} from signup</strong></p>
+        <p class="muted">These were pinned just for playing a class, not for a podium. Strip them without touching 1st–3rd class medals or anything you awarded by hand.</p>
+        <button type="button" class="btn ghost" id="strip-played-class">Strip signup class medals</button>
+      </div>` : ''}
       <div class="badge-preview">
         ${medalHtml({ title: badgeDraft.title || 'New badge', icon: badgeDraft.icon, motif: badgeDraft.motif }, 'lg')}
         <div class="medal-meta">
@@ -3694,20 +5042,26 @@ async function renderLedger() {
         <div class="row wrap"><button class="btn" type="submit">Save badge</button></div>
         <p class="err" id="badge-err" hidden></p>
       </form>
-      ${badges.map((b) => `
+      ${badges.map((b) => {
+        const holders = allAwards.filter((a) => a.badgeId === b.id);
+        return `
         <article class="card" style="margin-top:14px">
           <div class="row">
-            <div class="medal-row">${medalHtml(b, 'md')}<span class="medal-meta"><strong>${esc(b.title)}</strong><span class="muted">${esc(b.blurb || '')}${b.system ? ' · system' : ''}</span></span></div>
-            ${b.system ? '' : `<button type="button" class="mini bad" data-del-badge="${b.id}">Delete</button>`}
+            <div class="medal-row">${medalHtml(b, 'md')}<span class="medal-meta"><strong>${esc(b.title)}</strong><span class="muted">${esc(b.blurb || '')}${b.system ? ' · system' : ''} · ${holders.length} awarded</span></span></div>
+            <div class="roster-acts">
+              ${holders.length ? `<button type="button" class="mini bad" data-clear-awards="${b.id}" data-title="${esc(b.title)}">Clear all</button>` : ''}
+              ${b.system ? '' : `<button type="button" class="mini bad" data-del-badge="${b.id}">Delete</button>`}
+            </div>
           </div>
           <form class="award-row" style="margin-top:12px" data-award="${b.id}">
             ${handleField(`award-handle-${b.id}`)}
             <button class="mini go" type="submit">Award</button>
           </form>
           <p class="err" id="award-err-${b.id}" hidden></p>
-          <div class="chips" style="margin-top:10px">${allAwards.filter((a) => a.badgeId === b.id).map((a) => `
-            <span class="chip named-handle">${esc(a.handle)}${medalsInlineHtml(badgesFor(a.handle))} <button type="button" class="linkish" data-revoke="${a.id}">revoke</button></span>`).join('') || '<span class="muted">Not awarded yet.</span>'}</div>
-        </article>`).join('') || '<p class="muted" style="margin-top:12px">No badges forged yet.</p>'}
+          <div class="chips" style="margin-top:10px">${holders.map((a) => `
+            <span class="chip named-handle">${esc(a.handle)}${a.note ? `<span class="muted"> · ${esc(a.note)}</span>` : ''} <button type="button" class="mini bad" data-revoke="${a.id}">Remove</button></span>`).join('') || '<span class="muted">Not awarded yet.</span>'}</div>
+        </article>`;
+      }).join('') || '<p class="muted" style="margin-top:12px">No badges forged yet.</p>'}
     </section>`;
 
     const tabHtml = {
@@ -3860,6 +5214,20 @@ async function renderLedger() {
         run('deleteBadge', { id: Number(btn.getAttribute('data-del-badge')) });
       };
     });
+    const stripBtn = document.getElementById('strip-played-class');
+    if (stripBtn) {
+      stripBtn.onclick = () => {
+        if (!window.confirm(`Strip ${playedClassAwards.length} class medal${playedClassAwards.length === 1 ? '' : 's'} that were pinned just for playing? Podium class medals stay.`)) return;
+        run('stripPlayedClassAwards');
+      };
+    }
+    root.querySelectorAll('[data-clear-awards]').forEach((btn) => {
+      btn.onclick = () => {
+        const title = btn.getAttribute('data-title') || 'this badge';
+        if (!window.confirm(`Remove every ${title} medal from every handle?`)) return;
+        run('clearBadgeAwards', { badgeId: Number(btn.getAttribute('data-clear-awards')) });
+      };
+    });
     root.querySelectorAll('form[data-award]').forEach((form) => {
       form.onsubmit = (event) => {
         event.preventDefault();
@@ -3871,7 +5239,10 @@ async function renderLedger() {
       };
     });
     root.querySelectorAll('[data-revoke]').forEach((btn) => {
-      btn.onclick = () => run('revokeAward', { id: Number(btn.getAttribute('data-revoke')) });
+      btn.onclick = () => {
+        if (!window.confirm('Remove this badge from this handle?')) return;
+        run('revokeAward', { id: Number(btn.getAttribute('data-revoke')) });
+      };
     });
   };
 

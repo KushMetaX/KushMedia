@@ -104,6 +104,13 @@ function pathLooksSensitive(rawPath) {
 	return false;
 }
 
+function permissionsPolicyFor(request) {
+	const pathOnly = String((request && request.path) || '');
+	const tourneyMedia = /\/(tourney|__tourney_gate|bracket)(\/|$)/i.test(pathOnly);
+	const cam = tourneyMedia ? '(self)' : '()';
+	return `accelerometer=(), camera=${cam}, geolocation=(), gyroscope=(), magnetometer=(), microphone=${cam}, payment=(), usb=()`;
+}
+
 app.use((request, response, next) => {
 	response.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.set('X-Content-Type-Options', 'nosniff');
@@ -111,10 +118,7 @@ app.use((request, response, next) => {
 	response.set('Cross-Origin-Resource-Policy', shareImage ? 'cross-origin' : 'same-origin');
 	response.set('Cross-Origin-Opener-Policy', 'same-origin');
 	response.set('X-Frame-Options', 'DENY');
-	response.set(
-		'Permissions-Policy',
-		'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
-	);
+	response.set('Permissions-Policy', permissionsPolicyFor(request));
 	const xfProto = request.get('x-forwarded-proto');
 	const secure = request.secure || xfProto === 'https';
 	if (secure) {
@@ -181,6 +185,12 @@ function sendBracketPage(request, response) {
 		headers: { 'Cache-Control': 'no-store, private' },
 	});
 }
+const rtcRouter = require('../public/server/routes/rtc-signaling').createRouter({
+	canClaimSeat: createTourneyRouter.createIrlSeatGuard(tourneyDataDir),
+});
+app.use('/api/rtc', rtcRouter);
+app.use('/kmx-rtc', rtcRouter);
+app.use('/kk-rtc', rtcRouter);
 app.use('/tourney-api', tourneyApi);
 app.use('/kmx-tourney', tourneyApi);
 app.use('/kk-tourney', tourneyApi);

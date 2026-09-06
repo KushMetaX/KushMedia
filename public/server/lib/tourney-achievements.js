@@ -11,77 +11,109 @@ function count(rows, pred) {
 	return rows.filter(pred).length;
 }
 
+function isTournamentRow(row) {
+	return Number(row && row.fieldSize) > 2;
+}
+
+function isDuelRow(row) {
+	return Number(row && row.fieldSize) === 2;
+}
+
 const CATALOG = [
 	{
 		id: 'first_place',
 		title: 'Champion',
-		blurb: 'Won a 1st place finish in an official arena.',
-		test: (rows) => count(rows, (r) => r.placement === 1) >= 1,
+		blurb: 'Won an official tournament (3 or more players).',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r)) >= 1,
 	},
 	{
 		id: 'second_place',
 		title: 'Silver',
-		blurb: 'Finished 2nd in an official arena.',
-		test: (rows) => count(rows, (r) => r.placement === 2) >= 1,
+		blurb: 'Finished 2nd in an official tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 2 && isTournamentRow(r)) >= 1,
 	},
 	{
 		id: 'third_place',
 		title: 'Bronze',
-		blurb: 'Finished 3rd in an official arena.',
-		test: (rows) => count(rows, (r) => r.placement === 3) >= 1,
+		blurb: 'Finished 3rd in an official tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 3 && isTournamentRow(r)) >= 1,
+	},
+	{
+		id: 'fourth_place',
+		title: 'Top Four',
+		blurb: 'Finished 4th in an official tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 4 && isTournamentRow(r)) >= 1,
+	},
+	{
+		id: 'fifth_place',
+		title: 'Top Five',
+		blurb: 'Finished 5th in an official tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 5 && isTournamentRow(r)) >= 1,
 	},
 	{
 		id: 'champ_3',
 		title: 'Three-time champion',
-		blurb: 'Won 1st place in three official arenas.',
-		test: (rows) => count(rows, (r) => r.placement === 1) >= 3,
+		blurb: 'Won three official tournaments.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r)) >= 3,
 	},
 	{
 		id: 'champ_5',
 		title: 'Five-time champion',
-		blurb: 'Won 1st place in five official arenas.',
-		test: (rows) => count(rows, (r) => r.placement === 1) >= 5,
+		blurb: 'Won five official tournaments.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r)) >= 5,
 	},
 	{
 		id: 'se_champ',
 		title: 'Single-elim champion',
-		blurb: 'Won a single-elimination arena.',
-		test: (rows) => count(rows, (r) => r.placement === 1 && r.format === 'single_elim') >= 1,
+		blurb: 'Won a single-elimination tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r) && r.format === 'single_elim') >= 1,
 	},
 	{
 		id: 'se_champ_3',
 		title: 'Single-elim champion ×3',
-		blurb: 'Won three single-elimination arenas.',
-		test: (rows) => count(rows, (r) => r.placement === 1 && r.format === 'single_elim') >= 3,
+		blurb: 'Won three single-elimination tournaments.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r) && r.format === 'single_elim') >= 3,
 	},
 	{
 		id: 'de_champ',
 		title: 'Double-elim champion',
-		blurb: 'Won a double-elimination arena.',
-		test: (rows) => count(rows, (r) => r.placement === 1 && r.format === 'double_elim') >= 1,
+		blurb: 'Won a double-elimination tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r) && r.format === 'double_elim') >= 1,
 	},
 	{
 		id: 'rr_champ',
 		title: 'Round-robin champion',
-		blurb: 'Won a round-robin arena.',
-		test: (rows) => count(rows, (r) => r.placement === 1 && r.format === 'round_robin') >= 1,
+		blurb: 'Won a round-robin tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r) && r.format === 'round_robin') >= 1,
 	},
 	{
 		id: 'swiss_champ',
 		title: 'Swiss champion',
-		blurb: 'Won a Swiss arena.',
-		test: (rows) => count(rows, (r) => r.placement === 1 && r.format === 'swiss') >= 1,
+		blurb: 'Won a Swiss tournament.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isTournamentRow(r) && r.format === 'swiss') >= 1,
+	},
+	{
+		id: 'duel_win',
+		title: 'Duelist',
+		blurb: 'Won an official 1v1 duel.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isDuelRow(r)) >= 1,
+	},
+	{
+		id: 'duel_win_3',
+		title: 'Duel streak',
+		blurb: 'Won three official 1v1 duels.',
+		test: (rows) => count(rows, (r) => r.placement === 1 && isDuelRow(r)) >= 3,
 	},
 	{
 		id: 'field_8',
 		title: 'Packed house',
-		blurb: 'Won an official arena with 8 or more confirmed players.',
+		blurb: 'Won an official tournament with 8 or more confirmed players.',
 		test: (rows) => count(rows, (r) => r.placement === 1 && r.fieldSize >= 8) >= 1,
 	},
 	{
 		id: 'field_16',
 		title: 'Full roster',
-		blurb: 'Won an official arena with 16 or more confirmed players.',
+		blurb: 'Won an official tournament with 16 or more confirmed players.',
 		test: (rows) => count(rows, (r) => r.placement === 1 && r.fieldSize >= 16) >= 1,
 	},
 	{

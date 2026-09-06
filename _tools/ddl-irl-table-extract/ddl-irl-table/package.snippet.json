@@ -1,0 +1,6 @@
+{
+  "comment": "Add this dependency to your existing package.json. Do not replace the file.",
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1"
+  }
+}

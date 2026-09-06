@@ -9,6 +9,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>KushMetaX — DD Price Evaluator</title>
   <meta name="description" content="Trait-weighted Doginal Dogs price evaluation powered by live market data.">
+  <link rel="canonical" href="https://kushmedia.xyz/dd-evaluator/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="KushMetaX — DD Price Evaluator">
+  <meta name="twitter:description" content="Trait-weighted Doginal Dogs price evaluation powered by live market data.">
+  <meta name="twitter:image" content="https://kushmedia.xyz/dd-evaluator/og.jpg">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="KushMetaX">
+  <meta property="og:title" content="KushMetaX — DD Price Evaluator">
+  <meta property="og:description" content="Trait-weighted Doginal Dogs price evaluation powered by live market data.">
+  <meta property="og:url" content="https://kushmedia.xyz/dd-evaluator/">
+  <meta property="og:image" content="https://kushmedia.xyz/dd-evaluator/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Doginal Dogs Price Evaluator">
   <link rel="icon" href="../assets/Kush.png" type="image/png">
   <link rel="apple-touch-icon" href="../assets/Kush.png">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant:ital,wght@0,500;0,600;0,700&family=Great+Vibes&family=Outfit:wght@400;500;600;700;800&family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1375,10 +1389,35 @@
       font-weight:600;
       margin:0 0 .5rem
     }
+    .eval-mp-h-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:.5rem;
+      margin:0 0 .5rem;
+      flex-wrap:wrap
+    }
+    .eval-mp-h-row .eval-mp-h{margin:0}
+    .eval-mp-btn-sm{
+      padding:.32rem .7rem;
+      font-size:.7rem
+    }
+    .eval-mp-btn:disabled{
+      opacity:.55;
+      cursor:wait;
+      transform:none !important;
+      filter:none
+    }
     .eval-mp-grid{
       display:grid;
       grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
       gap:.55rem
+    }
+    .eval-mp-grid-scroll{
+      max-height:min(28rem, 70vh);
+      overflow-y:auto;
+      padding-right:.2rem;
+      scrollbar-width:thin
     }
     .eval-mp-tile{
       text-align:center;
@@ -5633,7 +5672,13 @@
     var marketPulseEmpty = document.getElementById('marketPulseEmpty');
     var marketPulseContent = document.getElementById('marketPulseContent');
     var MP_UNAVAIL = 'Market pulse is unavailable right now. You can still evaluate a dog or wallet.';
+    var MP_ALL_TIME_PREVIEW = 25;
+    var MP_ALL_TIME_MAX = 100;
     var mpExpanded = false;
+    var mpAllTimeExpanded = false;
+    var mpAllTimeFetchedMax = false;
+    var mpAllTimeLoading = false;
+    var mpLastPulse = { floorRows: [], salesRows: [], otcRows: [], allTimeRows: [], metaLine: '' };
 
     function mpTileHtml(dogNumber, priceDoge, isOtc) {
       var n = Number(dogNumber);
@@ -5669,13 +5714,22 @@
     }
 
     function mpRenderSections(floorRows, salesRows, otcRows, allTimeRows, metaLine) {
+      mpLastPulse = {
+        floorRows: floorRows || [],
+        salesRows: salesRows || [],
+        otcRows: otcRows || [],
+        allTimeRows: allTimeRows || [],
+        metaLine: metaLine || ''
+      };
       var allTimeSorted = (allTimeRows || [])
         .filter(function(x) { return x && x.dogNumber && Number(x.priceDoge) > 0; })
         .slice()
         .sort(function(a, b) { return Number(b.priceDoge) - Number(a.priceDoge); });
       var floorHtml = (floorRows || []).map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
       var saleHtml = (salesRows || []).slice(0, 10).map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
-      var allTimeHtml = allTimeSorted.map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
+      var allTimeLimit = mpAllTimeExpanded ? MP_ALL_TIME_MAX : MP_ALL_TIME_PREVIEW;
+      var allTimeShown = allTimeSorted.slice(0, allTimeLimit);
+      var allTimeHtml = allTimeShown.map(function(row) { return mpTileHtml(row.dogNumber, row.priceDoge); }).filter(Boolean);
       var otcHtml = (otcRows || []).slice(0, 10).map(function(row) { return mpTileHtml(row.dogNumber, null, true); }).filter(Boolean);
       if (!floorHtml.length && !saleHtml.length && !allTimeHtml.length && !otcHtml.length) {
         marketPulseEmpty.textContent = MP_UNAVAIL;
@@ -5686,7 +5740,22 @@
       }
       var html = '';
       if (allTimeHtml.length) {
-        html += '<div class="eval-mp-section"><h3 class="eval-mp-h">All time top sales</h3><div class="eval-mp-grid">' + allTimeHtml.join('') + '</div></div>';
+        var canCollapse = mpAllTimeExpanded && allTimeSorted.length > MP_ALL_TIME_PREVIEW;
+        var canExpand = !mpAllTimeExpanded && (allTimeSorted.length > MP_ALL_TIME_PREVIEW || (!mpAllTimeFetchedMax && allTimeSorted.length >= MP_ALL_TIME_PREVIEW));
+        var toggleHtml = '';
+        if (canCollapse || canExpand || mpAllTimeLoading) {
+          var toggleLabel = mpAllTimeLoading
+            ? 'Loading\u2026'
+            : (mpAllTimeExpanded ? 'Show fewer' : 'Show top 100');
+          toggleHtml = '<button type="button" class="eval-mp-btn eval-mp-btn-sm eval-mp-alltime-toggle"' +
+            ' aria-expanded="' + (mpAllTimeExpanded ? 'true' : 'false') + '"' +
+            (mpAllTimeLoading ? ' disabled' : '') + '>' + toggleLabel + '</button>';
+        }
+        var gridClass = (mpAllTimeExpanded && allTimeHtml.length > MP_ALL_TIME_PREVIEW)
+          ? 'eval-mp-grid eval-mp-grid-scroll'
+          : 'eval-mp-grid';
+        html += '<div class="eval-mp-section"><div class="eval-mp-h-row"><h3 class="eval-mp-h">All time top sales</h3>' +
+          toggleHtml + '</div><div class="' + gridClass + '">' + allTimeHtml.join('') + '</div></div>';
       }
       if (floorHtml.length) {
         html += '<div class="eval-mp-section"><h3 class="eval-mp-h">Current floor listings</h3><div class="eval-mp-grid">' + floorHtml.join('') + '</div></div>';
@@ -5717,21 +5786,54 @@
       }
     }
 
-    function mpBindTiles() {
-      var root = marketPulseContent;
-      if (!root) return;
-      root.querySelectorAll('.eval-mp-tile[data-dog]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var d = parseInt(btn.getAttribute('data-dog'), 10);
-          if (!d) return;
-          searchMode = 'inscription';
-          modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === 'inscription'); });
-          syncModeTabs();
-          applySearchMode();
-          input.value = String(d);
-          evaluate();
-          mpSnapToEvaluation();
+    function mpOpenDog(dogNumber) {
+      var d = parseInt(dogNumber, 10);
+      if (!d) return;
+      searchMode = 'inscription';
+      modeBtns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === 'inscription'); });
+      syncModeTabs();
+      applySearchMode();
+      input.value = String(d);
+      evaluate();
+      mpSnapToEvaluation();
+    }
+
+    async function mpToggleAllTime() {
+      if (mpAllTimeLoading) return;
+      if (mpAllTimeExpanded) {
+        mpAllTimeExpanded = false;
+        mpRenderSections(mpLastPulse.floorRows, mpLastPulse.salesRows, mpLastPulse.otcRows, mpLastPulse.allTimeRows, mpLastPulse.metaLine);
+        return;
+      }
+      if (mpAllTimeFetchedMax || mpLastPulse.allTimeRows.length >= MP_ALL_TIME_MAX) {
+        mpAllTimeExpanded = true;
+        mpRenderSections(mpLastPulse.floorRows, mpLastPulse.salesRows, mpLastPulse.otcRows, mpLastPulse.allTimeRows, mpLastPulse.metaLine);
+        return;
+      }
+      mpAllTimeLoading = true;
+      mpRenderSections(mpLastPulse.floorRows, mpLastPulse.salesRows, mpLastPulse.otcRows, mpLastPulse.allTimeRows, mpLastPulse.metaLine);
+      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=top-sales&limit=' + MP_ALL_TIME_MAX);
+      mpAllTimeLoading = false;
+      if (atr.ok && atr.data && atr.data.topSales) {
+        mpAllTimeFetchedMax = true;
+        mpLastPulse.allTimeRows = atr.data.topSales.filter(function(x) {
+          return x && x.dogNumber && Number(x.priceDoge) > 0;
         });
+        mpAllTimeExpanded = mpLastPulse.allTimeRows.length > MP_ALL_TIME_PREVIEW;
+      }
+      mpRenderSections(mpLastPulse.floorRows, mpLastPulse.salesRows, mpLastPulse.otcRows, mpLastPulse.allTimeRows, mpLastPulse.metaLine);
+    }
+
+    if (marketPulseContent) {
+      marketPulseContent.addEventListener('click', function(e) {
+        var toggle = e.target.closest ? e.target.closest('.eval-mp-alltime-toggle') : null;
+        if (toggle) {
+          mpToggleAllTime();
+          return;
+        }
+        var tile = e.target.closest ? e.target.closest('.eval-mp-tile[data-dog]') : null;
+        if (!tile || !marketPulseContent.contains(tile)) return;
+        mpOpenDog(tile.getAttribute('data-dog'));
       });
     }
 
@@ -5759,9 +5861,11 @@
 
       // All-time top sales come from the PHP feed, which scans the full global
       // activity history (the Node feed only carries the recent window).
-      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=top-sales&limit=25');
+      var allTimeLimit = mpAllTimeExpanded ? MP_ALL_TIME_MAX : MP_ALL_TIME_PREVIEW;
+      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=top-sales&limit=' + allTimeLimit);
       if (atr.ok && atr.data && atr.data.topSales) {
         allTimeRows = atr.data.topSales.filter(function(x) { return x && x.dogNumber && Number(x.priceDoge) > 0; });
+        if (allTimeLimit >= MP_ALL_TIME_MAX) mpAllTimeFetchedMax = true;
       }
 
       if (nodeUsable) {
@@ -5791,7 +5895,6 @@
 
       marketPulseLoading.style.display = 'none';
       mpRenderSections(floorRows, salesRows, otcRows, allTimeRows, metaLine);
-      mpBindTiles();
     }
 
     if (marketPulseToggle && marketPulseBody) {

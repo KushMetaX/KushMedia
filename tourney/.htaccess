@@ -23,7 +23,7 @@ DirectoryIndex disabled
 
   RewriteRule ^t/([^/]+)/?$ /tourney/?t=$1 [R=302,L,QSA]
   RewriteCond %{ENV:REDIRECT_TOURNEY_GATED} !=1
-  RewriteRule ^(.*)$ /__tourney_gate/$1 [E=TOURNEY_GATED:1,L]
+  RewriteRule ^(.*)$ /__tourney_gate/$1 [E=TOURNEY_GATED:1,E=TOURNEY_MEDIA:1,L]
 </IfModule>
 
 <IfModule !mod_rewrite.c>

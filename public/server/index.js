@@ -73,6 +73,13 @@ app.use((req, res, next) => {
 });
 app.use(cookieParser(resolveSessionSecret() || ''));
 
+function permissionsPolicyFor(request) {
+	const pathOnly = String((request && request.path) || '');
+	const tourneyMedia = /\/(tourney|__tourney_gate|bracket)(\/|$)/i.test(pathOnly);
+	const cam = tourneyMedia ? '(self)' : '()';
+	return `accelerometer=(), camera=${cam}, geolocation=(), gyroscope=(), magnetometer=(), microphone=${cam}, payment=(), usb=()`;
+}
+
 function pathLooksSensitive(rawPath) {
 	if (!rawPath || typeof rawPath !== 'string') {
 		return true;
@@ -121,10 +128,7 @@ app.use((request, response, next) => {
 	response.set('Cross-Origin-Resource-Policy', shareImage ? 'cross-origin' : 'same-origin');
 	response.set('Cross-Origin-Opener-Policy', 'same-origin');
 	response.set('X-Frame-Options', 'DENY');
-	response.set(
-		'Permissions-Policy',
-		'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
-	);
+	response.set('Permissions-Policy', permissionsPolicyFor(request));
 	const xfProto = request.get('x-forwarded-proto');
 	const secure = request.secure || xfProto === 'https';
 	if (secure) {
@@ -239,6 +243,7 @@ const tourneyDataDir = path.join(__dirname, 'data');
 const createTourneyRouter = require('./routes/tourney-bracket');
 const tourneyApi = createTourneyRouter({
 	dataDir: tourneyDataDir,
+	bracketDir,
 });
 function sendBracketPage(request, response) {
 	if (typeof createTourneyRouter.sendAppPage === 'function') {
@@ -254,6 +259,12 @@ function sendBracketPage(request, response) {
 		headers: { 'Cache-Control': 'no-store, private' },
 	});
 }
+const rtcRouter = require('./routes/rtc-signaling').createRouter({
+	canClaimSeat: createTourneyRouter.createIrlSeatGuard(tourneyDataDir),
+});
+app.use('/api/rtc', rtcRouter);
+app.use('/kmx-rtc', rtcRouter);
+app.use('/kk-rtc', rtcRouter);
 app.use('/tourney-api', tourneyApi);
 app.use('/kmx-tourney', tourneyApi);
 app.use('/kk-tourney', tourneyApi);
@@ -273,7 +284,8 @@ app.get([
 	'/__tourney_gate', '/__tourney_gate/',
 ], sendBracketPage);
 function bracketStaticHeaders(res, filePath) {
-	if (/\.(js|css|html)$/i.test(String(filePath || ''))) {
+	const file = String(filePath || '');
+	if (/\.(js|css|html)$/i.test(file) || /playmat-lanes\.png$/i.test(file)) {
 		res.setHeader('Cache-Control', 'no-store, private');
 	}
 }
@@ -438,8 +450,47 @@ function ddlChallenge(response) {
 	response.status(401).send('Unauthorized');
 }
 
+function ddlIsPublic() {
+	return /^(1|true|yes|on)$/i.test(String(process.env.DDL_PUBLIC || ''));
+}
+
+const DDL_HIDE_PRICES_SNIPPET =
+	'<style id="ddl-hide-prices">[data-tab="prices"],#view-prices{display:none!important}</style>' +
+	'<script>if((location.hash||"").replace(/^#/,"")==="prices")history.replaceState(null,"","#cards");</script>';
+
+function htmlWithHiddenPrices(html) {
+	if (!ddlIsPublic() || typeof html !== 'string' || html.includes('id="ddl-hide-prices"')) return html;
+	if (/<\/head>/i.test(html)) {
+		return html.replace(/<\/head>/i, DDL_HIDE_PRICES_SNIPPET + '</head>');
+	}
+	return DDL_HIDE_PRICES_SNIPPET + html;
+}
+
+function sendDdlIndex(response) {
+	const indexPath = path.join(siteRoot, 'ddl', 'index.html');
+	if (!ddlIsPublic()) {
+		response.sendFile(indexPath, {
+			headers: {
+				'Cache-Control': 'no-store, private',
+				'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive'
+			}
+		});
+		return;
+	}
+	fs.readFile(indexPath, 'utf8', (err, html) => {
+		if (err) {
+			ddlHidden(response);
+			return;
+		}
+		response.set('Content-Type', 'text/html; charset=utf-8');
+		response.set('Cache-Control', 'no-store, private');
+		response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+		response.send(htmlWithHiddenPrices(html));
+	});
+}
+
 function ddlGate(request, response, next) {
-	if (/^(1|true|yes|on)$/i.test(String(process.env.DDL_PUBLIC || ''))) {
+	if (ddlIsPublic()) {
 		response.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
 		return next();
 	}
@@ -467,7 +518,13 @@ function ddlGate(request, response, next) {
 	return next();
 }
 
-app.use('/__ddl_gate', ddlGate, express.static(path.join(siteRoot, 'ddl'), {
+app.use('/__ddl_gate', ddlGate, (request, response, next) => {
+	const p = String(request.path || '/');
+	if (p === '/' || p === '/index.html') {
+		return sendDdlIndex(response);
+	}
+	next();
+}, express.static(path.join(siteRoot, 'ddl'), {
 	dotfiles: 'deny',
 	index: 'index.html',
 	extensions: ['html'],
@@ -478,12 +535,7 @@ app.use('/__ddl_gate', ddlGate, express.static(path.join(siteRoot, 'ddl'), {
 }));
 
 app.get(['/ddl', '/ddl/'], ddlGate, (request, response) => {
-	response.sendFile(path.join(siteRoot, 'ddl', 'index.html'), {
-		headers: {
-			'Cache-Control': 'no-store, private',
-			'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive'
-		}
-	});
+	sendDdlIndex(response);
 });
 app.get(/^\/ddl\/.+$/, ddlGate, (request, response, next) => {
 	const sub = request.path.replace(/^\/ddl\//, '');
@@ -494,6 +546,9 @@ app.get(/^\/ddl\/.+$/, ddlGate, (request, response, next) => {
 	const safeRoot = path.join(siteRoot, 'ddl') + path.sep;
 	if (!filePath.startsWith(safeRoot)) {
 		return ddlHidden(response);
+	}
+	if (sub === 'index.html' || sub === 'index.htm') {
+		return sendDdlIndex(response);
 	}
 	response.sendFile(filePath, {
 		headers: {
@@ -672,7 +727,9 @@ if (require.main === module) {
 		if (ddEvaluatorRouter.getCommunitySubmitPassword()) {
 			console.log('[dd-evaluator] Community suggestion submissions require DD_COMMUNITY_PASSWORD.');
 		}
-		if (String(process.env.DDL_PASSWORD || '').trim() || String(process.env.DDL_PASSWORD_FILE || '').trim()) {
+		if (ddlIsPublic()) {
+			console.log('[ddl-tcg] public mode (no password, Prices tab hidden)');
+		} else if (String(process.env.DDL_PASSWORD || '').trim() || String(process.env.DDL_PASSWORD_FILE || '').trim()) {
 			console.log('[ddl-tcg] password gate on /ddl, ddl.kushmedia.xyz, ddltcg.kushmetax.com');
 		} else {
 			console.log('[ddl-tcg] hidden (404) until DDL_PASSWORD is set');
