@@ -325,6 +325,7 @@ function baseTournament(event) {
 		bestOf: known.bestOf || 3,
 		rewardMode: known.rewardMode || 'pot',
 		hostPotUsd: known.hostPotUsd || 0,
+		potFundMode: known.potFundMode || (Number(known.hostPotUsd) > 0 || known.feeMode === 'free' ? 'usd' : 'percent'),
 		payouts: known.payouts || [{ place: 1, percent: 100, prize: '' }],
 		eventKind: event.event_kind || known.eventKind || (field <= 2 ? 'duel' : 'tournament'),
 		roundBestOf: known.roundBestOf || {},

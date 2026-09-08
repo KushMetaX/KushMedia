@@ -45,6 +45,9 @@ _tools/voyager-scraper/data/out/*.json
 public/server/data/dd-tip-intents.ndjson
 server/data/.session-secret
 public/server/data/.session-secret
+# IRL print-builder cache (official card PNGs, regenerated)
+_tools/.cache/
+
 public/server/data/.coingecko-api-key
 # Runtime / host noise (do not commit)
 **/api/error_log

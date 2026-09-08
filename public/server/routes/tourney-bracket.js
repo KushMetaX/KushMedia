@@ -37,6 +37,9 @@ const LEGACY_PAY_TO = {
 	DOGE: PAY_TO.DOGE,
 };
 const KNOWN_PAY_ASSETS = ['DOGE', 'SOL'];
+/** Share of paid entry fees redistributed as the pot. The rest is retained. */
+const PRIZE_POOL_PERCENT = 65;
+const HOUSE_RETAIN_PERCENT = 35;
 const KICK_RESERVED = new Set([
 	'about', 'api', 'browse', 'categories', 'category', 'channel', 'channels',
 	'clip', 'clips', 'community', 'dashboard', 'directory', 'embed', 'explore',
@@ -407,6 +410,7 @@ function normalizeTournament(tournament) {
 	if (wasWhitelistMode && !(Number(tournament.whitelistSpots) > 0)) tournament.whitelistSpots = 2;
 	tournament.whitelistSpots = sanitizeWhitelistSpots(tournament.whitelistSpots, 0);
 	tournament.feeMode = tournament.feeMode === 'free' || Number(tournament.entryFeeUsd) === 0 ? 'free' : 'paid';
+	tournament.potFundMode = sanitizePotFundMode(tournament.potFundMode, tournament);
 	tournament.requireTeams = Boolean(tournament.requireTeams);
 	tournament.capPlayers = tournament.capPlayers !== false;
 	tournament.startAt = tournament.startAt || null;
@@ -422,6 +426,7 @@ function normalizeTournament(tournament) {
 	tournament.predictionCustomFields = Boolean(tournament.predictionCustomFields);
 	tournament.requireAccount = tournament.requireAccount !== false;
 	tournament.official = tournament.official !== false;
+	tournament.semiIrl = Boolean(tournament.semiIrl);
 	tournament.groupSize = Math.min(16, Math.max(2, Number(tournament.groupSize) || 4));
 	tournament.advancePerGroup = Math.min(8, Math.max(1, Number(tournament.advancePerGroup) || 2));
 	if (tournament.format === 'double_elim') tournament.losersBracket = true;
@@ -489,6 +494,7 @@ function readSettings(body, current) {
 	if (src.predictionCustomFields != null) t.predictionCustomFields = Boolean(src.predictionCustomFields);
 	if (src.requireAccount != null) t.requireAccount = Boolean(src.requireAccount);
 	if (src.official != null) t.official = Boolean(src.official);
+	if (src.semiIrl != null) t.semiIrl = Boolean(src.semiIrl);
 	if (src.groupSize != null) t.groupSize = Math.min(16, Math.max(2, Number(src.groupSize) || 4));
 	if (src.advancePerGroup != null) t.advancePerGroup = Math.min(8, Math.max(1, Number(src.advancePerGroup) || 2));
 	if (src.bestOf != null) t.bestOf = normalizeBestOf(src.bestOf, t.bestOf);
@@ -497,6 +503,7 @@ function readSettings(body, current) {
 	if (src.swissRounds != null) t.swissRounds = Math.min(12, Math.max(3, Number(src.swissRounds) || 3));
 	if (src.rewardMode != null) t.rewardMode = src.rewardMode === 'prize' ? 'prize' : 'pot';
 	if (src.hostPotUsd != null) t.hostPotUsd = sanitizeHostPotUsd(src.hostPotUsd, t.hostPotUsd);
+	if (src.potFundMode != null) t.potFundMode = src.potFundMode === 'percent' ? 'percent' : 'usd';
 	if (src.payouts != null) t.payouts = sanitizePayouts(src.payouts);
 	if (src.eventKind != null) t.eventKind = src.eventKind;
 	if (t.feeMode === 'free') t.entryFeeUsd = 0;
@@ -536,14 +543,27 @@ function sanitizeHostPotUsd(value, fallback = 0) {
 	return Math.round(Math.min(1_000_000, base) * 100) / 100;
 }
 
+function sanitizePotFundMode(value, tournament) {
+	if (value === 'percent' || value === 'usd') return value;
+	if (sanitizeHostPotUsd(tournament && tournament.hostPotUsd, 0) > 0) return 'usd';
+	if (tournament && (tournament.feeMode === 'free' || !(Number(tournament.entryFeeUsd) > 0))) return 'usd';
+	return 'percent';
+}
+
 function feeEntries(entries) {
 	return (entries || []).filter((e) => e.paid && (!e.whitelist || e.subbedIn));
 }
 
+function feeTotalUsd(entries) {
+	return roundCrypto(feeEntries(entries).reduce((sum, e) => sum + paidUsd(e), 0), 2);
+}
+
 function computePrizePool(tournament, entries) {
-	const host = sanitizeHostPotUsd(tournament && tournament.hostPotUsd, 0);
-	const fees = feeEntries(entries).reduce((sum, e) => sum + paidUsd(e), 0);
-	return roundCrypto(host + fees, 2);
+	const fees = feeTotalUsd(entries);
+	if (sanitizePotFundMode(tournament && tournament.potFundMode, tournament) === 'percent') {
+		return roundCrypto(fees * PRIZE_POOL_PERCENT / 100, 2);
+	}
+	return sanitizeHostPotUsd(tournament && tournament.hostPotUsd, 0);
 }
 
 function matchHasReportedPlay(match) {
@@ -940,9 +960,11 @@ function swapPlayersInBracket(store, tournament, a, b) {
 	swapSlots(store, tournament, { matchId: seatA.match.id, slot: seatA.slot }, { matchId: seatB.match.id, slot: seatB.slot });
 }
 
-function rewardView(tournament, prizePool) {
+function rewardView(tournament, prizePool, feesCollected) {
 	const mode = tournament && tournament.rewardMode === 'prize' ? 'prize' : 'pot';
 	const pool = Math.max(0, Number(prizePool) || 0);
+	const fees = Math.max(0, Number(feesCollected) || 0);
+	const potFundMode = sanitizePotFundMode(tournament && tournament.potFundMode, tournament);
 	const payouts = Array.isArray(tournament && tournament.payouts) ? tournament.payouts : [];
 	const rows = [];
 	for (const p of payouts) {
@@ -967,7 +989,16 @@ function rewardView(tournament, prizePool) {
 			percent,
 		});
 	}
-	return { mode, pool, rows };
+	return {
+		mode,
+		pool,
+		potFundMode,
+		poolPercent: PRIZE_POOL_PERCENT,
+		retainPercent: HOUSE_RETAIN_PERCENT,
+		feesCollected: fees,
+		houseRetainUsd: potFundMode === 'percent' ? roundCrypto(fees * HOUSE_RETAIN_PERCENT / 100, 2) : 0,
+		rows,
+	};
 }
 
 async function fetchJson(url) {
@@ -1798,6 +1829,7 @@ function attachHostIdentity(request, tournament) {
 function summarize(store, t) {
 	const entries = store.entries.filter((e) => e.tournamentId === t.id);
 	const paid = entries.filter((e) => e.paid && !e.noShow && (!e.whitelist || e.subbedIn));
+	const feesCollected = feeTotalUsd(entries);
 	const prizePool = computePrizePool(t, entries);
 	return {
 		...t,
@@ -1805,7 +1837,7 @@ function summarize(store, t) {
 		paidCount: paid.length,
 		entryCount: entries.length,
 		prizePool,
-		rewards: rewardView(t, prizePool),
+		rewards: rewardView(t, prizePool, feesCollected),
 		champion: t.status === 'completed' ? championFor(store, t) : null,
 	};
 }
@@ -1831,6 +1863,7 @@ function detail(store, t, isHost) {
 	const entries = store.entries.filter((e) => e.tournamentId === t.id);
 	const matches = store.matches.filter((m) => m.tournamentId === t.id);
 	const paid = entries.filter((e) => e.paid && (!e.whitelist || e.subbedIn));
+	const feesCollected = feeTotalUsd(entries);
 	const prizePool = computePrizePool(t, entries);
 	const listed = entries.map((entry) => {
 		const row = isHost ? { ...entry } : publicEntry(entry);
@@ -1847,7 +1880,7 @@ function detail(store, t, isHost) {
 		matches,
 		standings: standingsFor(store, t),
 		prizePool,
-		rewards: rewardView(t, prizePool),
+		rewards: rewardView(t, prizePool, feesCollected),
 		champion: t.status === 'completed' ? championFor(store, t) : null,
 		podium: podiumFor(store, t),
 		votes: (store.votes || []).filter((v) => v.tournamentId === t.id),
@@ -2329,7 +2362,9 @@ function createRouter(options) {
 		if (body.breakTies != null && !wantsLosersBracket(t) && t.eventKind !== 'duel') {
 			t.breakTies = Boolean(body.breakTies);
 		}
+		if (body.potFundMode != null) t.potFundMode = body.potFundMode === 'percent' ? 'percent' : 'usd';
 		if (body.hostPotUsd != null) t.hostPotUsd = sanitizeHostPotUsd(body.hostPotUsd, t.hostPotUsd);
+		normalizeTournament(t);
 		if (body.shuffle) paid = shuffleList(paid);
 		else paid = [...paid].sort((a, b) => (a.seed || a.id) - (b.seed || b.id));
 		paid.forEach((e, i) => { e.seed = i + 1; });

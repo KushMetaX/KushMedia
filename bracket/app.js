@@ -1158,6 +1158,8 @@ function formatUsdRate(value) {
 }
 
 const MAX_PAYOUT_PLACES = 8;
+const PRIZE_POOL_PERCENT = 65;
+const HOUSE_RETAIN_PERCENT = 35;
 
 function placeLabel(n) {
   const v = Math.round(Number(n) || 0);
@@ -1172,10 +1174,29 @@ function placeLabel(n) {
 }
 
 function rewardsOf(data, t) {
-  if (data && data.rewards && data.rewards.mode) return data.rewards;
-  if (t && t.rewards && t.rewards.mode) return t.rewards;
+  if (data && data.rewards && data.rewards.mode) {
+    return {
+      poolPercent: PRIZE_POOL_PERCENT,
+      retainPercent: HOUSE_RETAIN_PERCENT,
+      potFundMode: potFundModeOf(t, data.rewards),
+      feesCollected: 0,
+      houseRetainUsd: 0,
+      ...data.rewards,
+    };
+  }
+  if (t && t.rewards && t.rewards.mode) {
+    return {
+      poolPercent: PRIZE_POOL_PERCENT,
+      retainPercent: HOUSE_RETAIN_PERCENT,
+      potFundMode: potFundModeOf(t, t.rewards),
+      feesCollected: 0,
+      houseRetainUsd: 0,
+      ...t.rewards,
+    };
+  }
   const mode = t && t.rewardMode === 'prize' ? 'prize' : 'pot';
   const pool = Number((data && data.prizePool) ?? (t && t.prizePool)) || 0;
+  const potFundMode = potFundModeOf(t);
   const payouts = Array.isArray(t && t.payouts) ? t.payouts : [];
   const rows = payouts.map((p) => {
     if (mode === 'prize') {
@@ -1191,7 +1212,24 @@ function rewardsOf(data, t) {
       percent,
     };
   }).filter(Boolean);
-  return { mode, pool, rows };
+  return {
+    mode,
+    pool,
+    potFundMode,
+    poolPercent: PRIZE_POOL_PERCENT,
+    retainPercent: HOUSE_RETAIN_PERCENT,
+    feesCollected: 0,
+    houseRetainUsd: 0,
+    rows,
+  };
+}
+
+function potFundModeOf(t, rewards) {
+  const raw = (rewards && rewards.potFundMode) || (t && t.potFundMode);
+  if (raw === 'percent' || raw === 'usd') return raw;
+  if (Number(t && t.hostPotUsd) > 0) return 'usd';
+  if (t && (t.feeMode === 'free' || !(Number(t.entryFeeUsd) > 0))) return 'usd';
+  return 'percent';
 }
 
 function prizeForPlace(rewards, place) {
@@ -1257,7 +1295,11 @@ function compactPrizeLine(texts) {
 function rewardMetaHtml(rewards) {
   const rows = rewards && rewards.rows ? rewards.rows : [];
   if (rewards && rewards.mode === 'prize') return '';
-  const pool = `<div><dt>Pot</dt><dd>${formatUsd(rewards && rewards.pool)}</dd></div>`;
+  const percentPool = rewards && rewards.potFundMode === 'percent';
+  const poolTip = percentPool
+    ? `${Number(rewards.poolPercent) || PRIZE_POOL_PERCENT}% of paid entries is redistributed. This is the pot, not total raised.`
+    : 'Dollar amount players share. Entry fees are not added on top.';
+  const pool = `<div ${tip(poolTip)}><dt>Pot</dt><dd>${formatUsd(rewards && rewards.pool)}</dd></div>`;
   if (!rows.length) return pool;
   const split = rows.map((r) => {
     const cash = Number(rewards.pool) > 0 ? ` ${formatUsd(r.amountUsd)}` : '';
@@ -1291,19 +1333,26 @@ function assertRewardsSaved(payload, next) {
 
 function rewardBreakdownHtml(rewards) {
   const rows = rewards && rewards.rows ? rewards.rows : [];
-  if (!rows.length) return '';
+  if (!rows.length && !(rewards && rewards.mode !== 'prize' && rewards.potFundMode === 'percent')) return '';
   const prizeMode = rewards.mode === 'prize';
+  if (prizeMode && !rows.length) return '';
+  const percentPool = !prizeMode && rewards.potFundMode === 'percent';
+  const poolPct = Number(rewards.poolPercent) || PRIZE_POOL_PERCENT;
+  const retainPct = Number(rewards.retainPercent) || HOUSE_RETAIN_PERCENT;
   return `<section class="payouts" ${tip(prizeMode
     ? 'Host-set prizes for each place. Entry fees are not this prize list.'
-    : 'How the paid entry pot splits by place.')}>
+    : percentPool
+      ? `${poolPct}% of paid entry fees is redistributed by place. The house retains ${retainPct}%.`
+      : 'How the host-set dollar pot splits by place.')}>
     <h2>${prizeMode ? 'Prizes' : 'Pot breakdown'}</h2>
-    <ol>
+    ${percentPool ? `<p class="muted">Pot is ${poolPct}% of paid entries — what gets redistributed, not total raised.</p>` : ''}
+    ${rows.length ? `<ol>
       ${rows.map((row) => `<li>
         <span>${esc(row.label)}</span>
         <strong>${esc(prizeMode ? row.text : formatUsd(row.amountUsd))}</strong>
         ${!prizeMode && row.percent != null ? `<small>${esc(String(row.percent))}%</small>` : ''}
       </li>`).join('')}
-    </ol>
+    </ol>` : ''}
   </section>`;
 }
 
@@ -1315,8 +1364,13 @@ function rewardCardHtml(t) {
     const line = compactPrizeLine(texts);
     return `<p class="muted prize-line" title="${esc(`Prize(s): ${texts.join(', ')}`)}">Prize(s): ${esc(line)}</p>`;
   }
-  if (Number(t && t.prizePool) > 0) {
-    return `<p class="muted">Pot ${formatUsd(t.prizePool)}</p>`;
+  const pool = Number((rewards && rewards.pool) ?? (t && t.prizePool)) || 0;
+  if (rewards.potFundMode === 'percent') {
+    const pct = Number(rewards.poolPercent) || PRIZE_POOL_PERCENT;
+    return `<p class="muted">${pool > 0 ? `Pot ${formatUsd(pool)}` : `Pot ${pct}% of entries`}</p>`;
+  }
+  if (pool > 0) {
+    return `<p class="muted">Pot ${formatUsd(pool)}</p>`;
   }
   return '';
 }
@@ -2517,6 +2571,7 @@ function defaultsFrom(t) {
     feeMode: d.feeMode || (Number(d.entryFeeUsd) > 0 ? 'paid' : 'free'),
     entryFeeUsd: Number(d.entryFeeUsd) || 0,
     rewardMode: d.rewardMode === 'prize' ? 'prize' : 'pot',
+    potFundMode: potFundModeOf(d),
     hostPotUsd: Number(d.hostPotUsd) || 0,
     payouts: Array.isArray(d.payouts) ? d.payouts : [],
     requireTeams: Boolean(d.requireTeams),
@@ -2532,6 +2587,7 @@ function defaultsFrom(t) {
     requireVerifiedEmail: Boolean(d.requireVerifiedEmail),
     requireAccount: d.requireAccount !== false,
     official: d.official !== false,
+    semiIrl: Boolean(d.semiIrl),
     countryLock: Boolean(d.countryLock),
     allowedCountries: d.allowedCountries || '',
     predictionCustomFields: Boolean(d.predictionCustomFields),
@@ -2595,13 +2651,24 @@ function settingsFormHtml(t, opts) {
             <input type="hidden" id="s-reward" value="${esc(d.rewardMode)}">
             <p class="hint" id="reward-hint">${d.rewardMode === 'prize'
               ? 'Type what each place wins. Entry fees stay the entry — this list is the prize, not the pot.'
-              : 'Set a prize pot in dollars, or let paid entries fill it. Percents split that total by place. Leave percents blank to show only the running total.'}</p>
+              : 'Choose a dollar pot or 65% of paid entries. Place percents split that redistributed pot, not total raised.'}</p>
           </div>
         </div>
-        <div class="form-row" id="hostpot-row" style="${d.rewardMode === 'prize' ? 'display:none' : ''}"><label for="s-hostpot">Prize pot (USD)</label>
+        <div class="form-row" id="hostpot-row" style="${d.rewardMode === 'prize' ? 'display:none' : ''}"><span class="lbl">Prize pool</span>
           <div>
-            <input id="s-hostpot" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(d.hostPotUsd || 0)}" ${tip('House money for this arena. Added on top of paid entries. For a free list you add yourself, this is the whole pot — set it before you lock.')}>
-            <p class="hint">Shows as Pot on the public page. Paid entries add on top. $0 means entry fees only.</p>
+            <div class="seg" id="potfund-seg">
+              <button type="button" data-potfund="usd" class="${d.potFundMode !== 'percent' ? 'on' : ''}">$</button>
+              <button type="button" data-potfund="percent" class="${d.potFundMode === 'percent' ? 'on' : ''}">%</button>
+            </div>
+            <input type="hidden" id="s-potfund" value="${esc(d.potFundMode)}">
+            <div id="hostpot-usd" style="${d.potFundMode === 'percent' ? 'display:none' : ''}">
+              <label for="s-hostpot">Amount (USD)</label>
+              <input id="s-hostpot" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(d.hostPotUsd || 0)}" ${tip('This dollar amount is the pot players share. Entry fees are not added on top.')}>
+              <p class="hint">Shows as Pot on the public page. Not total raised — only this redistributed amount.</p>
+            </div>
+            <div id="hostpot-pct" style="${d.potFundMode === 'percent' ? '' : 'display:none'}">
+              <p class="hint">${PRIZE_POOL_PERCENT}% of paid entry fees is redistributed as the pot. The house retains ${HOUSE_RETAIN_PERCENT}%. Public Pot is that share, not total raised.</p>
+            </div>
           </div>
         </div>
         <div class="form-row"><span class="lbl">By place</span>
@@ -2715,7 +2782,8 @@ function settingsFormHtml(t, opts) {
           <div>
             <label class="check"><input type="checkbox" id="s-account" ${d.requireAccount ? 'checked' : ''}> Require Discord sign-in to register (walk-ins can still be added by the host)</label>
             <label class="check"><input type="checkbox" id="s-official" ${d.official ? 'checked' : ''}> Count this arena toward records and accolades</label>
-            <p class="hint">Completed tournaments (3+ players) crown a champion. Completed duels count as 1v1 wins. Uncheck this for a scrim.</p>
+            <label class="check"><input type="checkbox" id="s-semi-irl" ${d.semiIrl ? 'checked' : ''}> Semi-IRL / verified holder table (lock Companion 40-card lists, 60s turns, hand + lane watch)</label>
+            <p class="hint">Completed tournaments (3+ players) crown a champion. Completed duels count as 1v1 wins. Uncheck official for a scrim. Semi-IRL asks both players to lock a decklist on the table.</p>
           </div>
         </div>
       </div>
@@ -2743,11 +2811,30 @@ function settingsFormHtml(t, opts) {
 function bindSettingsChrome(form) {
   const paid = form.querySelector('#fee-paid');
   const hidden = form.querySelector('#s-fee');
+  const potFundHidden = form.querySelector('#s-potfund');
+  const setPotFund = (mode) => {
+    const fund = mode === 'percent' ? 'percent' : 'usd';
+    if (potFundHidden) potFundHidden.value = fund;
+    form.querySelectorAll('[data-potfund]').forEach((b) => {
+      b.classList.toggle('on', b.getAttribute('data-potfund') === fund);
+    });
+    const usdBox = form.querySelector('#hostpot-usd');
+    const pctBox = form.querySelector('#hostpot-pct');
+    if (usdBox) usdBox.style.display = fund === 'usd' ? '' : 'none';
+    if (pctBox) pctBox.style.display = fund === 'percent' ? '' : 'none';
+    updatePayoutSum();
+  };
   form.querySelectorAll('[data-fee]').forEach((btn) => {
     btn.onclick = () => {
       form.querySelectorAll('[data-fee]').forEach((b) => b.classList.toggle('on', b === btn));
       hidden.value = btn.getAttribute('data-fee');
       paid.style.display = hidden.value === 'free' ? 'none' : '';
+      const hostAmt = Number(form.querySelector('#s-hostpot')?.value || 0);
+      if (hidden.value === 'free' && potFundHidden && potFundHidden.value === 'percent') {
+        setPotFund('usd');
+      } else if (hidden.value === 'paid' && !(hostAmt > 0)) {
+        setPotFund('percent');
+      }
     };
   });
   const stageSync = () => {
@@ -2814,7 +2901,7 @@ function bindSettingsChrome(form) {
     if (rewardHint) {
       rewardHint.textContent = mode === 'prize'
         ? 'Type what each place wins. Entry fees stay the entry — this list is the prize, not the pot.'
-        : 'Set a prize pot in dollars, or let paid entries fill it. Percents split that total by place. Leave percents blank to show only the running total.';
+        : 'Choose a dollar pot or 65% of paid entries. Place percents split that redistributed pot, not total raised.';
     }
     const hostpotRow = form.querySelector('#hostpot-row');
     if (hostpotRow) hostpotRow.style.display = mode === 'prize' ? 'none' : '';
@@ -2848,11 +2935,17 @@ function bindSettingsChrome(form) {
       if (!filled.length) {
         preview.textContent = mode === 'prize'
           ? 'Players will still see Pot until you type prizes and save.'
-          : 'Players will see the running pot total only.';
+          : (form.querySelector('#s-potfund')?.value === 'percent'
+            ? `Players will see the redistributed pot (${PRIZE_POOL_PERCENT}% of paid entries), not total raised.`
+            : 'Players will see the host-set dollar pot. Entry fees are not added on top.');
       } else if (mode === 'prize') {
         preview.textContent = `Arena cards list Prize(s): ${compactPrizeLine(filled.map((r) => r.prize))} — opening the tournament still shows 1st / 2nd / 3rd.`;
       } else {
-        preview.textContent = `Players will see Pot plus payout: ${filled.map((r) => `${r.label} ${r.percent}%`).join(' · ')}`;
+        const fund = form.querySelector('#s-potfund')?.value === 'percent' ? 'percent' : 'usd';
+        const potLabel = fund === 'percent'
+          ? `the ${PRIZE_POOL_PERCENT}% redistributed pot`
+          : 'the host-set dollar pot';
+        preview.textContent = `Players will see ${potLabel} plus payout: ${filled.map((r) => `${r.label} ${r.percent}%`).join(' · ')}`;
       }
     }
     if (mode === 'prize') {
@@ -2861,13 +2954,15 @@ function bindSettingsChrome(form) {
     }
     const total = rows.reduce((sum, row) => sum + (row.percent || 0), 0);
     if (!(total > 0)) {
-      payoutSum.textContent = 'No split yet — the public page shows the pot total only.';
+      payoutSum.textContent = form.querySelector('#s-potfund')?.value === 'percent'
+        ? `No split yet — the public page shows ${PRIZE_POOL_PERCENT}% of paid entries as the pot.`
+        : 'No split yet — the public page shows the dollar pot only.';
       return;
     }
     const rounded = Math.round(total * 100) / 100;
     payoutSum.textContent = rounded === 100
-      ? 'Splits add up to 100% of the pot.'
-      : `Splits add up to ${rounded}% of the pot.`;
+      ? 'Splits add up to 100% of the redistributed pot.'
+      : `Splits add up to ${rounded}% of the redistributed pot.`;
   };
   form.querySelectorAll('[data-reward]').forEach((btn) => {
     btn.onclick = () => {
@@ -2875,6 +2970,9 @@ function bindSettingsChrome(form) {
       if (rewardHidden) rewardHidden.value = btn.getAttribute('data-reward');
       syncRewardMode();
     };
+  });
+  form.querySelectorAll('[data-potfund]').forEach((btn) => {
+    btn.onclick = () => setPotFund(btn.getAttribute('data-potfund'));
   });
   if (payoutRowsEl) {
     payoutRowsEl.addEventListener('input', updatePayoutSum);
@@ -2961,6 +3059,7 @@ function collectSettings(form) {
     feeMode,
     entryFeeUsd: usd,
     rewardMode,
+    potFundMode: form.querySelector('#s-potfund')?.value === 'percent' ? 'percent' : 'usd',
     hostPotUsd: Number(form.querySelector('#s-hostpot')?.value || 0),
     payouts,
     requireTeams: form.querySelector('#s-teams')?.checked,
@@ -2976,6 +3075,7 @@ function collectSettings(form) {
     requireVerifiedEmail: form.querySelector('#s-email')?.checked,
     requireAccount: form.querySelector('#s-account')?.checked,
     official: form.querySelector('#s-official')?.checked,
+    semiIrl: form.querySelector('#s-semi-irl')?.checked,
     countryLock: form.querySelector('#s-country')?.checked,
     allowedCountries: form.querySelector('#s-countries')?.value,
     predictionCustomFields: form.querySelector('#s-predfields')?.checked,
@@ -3040,6 +3140,7 @@ async function renderIrlTable(slug, matchId) {
     matchOpen: match.status === 'ready',
     matchComplete: match.status === 'complete',
     bestOf: match.bestOf,
+    semiIrl: Boolean(data.tournament.semiIrl),
     canReport: () => Boolean(hostMode && hostPassword),
     onHostGate: () => openHostSignIn(),
     onResult: async ({ score1, score2, bestOf }) => {
@@ -3997,12 +4098,23 @@ async function renderArena(slug) {
       ${pending.length ? `<p class="muted">${pending.length} ${pending.length === 1 ? 'entry has' : 'entries have'} not paid and will be left out — <button type="button" class="linkish" data-go="players">confirm payments</button> first if that is wrong.</p>` : ''}
       ${confirmed.length ? `<p class="chips">${confirmed.map((e) => `<span class="chip named-handle">${esc(e.handle)}${classLabelHtml(e.ddlClass)}${medalsInlineHtml(badgesFor(e.handle, e.badges))}</span>`).join('')}</p>` : ''}
       ${t.rewardMode !== 'prize' ? `<div>
-        <label for="lock-pot">Prize pot (USD)</label>
-        <div class="host-money">
-          <input id="lock-pot" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(Number(t.hostPotUsd) || 0)}" ${tip('House money for this arena. Added on top of paid entries. For a free list, this is the whole pot.')}>
-          <button type="button" class="btn ghost" id="save-pot">Save pot</button>
+        <span class="lbl">Prize pool</span>
+        <div class="seg" id="lock-potfund-seg">
+          <button type="button" data-lock-potfund="usd" class="${potFundModeOf(t) !== 'percent' ? 'on' : ''}">$</button>
+          <button type="button" data-lock-potfund="percent" class="${potFundModeOf(t) === 'percent' ? 'on' : ''}">%</button>
         </div>
-        <p class="hint">Shows on the public page as Pot. Paid entries add on top. You can still change this after lock.</p>
+        <input type="hidden" id="lock-potfund" value="${esc(potFundModeOf(t))}">
+        <div id="lock-pot-usd" style="${potFundModeOf(t) === 'percent' ? 'display:none' : ''}">
+          <label for="lock-pot">Amount (USD)</label>
+          <input id="lock-pot" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(Number(t.hostPotUsd) || 0)}" ${tip('This dollar amount is the pot players share. Entry fees are not added on top.')}>
+          <p class="hint">Shows as Pot. Not total raised — only this redistributed amount.</p>
+        </div>
+        <div id="lock-pot-pct" style="${potFundModeOf(t) === 'percent' ? '' : 'display:none'}">
+          <p class="hint">${PRIZE_POOL_PERCENT}% of paid entry fees is redistributed. The house retains ${HOUSE_RETAIN_PERCENT}%. Public Pot is that share, not total raised.</p>
+        </div>
+        <div class="host-money">
+          <button type="button" class="btn ghost" id="save-pot">Save pool</button>
+        </div>
       </div>` : ''}
       <label class="check"><input type="checkbox" id="shuffle" ${shuffle ? 'checked' : ''}> Shuffle seeds for a random draw</label>
       ${showBronze ? `<label class="check"><input type="checkbox" id="lock-break" ${breakTies ? 'checked' : ''}> 3rd place match — semi-final losers play for bronze</label>` : ''}
@@ -4043,11 +4155,30 @@ async function renderArena(slug) {
     if (breakEl) breakEl.onchange = () => { readLocal(); paint(); };
     panel.querySelector('#shuffle').onchange = readLocal;
     panel.querySelectorAll('[data-round-bestof]').forEach((el) => { el.onchange = readLocal; });
+    const lockPotFund = panel.querySelector('#lock-potfund');
+    const setLockPotFund = (mode) => {
+      const fund = mode === 'percent' ? 'percent' : 'usd';
+      if (lockPotFund) lockPotFund.value = fund;
+      panel.querySelectorAll('[data-lock-potfund]').forEach((b) => {
+        b.classList.toggle('on', b.getAttribute('data-lock-potfund') === fund);
+      });
+      const usdBox = panel.querySelector('#lock-pot-usd');
+      const pctBox = panel.querySelector('#lock-pot-pct');
+      if (usdBox) usdBox.style.display = fund === 'usd' ? '' : 'none';
+      if (pctBox) pctBox.style.display = fund === 'percent' ? '' : 'none';
+    };
+    panel.querySelectorAll('[data-lock-potfund]').forEach((btn) => {
+      btn.onclick = () => setLockPotFund(btn.getAttribute('data-lock-potfund'));
+    });
+    const lockPotPayload = () => ({
+      potFundMode: panel.querySelector('#lock-potfund')?.value === 'percent' ? 'percent' : 'usd',
+      hostPotUsd: Number(panel.querySelector('#lock-pot')?.value ?? t.hostPotUsd ?? 0),
+    });
     const savePot = panel.querySelector('#save-pot');
     if (savePot) {
       savePot.onclick = () => hostAction(errEl, () => api.post(`/arenas/${encodeURIComponent(slug)}/settings`, {
         hostPassword,
-        hostPotUsd: Number(panel.querySelector('#lock-pot').value || 0),
+        ...lockPotPayload(),
       }));
     }
     panel.querySelector('#lock-btn').onclick = () => {
@@ -4063,7 +4194,7 @@ async function renderArena(slug) {
           finalsBestOf,
           roundBestOf,
           ...(panel.querySelector('#lock-break') ? { breakTies } : {}),
-          hostPotUsd: Number(panel.querySelector('#lock-pot')?.value ?? t.hostPotUsd ?? 0),
+          ...lockPotPayload(),
         });
         tab = 'bracket';
         return next;
@@ -4405,11 +4536,13 @@ async function renderArena(slug) {
         assertRewardsSaved(payload, next);
         hostSavedMsg = payload.rewardMode === 'prize'
           ? 'Prizes saved. The header now says Prizes instead of Pot.'
-          : Number(payload.hostPotUsd) > 0
-            ? 'Prize pot saved. The header shows this amount plus any paid entries.'
-            : filledPayouts(payload).length
-              ? 'Pot split saved. The header still shows the running pot; Payout lists the place breakdown.'
-              : 'Options saved.';
+          : payload.potFundMode === 'percent'
+            ? `Prize pool is ${PRIZE_POOL_PERCENT}% of paid entries. The header shows that redistributed pot, not total raised.`
+            : Number(payload.hostPotUsd) > 0
+              ? 'Prize pool saved. The header shows this dollar amount — not entry fees.'
+              : filledPayouts(payload).length
+                ? 'Pot split saved. The header still shows the redistributed pot; Payout lists the place breakdown.'
+                : 'Options saved.';
         return next;
       });
     };

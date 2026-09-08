@@ -223,7 +223,7 @@ async function main() {
 
 		await fillRoster(server, 'prize-cup', ['PrizeA', 'PrizeB']);
 		const prizeDetail = await call(server, 'GET', '/arenas/prize-cup');
-		check('prize arenas still report a numeric pot from entries', prizeDetail.status === 200 && prizeDetail.data.prizePool === 20, String(prizeDetail.data && prizeDetail.data.prizePool));
+		check('prize arenas still report a numeric pot from entries', prizeDetail.status === 200 && prizeDetail.data.prizePool === 13, String(prizeDetail.data && prizeDetail.data.prizePool));
 		check('prize breakdown is by place, not pot percents', prizeDetail.data.rewards && prizeDetail.data.rewards.mode === 'prize' && prizeDetail.data.rewards.rows[0].text === 'Rare Dog #1' && prizeDetail.data.rewards.rows[1].text === '50 DOGE', JSON.stringify(prizeDetail.data && prizeDetail.data.rewards));
 
 		const split = await call(server, 'POST', '/arenas/legacy-pot/settings', {
@@ -261,6 +261,32 @@ async function main() {
 		await fillRoster(server, 'house-pot', twelve);
 		const houseOpen = await call(server, 'GET', '/arenas/house-pot');
 		check('free arena pot uses the host amount before lock', houseOpen.status === 200 && houseOpen.data.prizePool === 100 && houseOpen.data.rewards.rows[0].amountUsd === 70, JSON.stringify(houseOpen.data && houseOpen.data.rewards));
+
+		const rake = await call(server, 'POST', '/arenas', {
+			hostPassword: HOST_PW,
+			name: 'Rake Pot',
+			slug: 'rake-pot',
+			format: 'single_elim',
+			feeMode: 'paid',
+			entryFeeUsd: 10,
+			registrationMode: 'list',
+			requireAccount: false,
+			rewardMode: 'pot',
+			potFundMode: 'percent',
+			payouts: [{ place: 1, percent: 100 }],
+			maxPlayers: 8,
+		});
+		check('paid arenas can fund the pot as a percent of entries', rake.status === 200 && rake.data.potFundMode === 'percent', rake.text.slice(0, 180));
+		await fillRoster(server, 'rake-pot', ['RakeA', 'RakeB']);
+		const rakeOpen = await call(server, 'GET', '/arenas/rake-pot');
+		check('percent pot is 65% of paid entries, not total raised', rakeOpen.status === 200 && rakeOpen.data.prizePool === 13 && rakeOpen.data.rewards.feesCollected === 20 && rakeOpen.data.rewards.houseRetainUsd === 7 && rakeOpen.data.rewards.rows[0].amountUsd === 13, JSON.stringify(rakeOpen.data && rakeOpen.data.rewards));
+
+		const cashPool = await call(server, 'POST', '/arenas/rake-pot/settings', {
+			hostPassword: HOST_PW,
+			potFundMode: 'usd',
+			hostPotUsd: 50,
+		});
+		check('usd pot is the host amount, not entry fees', cashPool.status === 200 && cashPool.data.prizePool === 50 && cashPool.data.tournament.potFundMode === 'usd' && cashPool.data.rewards.rows[0].amountUsd === 50, JSON.stringify(cashPool.data && cashPool.data.rewards));
 
 		const lockedHouse = await lock(server, 'house-pot');
 		const r1 = (lockedHouse.data.matches || []).filter((m) => m.side === 'winners' && Number(m.round) === 1);

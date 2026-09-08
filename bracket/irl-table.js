@@ -1,12 +1,14 @@
 /**
  * Doginal Dogs Legends IRL table: two hand cams, synced 40 HP,
  * turn-counted crystals (T1 = 1, cap 10, leftover lost), used-mana pips,
- * second-player Coin (+1 once), gold Legends playmat overlay.
+ * second-player Coin (+1 once), gold Legends playmat overlay,
+ * 60s shot clock, Companion lane peeks, hand lock, deck lock, watcher.
  */
 (function (global) {
   const START_LIFE = 40;
   const LIFE_MAX = 40;
   const MANA_MAX = 10;
+  const TURN_MS = 60000;
 
   function emptyClock() {
     return {
@@ -19,7 +21,45 @@
       used: { 1: 0, 2: 0 },
       coinArmed: false,
       coinSpent: false,
+      turnLeftMs: TURN_MS,
+      turnEndsAt: 0,
+      searching: 0,
+      searchKind: '',
+      searchLeftMs: 0,
     };
+  }
+
+  function remainingMs(clock) {
+    if (!clock || !clock.started) return 0;
+    if (clock.searching) return Math.max(0, Number(clock.searchLeftMs) || 0);
+    const ends = Number(clock.turnEndsAt) || 0;
+    if (ends) return Math.max(0, ends - Date.now());
+    return Math.max(0, Number(clock.turnLeftMs) || 0);
+  }
+
+  function armTurn(clock) {
+    clock.searching = 0;
+    clock.searchKind = '';
+    clock.searchLeftMs = 0;
+    clock.turnLeftMs = TURN_MS;
+    clock.turnEndsAt = Date.now() + TURN_MS;
+  }
+
+  function formatShot(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(total / 60);
+    return `${m}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  function searchKindOf(value) {
+    if (value === 'gy' || value === 'hand' || value === 'deck') return value;
+    return '';
+  }
+
+  function searchLabel(kind) {
+    if (kind === 'gy') return 'GY';
+    if (kind === 'hand') return 'hand';
+    return 'deck';
   }
 
   function crystalsOf(clock, n) {
@@ -49,6 +89,10 @@
       used: { 1: clock.used[1] || 0, 2: clock.used[2] || 0 },
       coinArmed: Boolean(clock.coinArmed),
       coinSpent: Boolean(clock.coinSpent),
+      turnLeftMs: remainingMs(clock),
+      searching: clock.searching === 2 ? 2 : clock.searching === 1 ? 1 : 0,
+      searchKind: searchKindOf(clock.searchKind),
+      searchLeftMs: Math.max(0, Number(clock.searchLeftMs) || 0),
     };
   }
 
@@ -98,11 +142,31 @@
       : clock.coinSpent
         ? 'Coin already spent'
         : `${secondName} holds the Coin`;
+    const left = remainingMs(clock);
+    const searching = searchKindOf(clock.searchKind) && (clock.searching === 1 || clock.searching === 2);
+    const searchName = names[clock.searching] || 'Player';
+    const mineActive = seated && clock.active === mine;
+    const searchBtns = mineActive
+      ? (searching && clock.searching === mine
+        ? `<button type="button" class="btn irl-search-btn" data-search-end>Resume timer</button>`
+        : `<div class="irl-search-row">
+            <button type="button" class="mini" data-search="deck">Search deck</button>
+            <button type="button" class="mini" data-search="gy">Search GY</button>
+            <button type="button" class="mini" data-search="hand">Look at hand</button>
+          </div>`)
+      : '';
     return `<div class="irl-clock is-live">
       <div class="irl-clock-row">
         <p class="irl-clock-title">Turn ${turnN} · ${esc(activeName)}</p>
         ${seated ? '<button type="button" class="btn ghost irl-clock-reset" data-clock-reset>Reset turns</button>' : ''}
       </div>
+      <p class="irl-shot${left <= 10000 && !searching ? ' is-ember' : ''}${searching ? ' is-paused' : ''}" data-shot>
+        <span data-shot-val>${esc(formatShot(left))}</span>
+        <span data-shot-note>${searching
+          ? `${esc(searchName)} searching ${esc(searchLabel(clock.searchKind))} · timer paused`
+          : '60s shot clock · auto-pass at 0:00'}</span>
+      </p>
+      ${searchBtns}
       <p class="muted">${esc(names[1])} T${clock.turns[1] || 0} · ${crystalsOf(clock, 1)} cr · ${esc(names[2])} T${clock.turns[2] || 0} · ${crystalsOf(clock, 2)} cr</p>
       <p class="muted">${esc(coinNote)}</p>
     </div>`;
@@ -125,7 +189,97 @@
       1: clamp(Number(raw.used && raw.used[1]) || 0, 0, availableOf(next, 1)),
       2: clamp(Number(raw.used && raw.used[2]) || 0, 0, availableOf(next, 2)),
     };
+    next.searching = raw.searching === 2 ? 2 : raw.searching === 1 ? 1 : 0;
+    next.searchKind = searchKindOf(raw.searchKind);
+    next.searchLeftMs = Math.max(0, Number(raw.searchLeftMs) || 0);
+    const left = Math.max(0, Number(raw.turnLeftMs));
+    next.turnLeftMs = Number.isFinite(left) ? left : TURN_MS;
+    if (!next.started) {
+      next.turnEndsAt = 0;
+    } else if (next.searching) {
+      next.turnEndsAt = 0;
+      if (!next.searchLeftMs) next.searchLeftMs = next.turnLeftMs;
+    } else {
+      next.turnEndsAt = Date.now() + next.turnLeftMs;
+    }
     return next;
+  }
+
+  function emptySlot() {
+    return { id: '', occupied: false, source: '', conf: 0 };
+  }
+
+  function emptySeatBoard() {
+    return {
+      extra: emptySlot(),
+      banish: emptySlot(),
+      creatures: [emptySlot(), emptySlot(), emptySlot(), emptySlot(), emptySlot()],
+      spells: [emptySlot(), emptySlot(), emptySlot(), emptySlot(), emptySlot()],
+    };
+  }
+
+  function emptyBoard() {
+    return { seq: 0, 1: emptySeatBoard(), 2: emptySeatBoard() };
+  }
+
+  function parseSlot(raw) {
+    const next = emptySlot();
+    if (!raw || typeof raw !== 'object') return next;
+    next.id = String(raw.id || '').toUpperCase();
+    if (next.id && !/^V\d{3}$/.test(next.id)) next.id = '';
+    next.occupied = Boolean(raw.occupied || next.id);
+    next.source = raw.source === 'pin' || raw.source === 'detect' ? raw.source : (next.id ? 'pin' : '');
+    next.conf = clamp(Number(raw.conf) || 0, 0, 1);
+    return next;
+  }
+
+  function parseSeatBoard(raw) {
+    const next = emptySeatBoard();
+    if (!raw || typeof raw !== 'object') return next;
+    next.extra = parseSlot(raw.extra);
+    next.banish = parseSlot(raw.banish);
+    next.creatures = [0, 1, 2, 3, 4].map((i) => parseSlot(raw.creatures && raw.creatures[i]));
+    next.spells = [0, 1, 2, 3, 4].map((i) => parseSlot(raw.spells && raw.spells[i]));
+    return next;
+  }
+
+  function parseBoard(raw) {
+    const next = emptyBoard();
+    if (!raw || typeof raw !== 'object') return next;
+    next.seq = Math.max(0, Number(raw.seq) || 0);
+    next[1] = parseSeatBoard(raw[1] || (raw.seats && raw.seats[1]));
+    next[2] = parseSeatBoard(raw[2] || (raw.seats && raw.seats[2]));
+    return next;
+  }
+
+  function boardWire(board) {
+    return {
+      seq: board.seq,
+      1: board[1],
+      2: board[2],
+    };
+  }
+
+  function laneSlotOf(seatBoard, key) {
+    if (!seatBoard || !key) return emptySlot();
+    if (key === 'extra') return seatBoard.extra;
+    if (key === 'banish') return seatBoard.banish;
+    const m = String(key).match(/^(creature|spell)-(\d)$/);
+    if (!m) return emptySlot();
+    const arr = m[1] === 'creature' ? seatBoard.creatures : seatBoard.spells;
+    return arr[Number(m[2])] || emptySlot();
+  }
+
+  function writeLane(seatBoard, key, slot) {
+    const next = parseSlot(slot);
+    if (key === 'extra') seatBoard.extra = next;
+    else if (key === 'banish') seatBoard.banish = next;
+    else {
+      const m = String(key).match(/^(creature|spell)-(\d)$/);
+      if (!m) return;
+      const arr = m[1] === 'creature' ? seatBoard.creatures : seatBoard.spells;
+      arr[Number(m[2])] = next;
+    }
   }
 
   function esc(value) {
@@ -141,8 +295,9 @@
   }
 
   const ZOOM_MIN = 1;
-  const ZOOM_MAX = 1.8;
+  const ZOOM_MAX = 3.5;
   const ZOOM_STORE = 'ddl-irl-cam-zoom';
+  const HD_VIDEO = { width: { ideal: 1920 }, height: { ideal: 1080 } };
 
   function readStoredZoom() {
     try {
@@ -238,10 +393,10 @@
   function scoreCamLabel(label) {
     const s = String(label || '').toLowerCase();
     let n = 0;
-    if (/front|user|face|selfie|true[- ]?depth/.test(s)) n -= 10;
-    if (/back|rear|environment|facing back/.test(s)) n += 2;
-    if (/tele|telephoto/.test(s)) n -= 6;
-    if (/ultra[\s-]?wide|ultrawide|\buw\b|0[\.,]5\s*x|\.5x/.test(s)) n += 8;
+    if (/front|selfie|face[\s_-]?cam|facing\s*front|前置|前摄|true[- ]?depth|facing\s*user/.test(s)) n -= 20;
+    if (/back|rear|environment|facing\s*back|facing\s*environment|后置|后摄/.test(s)) n += 12;
+    if (/tele|telephoto|periscope/.test(s)) n -= 8;
+    if (/ultra[\s-]?wide|ultrawide|\buw\b|超广|0[\.,]5\s*x|\.5x/.test(s)) n += 8;
     else if (/\bwide\b/.test(s)) n += 4;
     return n;
   }
@@ -249,10 +404,14 @@
   function trackFacing(track) {
     try {
       const settings = track && typeof track.getSettings === 'function' ? track.getSettings() : {};
-      return String(settings.facingMode || '');
-    } catch (_err) {
-      return '';
-    }
+      if (settings.facingMode) return String(settings.facingMode);
+    } catch (_err) {}
+    try {
+      const caps = track && typeof track.getCapabilities === 'function' ? track.getCapabilities() : {};
+      const modes = caps && caps.facingMode;
+      if (Array.isArray(modes) && modes.length === 1) return String(modes[0]);
+    } catch (_e) {}
+    return '';
   }
 
   function trackDeviceId(track) {
@@ -279,11 +438,20 @@
   async function applyWidestHardwareZoom(stream) {
     const track = camTrack(stream);
     if (!track || typeof track.applyConstraints !== 'function') return;
+    let caps = {};
+    try { caps = track.getCapabilities() || {}; } catch (_err) {}
     const minZ = hardwareZoomMin(track);
-    if (minZ == null) return;
+    const focusModes = caps.focusMode;
+    const advanced = [];
+    if (minZ != null) advanced.push({ zoom: minZ });
+    if (Array.isArray(focusModes) && focusModes.includes('continuous')) {
+      advanced.push({ focusMode: 'continuous' });
+    }
+    if (!advanced.length) return;
     try {
-      await track.applyConstraints({ advanced: [{ zoom: minZ }] });
+      await track.applyConstraints({ advanced });
     } catch (_err) {
+      if (minZ == null) return;
       try {
         await track.applyConstraints({ zoom: minZ });
       } catch (_e) {}
@@ -294,93 +462,111 @@
     const facing = trackFacing(track);
     if (facing === 'user') return true;
     if (facing === 'environment') return false;
-    return scoreCamLabel(track && track.label) <= -8;
+    return scoreCamLabel(track && track.label) < 0;
   }
 
-  async function switchToWidestLens(gum, stream) {
-    const cur = camTrack(stream);
-    if (isFrontCam(cur)) {
+  async function listVideoInputs() {
+    try {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') return [];
+      const list = await navigator.mediaDevices.enumerateDevices();
+      return list.filter((device) => device.kind === 'videoinput' && device.deviceId);
+    } catch (_err) {
+      return [];
+    }
+  }
+
+  function openVideo(gum, video) {
+    return gum({ audio: false, video });
+  }
+
+  async function openDevice(gum, deviceId) {
+    try {
+      return await openVideo(gum, { deviceId: { exact: deviceId }, ...HD_VIDEO });
+    } catch (_err) {
+      return openVideo(gum, { deviceId: { exact: deviceId } });
+    }
+  }
+
+  function rankVideoInputs(cams) {
+    return cams
+      .map((cam) => ({ cam, score: scoreCamLabel(cam.label) }))
+      .sort((a, b) => b.score - a.score);
+  }
+
+  async function switchToRearWidest(gum, stream) {
+    const phone = isPhoneCam();
+
+    async function replaceStream(current, opener) {
+      const prevId = trackDeviceId(camTrack(current));
+      const wasFront = isFrontCam(camTrack(current));
+      stopStream(current);
       try {
-        const rear = await gum({ audio: false, video: { facingMode: { exact: 'environment' } } });
-        stopStream(stream);
-        stream = rear;
-      } catch (_err) {
+        const next = await opener();
+        if (isFrontCam(camTrack(next)) && !wasFront && prevId) {
+          stopStream(next);
+          const restored = await openDevice(gum, prevId);
+          await applyWidestHardwareZoom(restored);
+          return restored;
+        }
+        await applyWidestHardwareZoom(next);
+        return next;
+      } catch (err) {
+        if (prevId) {
+          try {
+            const restored = await openDevice(gum, prevId);
+            await applyWidestHardwareZoom(restored);
+            return restored;
+          } catch (_e) {}
+        }
+        throw err;
+      }
+    }
+
+    if (isFrontCam(camTrack(stream))) {
+      const rearTries = [
+        { facingMode: { exact: 'environment' }, ...HD_VIDEO },
+        { facingMode: { ideal: 'environment' }, ...HD_VIDEO },
+        { facingMode: 'environment' },
+      ];
+      for (let i = 0; i < rearTries.length; i += 1) {
         try {
-          const rear = await gum({ audio: false, video: { facingMode: { ideal: 'environment' } } });
-          stopStream(stream);
-          stream = rear;
-        } catch (_e) {}
+          stream = await replaceStream(stream, () => openVideo(gum, rearTries[i]));
+          if (!isFrontCam(camTrack(stream))) break;
+        } catch (_err) {}
       }
     }
 
     await applyWidestHardwareZoom(stream);
 
-    let list = [];
-    try {
-      if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
-        list = await navigator.mediaDevices.enumerateDevices();
+    async function adoptBest(current) {
+      const cams = await listVideoInputs();
+      if (!cams.length) return current;
+      const ranked = rankVideoInputs(cams);
+      const labeledRear = ranked.filter((row) => row.score > 0);
+      const unlabeled = ranked.every((row) => row.score === 0);
+      const curId = trackDeviceId(camTrack(current));
+      const curFront = isFrontCam(camTrack(current));
+      let pick = labeledRear[0] || null;
+
+      if (!pick && unlabeled && phone && cams.length > 1) {
+        const fallback = cams.find((cam) => cam.deviceId !== curId) || cams[1] || cams[0];
+        pick = { cam: fallback, score: 0 };
+      } else if (!pick && curFront) {
+        pick = ranked.find((row) => row.cam.deviceId !== curId) || null;
       }
-    } catch (_err) {
-      return stream;
-    }
-    const cams = list.filter((device) => device.kind === 'videoinput' && device.deviceId);
-    if (!cams.length) return stream;
 
-    const curTrack = camTrack(stream);
-    const curId = trackDeviceId(curTrack);
-    const ranked = cams
-      .map((cam) => ({ cam, score: scoreCamLabel(cam.label) }))
-      .sort((a, b) => b.score - a.score);
-    const bestLabeled = ranked[0];
-
-    async function openById(deviceId) {
-      return gum({
-        audio: false,
-        video: { deviceId: { exact: deviceId } },
-      });
-    }
-
-    if (bestLabeled && bestLabeled.score >= 8 && bestLabeled.cam.deviceId !== curId) {
+      if (!pick || pick.cam.deviceId === curId) return current;
+      const curScore = scoreCamLabel(camTrack(current) && camTrack(current).label);
+      if (!curFront && !unlabeled && pick.score <= curScore) return current;
       try {
-        const next = await openById(bestLabeled.cam.deviceId);
-        stopStream(stream);
-        await applyWidestHardwareZoom(next);
-        return next;
-      } catch (_err) {}
-    }
-
-    if (cams.length < 2) return stream;
-
-    let best = { stream, zoomMin: hardwareZoomMin(curTrack) };
-    if (best.zoomMin == null) best.zoomMin = 1;
-    for (let i = 0; i < Math.min(cams.length, 5); i += 1) {
-      const cam = cams[i];
-      if (cam.deviceId === curId) continue;
-      if (scoreCamLabel(cam.label) <= -8) continue;
-      let probe;
-      try {
-        probe = await gum({ audio: false, video: { deviceId: { exact: cam.deviceId } } });
+        return await replaceStream(current, () => openDevice(gum, pick.cam.deviceId));
       } catch (_err) {
-        continue;
-      }
-      const probeTrack = camTrack(probe);
-      if (isFrontCam(probeTrack)) {
-        stopStream(probe);
-        continue;
-      }
-      const z = hardwareZoomMin(probeTrack);
-      const zoomMin = z == null ? 1 : z;
-      if (zoomMin < best.zoomMin - 0.04) {
-        if (best.stream !== stream) stopStream(best.stream);
-        best = { stream: probe, zoomMin };
-      } else {
-        stopStream(probe);
+        return current;
       }
     }
-    if (best.stream !== stream) {
-      stopStream(stream);
-      stream = best.stream;
-    }
+
+    stream = await adoptBest(stream);
+    stream = await adoptBest(stream);
     await applyWidestHardwareZoom(stream);
     return stream;
   }
@@ -400,11 +586,14 @@
     const phone = isPhoneCam();
     const attempts = phone
       ? [
+        { audio: false, video: { facingMode: { exact: 'environment' }, ...HD_VIDEO } },
+        { audio: false, video: { facingMode: { ideal: 'environment' }, ...HD_VIDEO } },
+        { audio: false, video: { facingMode: 'environment' } },
         { audio: false, video: true },
-        { audio: false, video: { facingMode: { ideal: 'environment' } } },
       ]
       : [
-        { audio: false, video: { facingMode: { ideal: 'environment' } } },
+        { audio: false, video: { facingMode: { ideal: 'environment' }, ...HD_VIDEO } },
+        { audio: false, video: HD_VIDEO },
         { audio: false, video: true },
       ];
     let lastErr;
@@ -422,7 +611,7 @@
     }
     if (!stream) throw lastErr || new Error('Camera did not start.');
     try {
-      return await switchToWidestLens(gum, stream);
+      return await switchToRearWidest(gum, stream);
     } catch (_err) {
       await applyWidestHardwareZoom(stream);
       return stream;
@@ -430,7 +619,17 @@
   }
 
   function emptySeat(handle) {
-    return { handle: handle || 'Seat', life: START_LIFE, mana: 0, turn: false, camLive: false, zoom: 1 };
+    return { handle: handle || 'Seat', life: START_LIFE, mana: 0, turn: false, camLive: false, zoom: 1, panX: 0, panY: 0 };
+  }
+
+  function applyCamTransform(el, zoom, panX, panY) {
+    if (!el) return;
+    const z = Number.isFinite(zoom) ? clamp(zoom, ZOOM_MIN, ZOOM_MAX) : 1;
+    const px = clamp(Number(panX) || 0, -1, 1) * Math.max(0, z - 1) * 50;
+    const py = clamp(Number(panY) || 0, -1, 1) * Math.max(0, z - 1) * 50;
+    el.style.setProperty('--cam-zoom', String(z));
+    el.style.setProperty('--cam-x', `${px}%`);
+    el.style.setProperty('--cam-y', `${py}%`);
   }
 
   function viewerAliases(user) {
@@ -459,33 +658,36 @@
   }
 
   const LANE_TOP = [
-    ['Extra', 'is-side'],
-    ['Creature', ''],
-    ['Creature', ''],
-    ['Creature', ''],
-    ['Creature', ''],
-    ['Creature', ''],
-    ['Banish', 'is-side'],
+    ['Extra', 'is-side', 'extra'],
+    ['Creature', '', 'creature-0'],
+    ['Creature', '', 'creature-1'],
+    ['Creature', '', 'creature-2'],
+    ['Creature', '', 'creature-3'],
+    ['Creature', '', 'creature-4'],
+    ['Banish', 'is-side', 'banish'],
   ];
   const LANE_BOT = [
-    ['Deck', 'is-side'],
-    ['Spell / Trap', ''],
-    ['Spell / Trap', ''],
-    ['Spell / Trap', ''],
-    ['Spell / Trap', ''],
-    ['Spell / Trap', ''],
-    ['GY', 'is-side'],
+    ['Deck', 'is-side', 'deck'],
+    ['Spell / Trap', '', 'spell-0'],
+    ['Spell / Trap', '', 'spell-1'],
+    ['Spell / Trap', '', 'spell-2'],
+    ['Spell / Trap', '', 'spell-3'],
+    ['Spell / Trap', '', 'spell-4'],
+    ['GY', 'is-side', 'gy'],
   ];
 
   function laneRowHtml(row) {
-    return `<div class="lane-row">${row.map(([name, klass]) =>
-      `<span class="lane-slot${klass ? ` ${klass}` : ''}"><b>${esc(name)}</b></span>`
+    return `<div class="lane-row">${row.map(([name, klass, key]) =>
+      `<button type="button" class="lane-slot${klass ? ` ${klass}` : ''}" data-lane="${esc(key)}" aria-label="${esc(name)}"><b>${esc(name)}</b><span class="lane-card-name" data-lane-name></span></button>`
     ).join('')}</div>`;
   }
 
   function laneOverlayHtml() {
-    return `<div class="lane-overlay" aria-hidden="true">
+    return `<div class="lane-overlay">
       <div class="lane-board">${laneRowHtml(LANE_TOP)}${laneRowHtml(LANE_BOT)}</div>
+      <div class="lane-reserve" data-lane-reserve>
+        <button type="button" class="lane-slot is-side is-hand" data-lane="hand" disabled aria-label="Hand"><b>Hand</b></button>
+      </div>
     </div>`;
   }
 
@@ -505,18 +707,25 @@
 
   function camShell(kind, label, waiting) {
     return `<div class="cam-stack" data-cam="${esc(kind)}">
-      <div class="hand-cam">
-        <video playsinline webkit-playsinline autoplay muted></video>
-        ${laneOverlayHtml()}
-        <div class="cam-waiting"><span>${esc(waiting)}</span></div>
+      <div class="cam-chips">
         <p class="cam-chip cam-label"></p>
         <p class="cam-chip cam-state"></p>
       </div>
+      <div class="hand-cam">
+        <div class="cam-frame">
+          <video playsinline webkit-playsinline autoplay muted></video>
+          <canvas class="hand-canvas" aria-hidden="true"></canvas>
+          ${laneOverlayHtml()}
+        </div>
+        <div class="cam-waiting"><span>${esc(waiting)}</span></div>
+      </div>
       <div class="cam-zoom" data-cam-zoom hidden>
-        <label class="cam-zoom-lbl">Fit <span data-zoom-val>1.00×</span></label>
-        <input type="range" data-zoom min="100" max="180" step="1" value="100" aria-label="Camera zoom">
+        <label class="cam-zoom-lbl">Closer <span data-zoom-val>1.00×</span></label>
+        <input type="range" data-zoom min="100" max="350" step="1" value="100" aria-label="Bring camera view closer">
+        <button type="button" class="mini" data-cam-cycle hidden>Switch cam</button>
         <button type="button" class="mini" data-overlay-toggle>Hide mat</button>
         <button type="button" class="mini" data-zoom-reset>Reset</button>
+        <p class="cam-zoom-hint">Lock your 40-card list, then line creatures / spells in the gold boxes. Face-down cards sit in the landscape Hand box under the mat. Extra, Deck, Banish, GY, and Hand stay unnamed. Double-click a play lane to correct.</p>
       </div>
     </div>`;
   }
@@ -589,11 +798,11 @@
     </div>`;
   }
 
-  function bindCam(el, stream, muted, zoom) {
+  function bindCam(el, stream, muted, zoom, panX, panY) {
     const video = el.querySelector('video');
     const waiting = el.querySelector('.cam-waiting');
     el.classList.toggle('is-live', Boolean(stream));
-    el.style.setProperty('--cam-zoom', String(Number.isFinite(zoom) ? Math.max(1, zoom) : 1));
+    applyCamTransform(el, zoom, panX, panY);
     if (waiting) waiting.hidden = Boolean(stream);
     if (!video) return;
     prepareVideoEl(video);
@@ -658,7 +867,7 @@
       root.innerHTML = `<div class="irl-page">
         <p class="irl-crumb">${opts.backHref ? `<a href="${esc(opts.backHref)}">${esc(opts.eventName || 'Bracket')}</a>` : `<span>${esc(opts.eventName || 'Doginal Dogs Legends')}</span>`}<span> / </span><span>Verified table</span></p>
         <h1>${esc(player1 && player1.handle ? player1.handle : 'TBD')} <span class="muted">vs</span> ${esc(player2 && player2.handle ? player2.handle : 'TBD')}</h1>
-        <p class="muted">Point the rear camera at your physical hand. Health starts at 40. Mana follows the rules: turn 1 is 1 crystal, cap 10, leftover is lost at pass. Going second gets the Coin once (+1). Both live cameras on a direct link mark the table verified.</p>
+        <p class="muted">Lock your 40-card list, then point the rear camera at the mat. Creature and spell/trap boxes match official art and the printed name against that list — Skip vs Spark vs Plague is easy in a 40, not in all 111. Extra, Deck, Banish, and GY stay unnamed. Each turn is 60 seconds.</p>
         <div class="irl-card">
           <p class="muted">${esc(gate)}</p>
           ${signedIn ? '' : `<p class="irl-seat-grid"><a class="btn" href="${esc(discordHref)}">Sign in with Discord to sit</a></p>`}
@@ -691,17 +900,32 @@
       const selfId = `p-${Math.random().toString(36).slice(2, 10)}`;
       let localHud = emptySeat(myHandle);
       let clock = emptyClock();
+      let board = emptyBoard();
+      const decks = { 1: null, 2: null };
+      const hands = { 1: 0, 2: 0 };
+      const handLabels = { 1: [], 2: [] };
+      const handStatus = { 1: 'off', 2: 'off' };
+      const handWatchers = { top: null, bottom: null };
       const remoteHud = { 1: null, 2: null };
       const peerSeat = new Map();
       const streamsByPeer = new Map();
       let localStream = null;
       let camZoom = readStoredZoom();
+      let camPanX = 0;
+      let camPanY = 0;
+      let videoInputCount = 0;
       let camError = '';
       let camModalOpen = seat === 1 || seat === 2;
       let camBusy = false;
       let busy = false;
       let scoreDraft = { 1: '', 2: '' };
       let flipTimer = 0;
+      let shotTimer = 0;
+      let watchTimer = 0;
+      let lastWatch = { 1: '', 2: '' };
+      const detectHold = { 1: {}, 2: {} };
+      let pickerLane = null;
+      let catalogReady = false;
       let joined = false;
       let peers = [];
       const P2PRoom = global.DdlP2PRoom;
@@ -727,9 +951,16 @@
 
       function adoptClock(raw) {
         const next = parseClock(raw);
-        if (next.seq < clock.seq) return false;
+        if (next.seq <= clock.seq) return false;
         clock = next;
         syncLocalFromClock();
+        return true;
+      }
+
+      function adoptBoard(raw) {
+        const next = parseBoard(raw);
+        if (next.seq <= board.seq) return false;
+        board = next;
         return true;
       }
 
@@ -779,11 +1010,25 @@
             if (adoptClock(msg.clock || msg)) renderChrome();
             return;
           }
+          if (msg.k === 'board') {
+            if (claimed !== 1 && claimed !== 2) return;
+            if (adoptBoard(msg.board)) renderChrome();
+            return;
+          }
+          if (msg.k === 'deck') {
+            if (claimed !== 1 && claimed !== 2) return;
+            if (msg.seat !== claimed) return;
+            decks[msg.seat] = parseLockedDeck(msg.deck);
+            renderChrome();
+            return;
+          }
           if (msg.k !== 'hello' && msg.k !== 'hud') return;
           if (msg.seat !== 1 && msg.seat !== 2) return;
           if (claimed !== msg.seat) return;
           peerSeat.set(_from, msg.seat);
           if (msg.clock) adoptClock(msg.clock);
+          if (msg.board) adoptBoard(msg.board);
+          if (msg.deck) decks[msg.seat] = parseLockedDeck(msg.deck);
           const prev = remoteHud[msg.seat] || emptySeat(msg.handle || handleName(msg.seat));
           remoteHud[msg.seat] = {
             handle: msg.k === 'hello' ? (msg.handle || prev.handle) : prev.handle,
@@ -792,6 +1037,8 @@
             turn: clock.started && clock.active === msg.seat,
             camLive: Boolean(msg.cam),
             zoom: Number.isFinite(msg.zoom) ? clamp(msg.zoom, ZOOM_MIN, ZOOM_MAX) : (prev.zoom || 1),
+            panX: Number.isFinite(msg.panX) ? clamp(msg.panX, -1, 1) : (prev.panX || 0),
+            panY: Number.isFinite(msg.panY) ? clamp(msg.panY, -1, 1) : (prev.panY || 0),
           };
           renderChrome();
         },
@@ -812,7 +1059,11 @@
           turn: Boolean(clock.started && clock.active === seat),
           cam: Boolean(localStream),
           zoom: camZoom,
+          panX: camPanX,
+          panY: camPanY,
           clock: clockWire(clock),
+          board: boardWire(board),
+          deck: decks[seat],
         }, to);
       }
 
@@ -826,6 +1077,8 @@
           turn: Boolean(clock.started && clock.active === seat),
           cam: next.camLive,
           zoom: camZoom,
+          panX: camPanX,
+          panY: camPanY,
           clock: clockWire(clock),
         });
       }
@@ -855,6 +1108,7 @@
         clock.used = { 1: 0, 2: 0 };
         clock.coinArmed = false;
         clock.coinSpent = false;
+        armTurn(clock);
         pushClock();
       }
 
@@ -874,15 +1128,512 @@
         }, 900);
       }
 
-      function passTurn() {
+      function passTurn(reason) {
         if (seat !== 1 && seat !== 2) return;
-        if (!clock.started || clock.active !== seat) return;
-        const next = seat === 1 ? 2 : 1;
+        if (!clock.started) return;
+        if (reason === 'timeout') {
+          if (clock.searching) return;
+          if (remainingMs(clock) > 250) return;
+        } else if (clock.active !== seat) return;
+        const next = clock.active === 1 ? 2 : 1;
         clock.active = next;
         clock.turns[next] = (clock.turns[next] || 0) + 1;
         clock.used = { 1: 0, 2: 0 };
         clock.coinArmed = false;
+        armTurn(clock);
         pushClock();
+      }
+
+      function beginSearch(kind) {
+        if (seat !== 1 && seat !== 2) return;
+        if (!clock.started || clock.active !== seat) return;
+        const nextKind = searchKindOf(kind);
+        if (!nextKind) return;
+        if (clock.searching === seat) return;
+        clock.searchLeftMs = remainingMs(clock);
+        clock.searching = seat;
+        clock.searchKind = nextKind;
+        clock.turnEndsAt = 0;
+        clock.turnLeftMs = clock.searchLeftMs;
+        pushClock();
+      }
+
+      function endSearch() {
+        if (seat !== 1 && seat !== 2) return;
+        if (clock.searching !== seat) return;
+        const left = Math.max(0, Number(clock.searchLeftMs) || 0);
+        clock.searching = 0;
+        clock.searchKind = '';
+        clock.searchLeftMs = 0;
+        clock.turnLeftMs = left;
+        clock.turnEndsAt = Date.now() + left;
+        pushClock();
+      }
+
+      function parseLockedDeck(raw) {
+        if (!raw || typeof raw !== 'object' || !raw.locked) return null;
+        const Cat = global.DdlIrlCatalog;
+        const heroes = Array.isArray(raw.heroes) ? raw.heroes.map(String) : [String(raw.hero || '')].filter(Boolean);
+        const counts = raw.counts && typeof raw.counts === 'object' ? raw.counts : {};
+        const checked = Cat ? Cat.validateDeck(counts, heroes) : { ok: false, total: 0, counts, rows: [], errors: ['Catalog missing'] };
+        return {
+          locked: true,
+          name: String(raw.name || 'Locked list'),
+          hero: String(raw.hero || heroes[0] || ''),
+          heroes,
+          counts: checked.counts,
+          rows: checked.rows,
+          total: checked.total,
+          ok: checked.ok,
+          errors: checked.errors,
+        };
+      }
+
+      function emitDeck() {
+        if (seat !== 1 && seat !== 2) return;
+        p2p.send({ k: 'deck', seat, deck: decks[seat] });
+      }
+
+      function emitBoard() {
+        if (seat !== 1 && seat !== 2) return;
+        p2p.send({ k: 'board', board: boardWire(board) });
+      }
+
+      function pushBoard() {
+        if (seat !== 1 && seat !== 2) return;
+        board.seq += 1;
+        emitBoard();
+        renderChrome();
+      }
+
+      function pinLane(seatN, key, id) {
+        if (seat !== 1 && seat !== 2) return;
+        const Watch = global.DdlIrlWatch;
+        if (Watch && Watch.isPileLane(key)) return;
+        const cardId = String(id || '').toUpperCase();
+        writeLane(board[seatN], key, cardId
+          ? { id: cardId, occupied: true, source: 'pin', conf: 1 }
+          : emptySlot());
+        pushBoard();
+      }
+
+      function feedVerified(n, streamOn) {
+        if (!streamOn) return false;
+        if (handStatus[n] === 'ready') return hands[n] > 0;
+        return true;
+      }
+
+      function handHintFor(n, streamOn, camLive) {
+        const status = handStatus[n];
+        if (!streamOn && !camLive) return 'No cam';
+        if (status === 'loading') return 'Loading tracker';
+        if (status === 'error') return streamOn ? 'Cam live' : 'Cam live';
+        if (hands[n] > 0) {
+          const labels = (handLabels[n] || []).join(' · ');
+          return labels ? `${labels} locked` : 'Hand locked';
+        }
+        if (streamOn) return 'Show a hand';
+        return camLive ? 'Cam live' : 'No cam';
+      }
+
+      function bindHands(sideKey, panel) {
+        const Hands = global.DdlIrlHands;
+        const cam = root.querySelector(`[data-side="${sideKey}"] .hand-cam`);
+        if (!cam || !Hands) return;
+        const video = cam.querySelector('video');
+        const canvas = cam.querySelector('.hand-canvas');
+        const stream = panel.stream;
+        const prev = handWatchers[sideKey];
+        if (prev && prev.stream === stream) return;
+        if (prev && prev.stop) prev.stop();
+        handWatchers[sideKey] = null;
+        if (!stream || !video || !canvas) {
+          hands[panel.n] = 0;
+          handStatus[panel.n] = 'off';
+          return;
+        }
+        const n = panel.n;
+        const watcher = Hands.watch(video, canvas, (count, labels, status) => {
+          if (status) handStatus[n] = status;
+          if (status !== 'loading' && status !== 'error') {
+            hands[n] = Number(count) || 0;
+            handLabels[n] = labels || [];
+          }
+          const wrap = root.querySelector(`[data-side="${sideKey}"]`);
+          const state = wrap && wrap.querySelector('.cam-state');
+          if (state && panel.stream) {
+            state.hidden = false;
+            const hint = handHintFor(n, true, true);
+            state.textContent = hint;
+            state.classList.toggle('ok', hands[n] > 0 || handStatus[n] === 'error');
+            state.classList.toggle('warn', handStatus[n] === 'ready' && hands[n] === 0);
+          }
+        });
+        handWatchers[sideKey] = { stream, stop: watcher.stop };
+      }
+
+      function paintLanes(cam, seatN) {
+        const Cat = global.DdlIrlCatalog;
+        const Watch = global.DdlIrlWatch;
+        const seatBoard = board[seatN];
+        cam.querySelectorAll('[data-lane]').forEach((el) => {
+          const key = el.getAttribute('data-lane');
+          const pile = Watch && Watch.isPileLane(key);
+          const slot = laneSlotOf(seatBoard, key);
+          const card = !pile && slot.id && Cat ? Cat.byId(slot.id) : null;
+          el.classList.toggle('is-pile', Boolean(pile));
+          el.classList.toggle('is-filled', Boolean(!pile && (slot.id || slot.occupied)));
+          el.classList.toggle('is-alert', key === 'extra' && slot.occupied);
+          el.disabled = Boolean(pile);
+          if (card) {
+            el.setAttribute('data-peek', card.id);
+            el.setAttribute('aria-label', card.name);
+            el.classList.toggle('is-auto', slot.source === 'detect');
+          } else {
+            el.removeAttribute('data-peek');
+            el.setAttribute('aria-label', key);
+            el.classList.remove('is-auto');
+          }
+          const typeEl = el.querySelector('b');
+          if (typeEl) typeEl.hidden = Boolean(card);
+          const nameEl = el.querySelector('[data-lane-name]');
+          if (nameEl) {
+            nameEl.hidden = !card;
+            nameEl.textContent = card ? card.name : '';
+          }
+          el.onclick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (pile) return;
+            if (card && Cat) {
+              Cat.showPeek(card.id, el, 'pin');
+              return;
+            }
+            if (seat !== 1 && seat !== 2) return;
+            pickerLane = { seat: seatN, key };
+            renderLanePicker();
+          };
+          el.ondblclick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (pile) return;
+            if (seat !== 1 && seat !== 2) return;
+            pickerLane = { seat: seatN, key };
+            renderLanePicker();
+          };
+        });
+      }
+
+      function lockMyDeck(counts, meta) {
+        const Cat = global.DdlIrlCatalog;
+        if (seat !== 1 && seat !== 2 || !Cat) return;
+        const heroes = meta && meta.heroes ? meta.heroes : [];
+        const checked = Cat.validateDeck(counts, heroes);
+        decks[seat] = {
+          locked: true,
+          name: (meta && meta.name) || 'Locked list',
+          hero: (meta && meta.hero) || (heroes[0] || ''),
+          heroes,
+          counts: checked.counts,
+          rows: checked.rows,
+          total: checked.total,
+          ok: checked.ok,
+          errors: checked.errors,
+        };
+        emitDeck();
+        renderChrome();
+      }
+
+      function renderDecksPanel() {
+        const mountEl = root.querySelector('[data-decks]');
+        if (!mountEl) return;
+        const Cat = global.DdlIrlCatalog;
+        const semi = Boolean(opts.semiIrl);
+        const mine = seat === 1 || seat === 2;
+        function packHtml(n) {
+          const pack = decks[n];
+          const name = handleName(n);
+          if (!pack) return `<p class="muted">${esc(name)} · no list locked</p>`;
+          const status = pack.ok ? 'Locked 40' : `Locked · ${esc((pack.errors && pack.errors[0]) || 'check list')}`;
+          return `<p><strong>${esc(name)}</strong> · ${esc(pack.name)} · ${esc(status)}</p>`;
+        }
+        const customs = Cat ? Cat.customDecks() : [];
+        const customOpts = customs.map((d) => `<option value="${esc(d.id)}">${esc(d.name)} (${esc((d.heroes || []).join('/'))})</option>`).join('');
+        mountEl.hidden = false;
+        const key = `d|${semi ? 1 : 0}|${mine ? seat : 0}|${decks[1] ? decks[1].total : 0}|${decks[2] ? decks[2].total : 0}|${catalogReady ? 1 : 0}|${customs.length}`;
+        if (mountEl.dataset.key === key) return;
+        mountEl.dataset.key = key;
+        mountEl.innerHTML = `<p class="hud-kicker">${semi ? 'Semi-IRL · verified lists' : 'Deck lock'}</p>
+          <p class="muted">${semi
+            ? 'Lock your 40-card Companion list. Auto-ID matches official art and printed names on that list only (Skip / Spark / Plague / Houdini, not all 111).'
+            : 'Lock your 40-card Companion list first. Auto-ID matches art and names from that list — not the whole 111-card pool.'}</p>
+          ${packHtml(1)}${packHtml(2)}
+          ${mine ? `<div class="irl-deck-lock">
+            ${customOpts ? `<label>My decks<select data-custom-deck><option value="">Pick a saved list</option>${customOpts}</select></label>` : '<p class="muted">No Companion My decks on this browser. Paste a list, or build one on ddltcg.kushmetax.com.</p>'}
+            <label>Paste list<textarea data-deck-paste rows="3" placeholder="V001 x3&#10;V017 x2"></textarea></label>
+            <button type="button" class="btn" data-deck-lock>Lock my list</button>
+          </div>` : ''}`;
+        const lockBtn = mountEl.querySelector('[data-deck-lock]');
+        if (lockBtn) {
+          lockBtn.onclick = () => {
+            if (!Cat) return toast(root, 'Companion catalog is still loading', false);
+            const sel = mountEl.querySelector('[data-custom-deck]');
+            const pasted = mountEl.querySelector('[data-deck-paste]');
+            let counts = Cat.parseDeckText(pasted && pasted.value);
+            let meta = { name: 'Pasted list', heroes: [] };
+            const picked = sel && sel.value;
+            if (picked) {
+              const custom = customs.find((d) => d.id === picked);
+              if (custom) {
+                counts = custom.cards;
+                meta = { name: custom.name, hero: custom.hero, heroes: custom.heroes };
+              }
+            }
+            const checked = Cat.validateDeck(counts, meta.heroes);
+            if (!checked.ok) {
+              toast(root, checked.errors[0] || 'List is not a legal 40', false);
+            }
+            lockMyDeck(counts, meta);
+            if (checked.ok) toast(root, 'List locked for this table', true);
+          };
+        }
+      }
+
+      function renderLanePicker() {
+        const mountEl = root.querySelector('[data-lane-picker]');
+        if (!mountEl) return;
+        const Cat = global.DdlIrlCatalog;
+        const Watch = global.DdlIrlWatch;
+        if (pickerLane && Watch && Watch.isPileLane(pickerLane.key)) pickerLane = null;
+        if (!pickerLane) {
+          mountEl.hidden = true;
+          mountEl.innerHTML = '';
+          return;
+        }
+        const cards = Cat ? Cat.cards() : [];
+        const locked = decks[pickerLane.seat];
+        const pool = locked && locked.rows && locked.rows.length
+          ? locked.rows.map((row) => Cat.byId(row.id)).filter(Boolean)
+          : cards;
+        mountEl.hidden = false;
+        mountEl.innerHTML = `<div class="irl-cam-dialog" role="dialog" aria-modal="true">
+          <p class="hud-kicker">Pin card · ${esc(pickerLane.key)}</p>
+          <h2>Companion lookup</h2>
+          <input type="search" data-lane-q placeholder="Name or Vxxx" autocomplete="off">
+          <div class="irl-card-pick" data-lane-results></div>
+          <div class="irl-seat-grid">
+            <button type="button" class="btn ghost" data-lane-clear>Clear lane</button>
+            <button type="button" class="btn ghost" data-lane-cancel>Close</button>
+          </div>
+        </div>`;
+        const q = mountEl.querySelector('[data-lane-q]');
+        const results = mountEl.querySelector('[data-lane-results]');
+        function paintResults() {
+          const term = String(q.value || '').trim().toLowerCase();
+          const hits = pool.filter((c) => {
+            if (!term) return true;
+            return c.id.toLowerCase().includes(term) || c.name.toLowerCase().includes(term);
+          }).slice(0, 24);
+          results.innerHTML = hits.map((c) =>
+            `<button type="button" class="mini" data-pin-id="${esc(c.id)}">${esc(c.name)} <span class="muted">${esc(c.id)}</span></button>`
+          ).join('') || '<p class="muted">No cards match.</p>';
+          results.querySelectorAll('[data-pin-id]').forEach((btn) => {
+            btn.onclick = () => {
+              pinLane(pickerLane.seat, pickerLane.key, btn.getAttribute('data-pin-id'));
+              pickerLane = null;
+              renderLanePicker();
+            };
+          });
+        }
+        paintResults();
+        q.oninput = paintResults;
+        q.focus();
+        mountEl.querySelector('[data-lane-cancel]').onclick = () => {
+          pickerLane = null;
+          renderLanePicker();
+        };
+        mountEl.querySelector('[data-lane-clear]').onclick = () => {
+          pinLane(pickerLane.seat, pickerLane.key, '');
+          pickerLane = null;
+          renderLanePicker();
+        };
+      }
+
+      function tickShot() {
+        if (!clock.started) return;
+        const shot = root.querySelector('[data-shot]');
+        if (shot) {
+          const left = remainingMs(clock);
+          const val = shot.querySelector('[data-shot-val]');
+          if (val) val.textContent = formatShot(left);
+          shot.classList.toggle('is-ember', left <= 10000 && !clock.searching);
+          shot.classList.toggle('is-paused', Boolean(clock.searching));
+        }
+        const active = clock.active;
+        const offCam = clock.started && !clock.searching && handStatus[active] === 'ready' && hands[active] === 0;
+        const note = root.querySelector('[data-shot-note]');
+        if (note && !clock.searching) {
+          note.textContent = offCam
+            ? `${handleName(active)} · hands off cam`
+            : '60s shot clock · auto-pass at 0:00';
+        }
+        if (!clock.searching && remainingMs(clock) <= 0) passTurn('timeout');
+      }
+
+      function runWatch() {
+        if (runWatch.busy) return;
+        runWatch.busy = true;
+        runWatch.tick = (runWatch.tick || 0) + 1;
+        try {
+        const Watch = global.DdlIrlWatch;
+        const Cat = global.DdlIrlCatalog;
+        if (!Watch || !Cat) return;
+        const notes = [];
+        let reading = 0;
+        ['top', 'bottom'].forEach((side) => {
+          const wrap = root.querySelector(`[data-side="${side}"]`);
+          if (!wrap) return;
+          const video = wrap.querySelector('video');
+          const cam = wrap.querySelector('.hand-cam');
+          if (!video || !cam || !cam.classList.contains('is-live')) return;
+          if (!cam.classList.contains('is-mine') && runWatch.tick % 2 === 0) return;
+          const seatN = Number(cam.getAttribute('data-board-seat'));
+          if (seatN !== 1 && seatN !== 2) return;
+          const slots = [...cam.querySelectorAll('[data-lane]')].map((el) => ({
+            key: el.getAttribute('data-lane'),
+            el,
+          })).filter((row) => Watch.isPlayLane(row.key));
+          const counts = decks[seatN] && decks[seatN].counts ? decks[seatN].counts : null;
+          const prefer = counts ? Object.keys(counts).filter((id) => Number(counts[id]) > 0) : [];
+          const hits = Watch.scan(video, slots, prefer);
+          reading += hits.filter((h) => h.id).length;
+          const hold = detectHold[seatN] || (detectHold[seatN] = {});
+          let changed = false;
+          ['extra', 'deck', 'banish', 'gy', 'hand'].forEach((key) => {
+            const cur = laneSlotOf(board[seatN], key);
+            if (cur.id || cur.occupied || cur.source) {
+              writeLane(board[seatN], key, emptySlot());
+              changed = true;
+            }
+          });
+          hits.forEach((hit) => {
+            const cur = laneSlotOf(board[seatN], hit.key);
+            if (cur.source === 'pin') return;
+            const st = hold[hit.key] || (
+              cur.source === 'detect' && cur.id
+                ? { locked: cur.id, pending: '', hits: 0, misses: 0, conf: cur.conf || 0 }
+                : { locked: '', pending: '', hits: 0, misses: 0, conf: 0 }
+            );
+            const raw = hit.id || '';
+            let next = null;
+            if (st.locked) {
+              if (raw === st.locked) {
+                st.misses = 0;
+                st.pending = '';
+                st.hits = 0;
+                st.conf = Math.max(st.conf, hit.conf || 0);
+              } else if (!raw) {
+                st.misses += 1;
+                st.pending = '';
+                st.hits = 0;
+                if (st.misses >= 2) {
+                  st.locked = '';
+                  st.conf = 0;
+                  next = emptySlot();
+                }
+              } else if (raw === st.pending) {
+                st.hits += 1;
+                st.misses = 0;
+                if (st.hits >= 2) {
+                  st.locked = raw;
+                  st.conf = hit.conf || 0;
+                  st.pending = '';
+                  st.hits = 0;
+                  next = {
+                    id: raw,
+                    occupied: true,
+                    source: 'detect',
+                    conf: hit.conf,
+                  };
+                }
+              } else {
+                st.pending = raw;
+                st.hits = 1;
+                st.misses = 0;
+              }
+            } else if (raw) {
+              if (raw === st.pending) st.hits += 1;
+              else {
+                st.pending = raw;
+                st.hits = 1;
+              }
+              st.misses = 0;
+              const need = 2;
+              if (st.hits >= need) {
+                st.locked = raw;
+                st.conf = hit.conf || 0;
+                st.pending = '';
+                st.hits = 0;
+                next = {
+                  id: raw,
+                  occupied: true,
+                  source: 'detect',
+                  conf: hit.conf,
+                };
+              }
+            } else {
+              st.pending = '';
+              st.hits = 0;
+            }
+            hold[hit.key] = st;
+            if (next) {
+              writeLane(board[seatN], hit.key, next);
+              changed = true;
+            }
+          });
+          const sig = hits.map((h) => {
+            const slot = laneSlotOf(board[seatN], h.key);
+            return `${h.key}:${slot.occupied ? 1 : 0}:${slot.id}`;
+          }).join('|');
+          if (changed) {
+            lastWatch[seatN] = sig;
+            paintLanes(cam, seatN);
+            if (seat === 1 || seat === 2) {
+              board.seq += 1;
+              emitBoard();
+            }
+          } else if (sig !== lastWatch[seatN]) {
+            lastWatch[seatN] = sig;
+          }
+          notes.push(...Watch.alertsFromScan(seatN, hits, board[seatN], clock, decks[seatN] && decks[seatN].counts, Cat.byId));
+        });
+        const alertEl = root.querySelector('[data-alerts]');
+        if (alertEl) {
+          const unique = [];
+          const seen = new Set();
+          notes.forEach((n) => {
+            if (!n || seen.has(n.text)) return;
+            seen.add(n.text);
+            unique.push(n);
+          });
+          alertEl.hidden = unique.length === 0;
+          alertEl.textContent = unique.map((n) => n.text).join(' · ');
+        }
+        const watchNote = root.querySelector('[data-watch-note]');
+        if (watchNote) {
+          const mine = (seat === 1 || seat === 2) ? decks[seat] : (decks[1] || decks[2]);
+          const n = mine && mine.counts
+            ? Object.keys(mine.counts).filter((id) => Number(mine.counts[id]) > 0).length
+            : 0;
+          watchNote.textContent = n
+            ? (reading
+              ? `Auto-ID is reading ${reading} lane${reading === 1 ? '' : 's'} from your ${n}-card list.`
+              : `Line a printed card inside a gold creature or spell box. Matching art from your ${n}-card list.`)
+            : 'Lock a 40-card list so auto-ID only matches those cards. Until then it still tries every creature/spell.';
+        }
+        } finally {
+          runWatch.busy = false;
+        }
       }
 
       function spendCoin() {
@@ -932,7 +1683,7 @@
         const blocked = Boolean(camError);
         const body = camError
           ? esc(camError)
-          : 'Tap <b>Allow camera</b>. iPhone and Android will show a system Allow/Block prompt — look at the top of the screen. Then point the rear camera at your cards.';
+          : 'Tap <b>Allow camera</b>. iPhone and Android will show a system Allow/Block prompt — look at the top of the screen. Then point the <b>rear</b> camera at your cards.';
         mountEl.innerHTML = `<div class="irl-cam-dialog" role="dialog" aria-modal="true" aria-labelledby="irl-cam-title">
           <p class="hud-kicker">Hand cam</p>
           <h2 id="irl-cam-title">${blocked ? 'Allow camera to continue' : 'Allow camera'}</h2>
@@ -986,6 +1737,7 @@
           camBusy = false;
           emitHud(localHud);
           renderChrome();
+          void refreshVideoInputs();
         } catch (err) {
           clearTimeout(watchdog);
           camBusy = false;
@@ -1031,6 +1783,8 @@
           label: mine ? mineLabel : hud.handle,
           waiting: mine ? 'Link your hand cam' : wait,
           zoom: mine ? camZoom : clamp(Number(hud.zoom) || 1, ZOOM_MIN, ZOOM_MAX),
+          panX: mine ? camPanX : clamp(Number(hud.panX) || 0, -1, 1),
+          panY: mine ? camPanY : clamp(Number(hud.panY) || 0, -1, 1),
         };
       }
 
@@ -1045,6 +1799,9 @@
           <span class="muted mono" data-rtt hidden></span>
         </div>
         <div class="irl-clock-mount" data-clock></div>
+        <p class="irl-alert" data-alerts hidden></p>
+        <p class="muted" data-watch-note></p>
+        <div class="irl-card irl-decks" data-decks></div>
         <p class="irl-stall" data-stall hidden>Direct link failed on this network. Stay on the page and retry the camera.</p>
         <div class="irl-actions" data-actions></div>
         <p class="err" data-cam-err hidden></p>
@@ -1061,6 +1818,7 @@
         <div class="irl-card" data-lock></div>
         <p class="irl-toast" hidden></p>
         <div class="irl-cam-overlay" data-cam-modal hidden></div>
+        <div class="irl-cam-overlay" data-lane-picker hidden></div>
       </div>`;
 
       root.querySelector('[data-reseat]').onclick = () => {
@@ -1073,7 +1831,7 @@
       function paintLocalZoom() {
         const mineCam = root.querySelector('.hand-cam.is-mine');
         if (!mineCam) return;
-        mineCam.style.setProperty('--cam-zoom', String(camZoom));
+        applyCamTransform(mineCam, camZoom, camPanX, camPanY);
         const wrap = mineCam.closest('[data-side]') || mineCam.parentElement;
         const label = wrap.querySelector('[data-zoom-val]');
         if (label) label.textContent = `${camZoom.toFixed(2)}×`;
@@ -1081,21 +1839,76 @@
         if (input && Number(input.value) !== Math.round(camZoom * 100)) {
           input.value = String(Math.round(camZoom * 100));
         }
+        wrap.querySelectorAll('[data-cam-cycle]').forEach((btn) => {
+          btn.hidden = videoInputCount < 2;
+        });
       }
 
-      function setCamZoom(factor) {
+      function setCamZoom(factor, keepPan) {
         camZoom = clamp(Number(factor) || 1, ZOOM_MIN, ZOOM_MAX);
         writeStoredZoom(camZoom);
+        if (!keepPan && camZoom <= 1.01) {
+          camPanX = 0;
+          camPanY = 0;
+        }
         paintLocalZoom();
         if (seat === 1 || seat === 2) emitHud(localHud);
       }
 
+      async function refreshVideoInputs() {
+        videoInputCount = (await listVideoInputs()).length;
+        paintLocalZoom();
+      }
+
+      async function cycleCam() {
+        if (!localStream || camBusy || (seat !== 1 && seat !== 2)) return;
+        const gum = getUserMediaFn();
+        if (!gum) return;
+        const cams = await listVideoInputs();
+        if (cams.length < 2) return;
+        const ranked = rankVideoInputs(cams);
+        const rear = ranked.filter((row) => row.score >= 0).map((row) => row.cam);
+        const pool = rear.length > 1 ? rear : cams;
+        const curId = trackDeviceId(camTrack(localStream));
+        const idx = Math.max(0, pool.findIndex((cam) => cam.deviceId === curId));
+        const next = pool[(idx + 1) % pool.length];
+        if (!next || next.deviceId === curId) return;
+        camBusy = true;
+        try {
+          const prevId = curId;
+          stopStream(localStream);
+          localStream = null;
+          let stream;
+          try {
+            stream = await openDevice(gum, next.deviceId);
+          } catch (_err) {
+            stream = await openDevice(gum, prevId);
+          }
+          await applyWidestHardwareZoom(stream);
+          localStream = stream;
+          p2p.setLocalStream(stream);
+          videoInputCount = cams.length;
+          emitHud(localHud);
+          renderChrome();
+        } catch (_err) {
+          toast(root, 'Could not switch camera', false);
+        }
+        camBusy = false;
+      }
+
       root.querySelectorAll('[data-zoom]').forEach((input) => {
         input.value = String(Math.round(camZoom * 100));
-        input.addEventListener('input', () => setCamZoom(Number(input.value) / 100));
+        input.addEventListener('input', () => setCamZoom(Number(input.value) / 100, true));
       });
       root.querySelectorAll('[data-zoom-reset]').forEach((btn) => {
-        btn.addEventListener('click', () => setCamZoom(1));
+        btn.addEventListener('click', () => {
+          camPanX = 0;
+          camPanY = 0;
+          setCamZoom(1);
+        });
+      });
+      root.querySelectorAll('[data-cam-cycle]').forEach((btn) => {
+        btn.addEventListener('click', () => { void cycleCam(); });
       });
       root.querySelectorAll('[data-overlay-toggle]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -1116,8 +1929,55 @@
           const dock = wrap.querySelector('[data-cam-zoom]');
           if (!dock || dock.hidden) return;
           ev.preventDefault();
-          setCamZoom(camZoom + (ev.deltaY < 0 ? 0.08 : -0.08));
+          setCamZoom(camZoom + (ev.deltaY < 0 ? 0.08 : -0.08), true);
         }, { passive: false });
+        const pointers = new Map();
+        let pinchDist = 0;
+        let panEmit = 0;
+        function emitPanFrame() {
+          paintLocalZoom();
+          if (panEmit) return;
+          panEmit = requestAnimationFrame(() => {
+            panEmit = 0;
+            if (seat === 1 || seat === 2) emitHud(localHud);
+          });
+        }
+        cam.addEventListener('pointerdown', (ev) => {
+          if (!cam.classList.contains('is-mine') || !localStream) return;
+          if (ev.target.closest('.lane-slot')) return;
+          cam.setPointerCapture(ev.pointerId);
+          pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+          if (pointers.size === 2) {
+            const pts = [...pointers.values()];
+            pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          }
+          if (camZoom > 1.01) cam.classList.add('is-panning');
+        });
+        cam.addEventListener('pointermove', (ev) => {
+          if (!pointers.has(ev.pointerId)) return;
+          const prev = pointers.get(ev.pointerId);
+          pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+          if (pointers.size === 2) {
+            const pts = [...pointers.values()];
+            const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            if (pinchDist > 0 && dist > 0) setCamZoom(camZoom * (dist / pinchDist), true);
+            pinchDist = dist;
+            return;
+          }
+          if (camZoom <= 1.01) return;
+          const rect = cam.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          camPanX = clamp(camPanX + ((ev.clientX - prev.x) / rect.width) * 2, -1, 1);
+          camPanY = clamp(camPanY + ((ev.clientY - prev.y) / rect.height) * 2, -1, 1);
+          emitPanFrame();
+        });
+        function endPointer(ev) {
+          pointers.delete(ev.pointerId);
+          if (pointers.size < 2) pinchDist = 0;
+          if (!pointers.size) cam.classList.remove('is-panning');
+        }
+        cam.addEventListener('pointerup', endPointer);
+        cam.addEventListener('pointercancel', endPointer);
       });
 
       function renderChrome() {
@@ -1128,18 +1988,22 @@
         const stalled = peers.some((p) => p.connectionState === 'failed' || p.terminal);
         const theirLive = Boolean(top.stream);
         const myLive = Boolean(bottom.stream);
-        const verified = linked && theirLive && myLive;
+        const verifiedHands = feedVerified(top.n, theirLive) && feedVerified(bottom.n, myLive);
+        const verified = linked && theirLive && myLive && verifiedHands;
         const connectedPeer = peers.find((p) => p.connectionState === 'connected');
         const badge = root.querySelector('[data-badge]');
         if (badge) {
           badge.classList.toggle('ok', verified);
+          const trackerDown = handStatus[top.n] === 'error' || handStatus[bottom.n] === 'error';
           badge.textContent = verified
-            ? 'Verified live'
-            : linked
-              ? 'Linked · both cams'
-              : joined
-                ? 'Waiting for opponent'
-                : 'Connecting…';
+            ? (trackerDown ? 'Verified live · cams' : 'Verified live')
+            : linked && theirLive && myLive
+              ? 'Linked · show both hands'
+              : linked
+                ? 'Linked · both cams'
+                : joined
+                  ? 'Waiting for opponent'
+                  : 'Connecting…';
         }
         const rtt = root.querySelector('[data-rtt]');
         if (rtt) {
@@ -1181,7 +2045,7 @@
 
         const clockMount = root.querySelector('[data-clock]');
         if (clockMount) {
-          const clockKey = `${clock.started ? 1 : 0}|${clock.flipping ? 1 : 0}|${clock.active}|${clock.seq}|${seat}`;
+          const clockKey = `${clock.started ? 1 : 0}|${clock.flipping ? 1 : 0}|${clock.active}|${clock.seq}|${clock.searching}|${clock.searchKind}|${seat}`;
           if (clockMount.dataset.key !== clockKey) {
             clockMount.dataset.key = clockKey;
             clockMount.innerHTML = clockBarHtml(clock, { 1: handleName(1), 2: handleName(2) }, seat);
@@ -1189,6 +2053,11 @@
             if (flipBtn) flipBtn.onclick = () => flipFirst();
             const resetBtn = clockMount.querySelector('[data-clock-reset]');
             if (resetBtn) resetBtn.onclick = () => resetClock();
+            clockMount.querySelectorAll('[data-search]').forEach((btn) => {
+              btn.onclick = () => beginSearch(btn.getAttribute('data-search'));
+            });
+            const resume = clockMount.querySelector('[data-search-end]');
+            if (resume) resume.onclick = () => endSearch();
           }
         }
 
@@ -1197,22 +2066,27 @@
           if (!wrap) return;
           const cam = wrap.querySelector('.hand-cam');
           cam.classList.toggle('is-mine', panel.mine);
-          bindCam(cam, panel.stream, panel.mine, panel.zoom);
+          cam.setAttribute('data-board-seat', String(panel.n));
+          bindCam(cam, panel.stream, panel.mine, panel.zoom, panel.panX, panel.panY);
+          bindHands(key, panel);
+          paintLanes(cam, panel.n);
           const zoomDock = wrap.querySelector('[data-cam-zoom]');
           if (zoomDock) zoomDock.hidden = !(panel.mine && panel.stream);
           if (panel.mine) paintLocalZoom();
-          const label = cam.querySelector('.cam-label');
+          const label = wrap.querySelector('.cam-label');
           if (label) label.textContent = panel.label;
-          const state = cam.querySelector('.cam-state');
+          const state = wrap.querySelector('.cam-state');
           if (state) {
-            state.hidden = !panel.stream;
-            state.textContent = panel.stream ? 'Cam live' : '';
-            state.classList.toggle('ok', Boolean(panel.stream));
+            const hint = handHintFor(panel.n, Boolean(panel.stream), panel.hud.camLive);
+            state.hidden = !panel.stream && hint === 'No cam';
+            state.textContent = panel.stream ? hint : '';
+            state.classList.toggle('ok', hands[panel.n] > 0 || (panel.stream && handStatus[panel.n] === 'error'));
+            state.classList.toggle('warn', Boolean(panel.stream) && handStatus[panel.n] === 'ready' && hands[panel.n] === 0);
           }
           const wait = cam.querySelector('.cam-waiting span');
           if (wait) wait.textContent = panel.waiting;
           const hudMount = wrap.querySelector('[data-hud]');
-          const hint = panel.stream ? 'Cam live' : (panel.hud.camLive ? 'Cam live' : 'No cam');
+          const hint = handHintFor(panel.n, Boolean(panel.stream), panel.hud.camLive);
           const meta = hudMeta(clock, panel.n, panel.mine);
           hudMount.innerHTML = hudHtml(panel.hud, panel.mine, hint, meta);
           if (panel.mine) {
@@ -1230,6 +2104,7 @@
         }
         paintSide('top', top);
         paintSide('bottom', bottom);
+        renderDecksPanel();
 
         const lock = root.querySelector('[data-lock]');
         if (lock) {
@@ -1307,13 +2182,45 @@
         }
       }
 
+      function onPeekCorrect(e) {
+        const lane = e.detail && e.detail.lane;
+        const seatN = Number(e.detail && e.detail.seat);
+        if (!lane || (seatN !== 1 && seatN !== 2)) return;
+        const Watch = global.DdlIrlWatch;
+        if (Watch && Watch.isPileLane(lane)) return;
+        pickerLane = { seat: seatN, key: lane };
+        renderLanePicker();
+      }
+
       function close() {
         clearTimeout(flipTimer);
+        clearInterval(shotTimer);
+        clearInterval(watchTimer);
+        window.removeEventListener('ddl-irl-peek-correct', onPeekCorrect);
+        if (global.DdlIrlHands) DdlIrlHands.stopAll();
+        if (global.DdlIrlCatalog) DdlIrlCatalog.hidePeek();
+        Object.keys(handWatchers).forEach((k) => {
+          if (handWatchers[k] && handWatchers[k].stop) handWatchers[k].stop();
+          handWatchers[k] = null;
+        });
         if (localStream) localStream.getTracks().forEach((t) => t.stop());
         localStream = null;
         p2p.close();
       }
 
+      if (global.DdlIrlCatalog) {
+        DdlIrlCatalog.bindPeekRoot(root);
+        window.addEventListener('ddl-irl-peek-correct', onPeekCorrect);
+        DdlIrlCatalog.load().then(() => {
+          catalogReady = true;
+          if (global.DdlIrlWatch) DdlIrlWatch.loadPrints();
+          renderChrome();
+        }).catch(() => {
+          catalogReady = false;
+        });
+      }
+      shotTimer = setInterval(tickShot, 250);
+      watchTimer = setInterval(runWatch, 800);
       renderChrome();
       if (joined) emitHello();
       void p2p.join();
@@ -1342,5 +2249,6 @@
     START_LIFE,
     LIFE_MAX,
     MANA_MAX,
+    TURN_MS,
   };
 })(window);
