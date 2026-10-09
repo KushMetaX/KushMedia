@@ -4,14 +4,16 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const { timingSafeEqualString } = require('../security-utils');
+const engine = require('../lib/bracket-engine');
 const {
+	nextPowerOfTwo,
 	generateSingleElim,
 	generateDoubleElim,
 	generateRoundRobin,
 	pairSwissRound,
 	defaultSwissRounds,
-	attachPlacement,
-} = require('../lib/bracket-engine');
+} = engine;
+const eventPhase = require('../lib/event-phase');
 const {
 	restackElimTree,
 	reseatCompletePair,
@@ -22,65 +24,56 @@ const {
 	parseRecord,
 } = require('../lib/arena-archive');
 let records = require('../lib/tourney-records');
+const persist = require('../lib/tourney-persist');
+const playDecks = require('../lib/play-decks');
+const classQuota = require('../lib/ddl-class-quota');
 const authDex = require('./auth-dex');
 const tourneyOg = require('../lib/tourney-og');
+const { sanitizeKickStream } = require('../../../bracket/kick-url');
+const dogePayWatch = require('../lib/doge-pay-watch');
+const arenaChat = require('../lib/arena-chat');
 
 const FORMATS = ['single_elim', 'double_elim', 'round_robin', 'swiss'];
 const BEST_OF = [1, 3, 5];
-const PAY_ASSETS = ['DOGE'];
+const PAY_ASSETS = ['DOGE', 'XMONEY', 'USDC_SOL'];
+const DEFAULT_DOGE_PAY_TO = 'D92759tetUUkf6Hn6Gk9mVKZqST32fN9iT';
+const DEFAULT_SOLANA_PAY_TO = '3tNZfWyvPBhx6KsaTuCBoChajrK7fbLME2eC4mKwrWgW';
+function dogePayTo() {
+	const fromEnv = String(process.env.DOGE_PAY_TO || process.env.TOURNEY_DOGE_ADDRESS || '').trim();
+	return fromEnv || DEFAULT_DOGE_PAY_TO;
+}
+function solanaPayTo() {
+	const fromEnv = String(process.env.USDC_SOL_PAY_TO || process.env.TOURNEY_SOLANA_ADDRESS || '').trim();
+	return fromEnv || DEFAULT_SOLANA_PAY_TO;
+}
 const PAY_TO = {
-	DOGE: 'DD4KcuppEUBR8vETG46d4w8BcgvDkzbss2',
+	DOGE: dogePayTo(),
+	USDC_SOL: solanaPayTo(),
 };
+/** Dogecoin P2PKH (mainnet) — starts with D, Base58, no 0/O/I/l. */
+const DOGE_ADDRESS_RE = /^D[1-9A-HJ-NP-Za-km-z]{25,39}$/;
+/** Solana pubkey — Base58, typically 32–44 chars. */
+const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const SOLANA_SIG_RE = /^[1-9A-HJ-NP-Za-km-z]{86,88}$/;
+/** Official Circle USDC mint on Solana mainnet. */
+const USDC_SOL_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 /** Kept so older SOL invoices still display the wallet they were quoted against. */
 const LEGACY_PAY_TO = {
-	SOL: '3tNZfWyvPBhx6KsaTuCBoChajrK7fbLME2eC4mKwrWgW',
+	SOL: DEFAULT_SOLANA_PAY_TO,
 	DOGE: PAY_TO.DOGE,
 };
-const KNOWN_PAY_ASSETS = ['DOGE', 'SOL'];
+const KNOWN_PAY_ASSETS = ['DOGE', 'SOL', 'XMONEY', 'USDC_SOL'];
+const HOST_CONFIRM_ASSETS = ['XMONEY', 'USDC_SOL'];
+function isHostConfirmAsset(asset) {
+	return HOST_CONFIRM_ASSETS.includes(String(asset || '').toUpperCase());
+}
 /** Share of paid entry fees redistributed as the pot. The rest is retained. */
 const PRIZE_POOL_PERCENT = 65;
 const HOUSE_RETAIN_PERCENT = 35;
-const KICK_RESERVED = new Set([
-	'about', 'api', 'browse', 'categories', 'category', 'channel', 'channels',
-	'clip', 'clips', 'community', 'dashboard', 'directory', 'embed', 'explore',
-	'following', 'help', 'home', 'live', 'login', 'messages', 'notifications',
-	'player', 'plus', 'premium', 'privacy', 'register', 'search', 'settings',
-	'signup', 'terms', 'video', 'videos',
-]);
-
-function kickChannelFrom(raw) {
-	const text = String(raw || '').trim();
-	if (!text) return '';
-	if (/^[A-Za-z0-9_-]{3,32}$/.test(text) && !KICK_RESERVED.has(text.toLowerCase())) {
-		return text;
-	}
-	let parsed;
-	try {
-		parsed = new URL(text.includes('://') ? text : `https://${text}`);
-	} catch (_err) {
-		return null;
-	}
-	const host = String(parsed.hostname || '').replace(/^www\./i, '').toLowerCase();
-	if (host !== 'kick.com' && host !== 'player.kick.com') return null;
-	const parts = String(parsed.pathname || '').split('/').filter(Boolean);
-	if (!parts.length) return null;
-	let slug = parts[0];
-	if (slug.toLowerCase() === 'embed' && parts[1]) slug = parts[1];
-	if (KICK_RESERVED.has(slug.toLowerCase())) return null;
-	if (!/^[A-Za-z0-9_-]{3,32}$/.test(slug)) return null;
-	return slug;
-}
-
-function sanitizeKickStream(raw) {
-	const text = String(raw == null ? '' : raw).trim();
-	if (!text) return '';
-	const channel = kickChannelFrom(text);
-	if (!channel) {
-		throw Object.assign(new Error('Paste a Kick channel or livestream URL (kick.com/yourname).'), { status: 400 });
-	}
-	return `https://kick.com/${channel}`;
-}
-
+/** One-shot: move these arenas onto a Discord account, then leave hostUserId frozen. */
+const PENDING_ARENA_HOSTS = [
+	{ slug: 'wyd-showdown-1', handle: 'Home' },
+];
 function normalizeBestOf(value, fallback = 3) {
 	const n = Number(value);
 	return BEST_OF.includes(n) ? n : (BEST_OF.includes(fallback) ? fallback : 3);
@@ -98,7 +91,7 @@ function sanitizeRoundBestOf(raw) {
 	const out = {};
 	if (!raw || typeof raw !== 'object') return out;
 	for (const [key, value] of Object.entries(raw)) {
-		if (!/^(winners|losers|grand|group|placement):\d+$/.test(String(key))) continue;
+		if (!/^(winners|losers|grand|group|placement|title):\d+$/.test(String(key))) continue;
 		out[key] = normalizeBestOf(value, 3);
 	}
 	return out;
@@ -110,8 +103,20 @@ function sanitizeFinalsBestOf(value) {
 	return BEST_OF.includes(n) ? n : null;
 }
 
-function isFinalsMatch(match) {
+function champEntryId(tournament) {
+	if (!tournament || !tournament.reigningChamp) return 0;
+	const id = Number(tournament.reigningChampEntryId);
+	return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+function wantsReigningChamp(tournament) {
+	return Boolean(champEntryId(tournament));
+}
+
+function isFinalsMatch(match, tournament) {
 	if (!match) return false;
+	if (match.side === 'title') return true;
+	if (wantsReigningChamp(tournament)) return false;
 	if (match.side === 'grand') return true;
 	if (match.side === 'placement' || match.side === 'losers' || match.side === 'group') return false;
 	return match.side === 'winners' && !match.winnerGoesTo;
@@ -122,7 +127,7 @@ function bestOfFor(tournament, side, round, match) {
 	const keyed = rules[roundKey(side, round)];
 	if (keyed) return normalizeBestOf(keyed, tournament && tournament.bestOf);
 	const finals = sanitizeFinalsBestOf(tournament && tournament.finalsBestOf);
-	if (finals && isFinalsMatch(match || { side, round, winnerGoesTo: true })) return finals;
+	if (finals && isFinalsMatch(match || { side, round, winnerGoesTo: true }, tournament)) return finals;
 	return normalizeBestOf(tournament && tournament.bestOf, 3);
 }
 
@@ -151,10 +156,12 @@ function wantsLosersBracket(tournament) {
 	return tournament.format === 'double_elim' || tournament.playoffFormat === 'double_elim';
 }
 
+const ELIM_SIDES = ['winners', 'losers', 'grand', 'placement'];
+
 function hasElimTree(store, tournament) {
 	return (store.matches || []).some((m) => (
 		m.tournamentId === tournament.id
-		&& (m.side === 'winners' || m.side === 'losers' || m.side === 'grand' || m.side === 'placement')
+		&& (ELIM_SIDES.includes(m.side) || m.side === 'title')
 	));
 }
 
@@ -367,9 +374,10 @@ function sanitizePayouts(raw) {
 		const percentRaw = Number(row.percent);
 		const percent = Number.isFinite(percentRaw) ? Math.min(100, Math.max(0, Math.round(percentRaw * 100) / 100)) : 0;
 		const prize = String(row.prize != null ? row.prize : (row.label || '')).trim().slice(0, 120);
-		if (percent <= 0 && !prize) continue;
+		const addedUsd = sanitizeHostPotUsd(row.addedUsd, 0);
+		if (percent <= 0 && !prize && !(addedUsd > 0)) continue;
 		seen.add(place);
-		out.push({ place, percent, prize });
+		out.push({ place, percent, prize, addedUsd });
 	}
 	return out.sort((a, b) => a.place - b.place);
 }
@@ -398,9 +406,12 @@ function normalizeTournament(tournament) {
 	}
 	tournament.rewardMode = tournament.rewardMode === 'prize' ? 'prize' : 'pot';
 	tournament.hostPotUsd = sanitizeHostPotUsd(tournament.hostPotUsd, 0);
+	tournament.addedPotUsd = sanitizeHostPotUsd(tournament.addedPotUsd, 0);
 	tournament.payouts = sanitizePayouts(tournament.payouts);
 	const hostUserId = tournament.hostUserId != null ? Number(tournament.hostUserId) : 0;
 	tournament.hostUserId = Number.isFinite(hostUserId) && hostUserId > 0 ? hostUserId : null;
+	const treasury = sanitizeDogeAddress(tournament.treasury, { soft: true });
+	tournament.treasury = treasury || '';
 	tournament.game = String(tournament.game || 'Doginal Dogs Legends TCG').trim() || 'Doginal Dogs Legends TCG';
 	tournament.stageType = tournament.stageType === 'two' ? 'two' : 'single';
 	tournament.stage = tournament.stage === 'playoff' ? 'playoff' : (tournament.stageType === 'two' ? (tournament.stage || 'groups') : 'main');
@@ -409,14 +420,36 @@ function normalizeTournament(tournament) {
 	tournament.registrationMode = sanitizeRegistrationMode(tournament.registrationMode);
 	if (wasWhitelistMode && !(Number(tournament.whitelistSpots) > 0)) tournament.whitelistSpots = 2;
 	tournament.whitelistSpots = sanitizeWhitelistSpots(tournament.whitelistSpots, 0);
-	tournament.feeMode = tournament.feeMode === 'free' || Number(tournament.entryFeeUsd) === 0 ? 'free' : 'paid';
+	tournament.feeMode = eventPhase.sanitizeFeeMode(tournament.feeMode, tournament.entryFeeUsd);
+	tournament.charityName = String(tournament.charityName || '').trim().slice(0, 80);
+	if (tournament.feeMode !== 'charity') tournament.charityName = tournament.charityName || '';
+	tournament.xHandle = sanitizeXHandle(tournament.xHandle);
+	tournament.acceptDoge = tournament.acceptDoge !== false;
+	tournament.acceptUsdcSol = Boolean(tournament.acceptUsdcSol);
+	tournament.solanaTreasury = sanitizeSolanaAddress(tournament.solanaTreasury, { soft: true });
+	if (tournament.acceptUsdcSol && !tournament.solanaTreasury) {
+		tournament.solanaTreasury = solanaPayTo();
+	}
+	if (tournament.feeMode === 'free') {
+		tournament.xHandle = tournament.xHandle || '';
+	} else if (!tournament.xHandle && tournament.acceptDoge === false && !tournament.acceptUsdcSol) {
+		tournament.acceptDoge = true;
+	}
 	tournament.potFundMode = sanitizePotFundMode(tournament.potFundMode, tournament);
 	tournament.requireTeams = Boolean(tournament.requireTeams);
 	tournament.capPlayers = tournament.capPlayers !== false;
 	tournament.startAt = tournament.startAt || null;
 	tournament.startTentative = Boolean(tournament.startTentative);
-	tournament.timezone = String(tournament.timezone || 'America/Halifax');
+	tournament.timezone = String(tournament.timezone || 'America/New_York');
 	tournament.requireCheckIn = Boolean(tournament.requireCheckIn);
+	tournament.checkInOpensAt = tournament.checkInOpensAt ? String(tournament.checkInOpensAt) : null;
+	tournament.listsDueAt = tournament.listsDueAt ? String(tournament.listsDueAt) : null;
+	tournament.listsPublicReveal = Boolean(tournament.listsPublicReveal);
+	tournament.listsRevealOnMatchComplete = tournament.listsRevealOnMatchComplete !== false;
+	tournament.judgeUserIds = eventPhase.sanitizeUserIdList(tournament.judgeUserIds);
+	tournament.streamUserIds = eventPhase.sanitizeUserIdList(tournament.streamUserIds);
+	const storedTree = Math.max(0, Number(tournament.bracketSize) || 0);
+	tournament.bracketSize = storedTree >= 2 ? storedTree : 0;
 	tournament.votingEnabled = Boolean(tournament.votingEnabled);
 	tournament.predictionsEnabled = Boolean(tournament.predictionsEnabled);
 	tournament.shareImages = Boolean(tournament.shareImages);
@@ -427,6 +460,9 @@ function normalizeTournament(tournament) {
 	tournament.requireAccount = tournament.requireAccount !== false;
 	tournament.official = tournament.official !== false;
 	tournament.semiIrl = Boolean(tournament.semiIrl);
+	tournament.requireRegisteredDeck = Boolean(tournament.requireRegisteredDeck);
+	tournament.deckClassQuota = classQuota.sanitizeQuota(tournament.deckClassQuota);
+	if (tournament.deckClassQuota) tournament.requireRegisteredDeck = true;
 	tournament.groupSize = Math.min(16, Math.max(2, Number(tournament.groupSize) || 4));
 	tournament.advancePerGroup = Math.min(8, Math.max(1, Number(tournament.advancePerGroup) || 2));
 	if (tournament.format === 'double_elim') tournament.losersBracket = true;
@@ -439,6 +475,10 @@ function normalizeTournament(tournament) {
 	if (tournament.losersBracket) tournament.breakTies = false;
 	tournament.playoffFormat = tournament.losersBracket ? 'double_elim' : 'single_elim';
 	tournament.eventKind = sanitizeEventKind(tournament.eventKind, tournament.name);
+	tournament.reigningChamp = Boolean(tournament.reigningChamp);
+	const champId = Number(tournament.reigningChampEntryId);
+	tournament.reigningChampEntryId = Number.isFinite(champId) && champId > 0 ? champId : null;
+	if (!tournament.reigningChamp) tournament.reigningChampEntryId = null;
 	if (tournament.eventKind === 'duel') {
 		tournament.capPlayers = true;
 		tournament.maxPlayers = 2;
@@ -447,6 +487,8 @@ function normalizeTournament(tournament) {
 		tournament.losersBracket = false;
 		tournament.breakTies = false;
 		tournament.playoffFormat = 'single_elim';
+		tournament.reigningChamp = false;
+		tournament.reigningChampEntryId = null;
 		if (tournament.format === 'double_elim') tournament.format = 'single_elim';
 	}
 	return tournament;
@@ -476,15 +518,28 @@ function readSettings(body, current) {
 		}
 	}
 	if (src.whitelistSpots != null) t.whitelistSpots = sanitizeWhitelistSpots(src.whitelistSpots, t.whitelistSpots || 0);
-	if (src.feeMode) t.feeMode = src.feeMode === 'free' ? 'free' : 'paid';
+	if (src.feeMode) t.feeMode = src.feeMode === 'charity' ? 'charity' : (src.feeMode === 'free' ? 'free' : 'paid');
+	if (src.charityName != null) t.charityName = String(src.charityName).trim().slice(0, 80);
+	if (src.xHandle != null) t.xHandle = sanitizeXHandle(src.xHandle);
+	if (src.acceptDoge != null) t.acceptDoge = Boolean(src.acceptDoge);
+	if (src.acceptUsdcSol != null) t.acceptUsdcSol = Boolean(src.acceptUsdcSol);
+	if (src.solanaTreasury != null) {
+		t.solanaTreasury = sanitizeSolanaAddress(src.solanaTreasury, t.acceptUsdcSol ? undefined : { soft: true });
+	}
 	if (src.requireTeams != null) t.requireTeams = Boolean(src.requireTeams);
 	if (src.capPlayers != null) t.capPlayers = Boolean(src.capPlayers);
 	if (src.maxPlayers != null) t.maxPlayers = Math.min(64, Math.max(2, Number(src.maxPlayers) || 16));
 	if (src.entryFeeUsd != null) t.entryFeeUsd = Math.max(0, Number(src.entryFeeUsd) || 0);
 	if (src.startAt !== undefined) t.startAt = src.startAt ? String(src.startAt) : null;
 	if (src.startTentative != null) t.startTentative = Boolean(src.startTentative);
-	if (src.timezone != null) t.timezone = String(src.timezone || 'America/Halifax');
+	if (src.timezone != null) t.timezone = String(src.timezone || 'America/New_York');
 	if (src.requireCheckIn != null) t.requireCheckIn = Boolean(src.requireCheckIn);
+	if (src.checkInOpensAt !== undefined) t.checkInOpensAt = src.checkInOpensAt ? String(src.checkInOpensAt) : null;
+	if (src.listsDueAt !== undefined) t.listsDueAt = src.listsDueAt ? String(src.listsDueAt) : null;
+	if (src.listsPublicReveal != null) t.listsPublicReveal = Boolean(src.listsPublicReveal);
+	if (src.listsRevealOnMatchComplete != null) t.listsRevealOnMatchComplete = Boolean(src.listsRevealOnMatchComplete);
+	if (src.judgeUserIds != null) t.judgeUserIds = eventPhase.sanitizeUserIdList(src.judgeUserIds);
+	if (src.streamUserIds != null) t.streamUserIds = eventPhase.sanitizeUserIdList(src.streamUserIds);
 	if (src.votingEnabled != null) t.votingEnabled = Boolean(src.votingEnabled);
 	if (src.predictionsEnabled != null) t.predictionsEnabled = Boolean(src.predictionsEnabled);
 	if (src.shareImages != null) t.shareImages = Boolean(src.shareImages);
@@ -495,6 +550,21 @@ function readSettings(body, current) {
 	if (src.requireAccount != null) t.requireAccount = Boolean(src.requireAccount);
 	if (src.official != null) t.official = Boolean(src.official);
 	if (src.semiIrl != null) t.semiIrl = Boolean(src.semiIrl);
+	if (src.requireRegisteredDeck != null) t.requireRegisteredDeck = Boolean(src.requireRegisteredDeck);
+	if (Object.prototype.hasOwnProperty.call(src, 'deckClassQuota')
+		|| src.requireDeckClassQuota != null
+		|| src.deckClass != null
+		|| src.deckClassPercent != null) {
+		if (src.requireDeckClassQuota === false || src.deckClassQuota === null) {
+			t.deckClassQuota = null;
+		} else {
+			const raw = src.deckClassQuota && typeof src.deckClassQuota === 'object' ? src.deckClassQuota : src;
+			t.deckClassQuota = classQuota.sanitizeQuota({
+				class: src.deckClass || raw.class,
+				percent: src.deckClassPercent != null ? src.deckClassPercent : raw.percent,
+			});
+		}
+	}
 	if (src.groupSize != null) t.groupSize = Math.min(16, Math.max(2, Number(src.groupSize) || 4));
 	if (src.advancePerGroup != null) t.advancePerGroup = Math.min(8, Math.max(1, Number(src.advancePerGroup) || 2));
 	if (src.bestOf != null) t.bestOf = normalizeBestOf(src.bestOf, t.bestOf);
@@ -503,9 +573,20 @@ function readSettings(body, current) {
 	if (src.swissRounds != null) t.swissRounds = Math.min(12, Math.max(3, Number(src.swissRounds) || 3));
 	if (src.rewardMode != null) t.rewardMode = src.rewardMode === 'prize' ? 'prize' : 'pot';
 	if (src.hostPotUsd != null) t.hostPotUsd = sanitizeHostPotUsd(src.hostPotUsd, t.hostPotUsd);
+	if (src.addedPotUsd != null) t.addedPotUsd = sanitizeHostPotUsd(src.addedPotUsd, t.addedPotUsd);
 	if (src.potFundMode != null) t.potFundMode = src.potFundMode === 'percent' ? 'percent' : 'usd';
 	if (src.payouts != null) t.payouts = sanitizePayouts(src.payouts);
 	if (src.eventKind != null) t.eventKind = src.eventKind;
+	if (src.reigningChamp != null) t.reigningChamp = Boolean(src.reigningChamp);
+	if (Object.prototype.hasOwnProperty.call(src, 'reigningChampEntryId')) {
+		const champId = Number(src.reigningChampEntryId);
+		t.reigningChampEntryId = Number.isFinite(champId) && champId > 0 ? champId : null;
+	}
+	if (src.treasury != null || src.dogeAddress != null) {
+		const raw = src.treasury != null ? src.treasury : src.dogeAddress;
+		if (t.acceptDoge === false && !String(raw || '').trim()) t.treasury = '';
+		else t.treasury = sanitizeDogeAddress(raw, t.acceptDoge === false ? { soft: true } : undefined);
+	}
 	if (t.feeMode === 'free') t.entryFeeUsd = 0;
 	return normalizeTournament(t);
 }
@@ -514,6 +595,20 @@ function normalizeMatch(match, tournament) {
 	if (!match || typeof match !== 'object') return match;
 	match.bestOf = normalizeBestOf(match.bestOf, bestOfFor(tournament, match.side, match.round, match));
 	match.games = Array.isArray(match.games) ? match.games : [];
+	if (match.reportProposal && typeof match.reportProposal === 'object') {
+		const by = Number(match.reportProposal.byEntryId);
+		match.reportProposal = {
+			byEntryId: Number.isFinite(by) && by > 0 ? by : 0,
+			score1: Number(match.reportProposal.score1),
+			score2: Number(match.reportProposal.score2),
+			games: Array.isArray(match.reportProposal.games) ? match.reportProposal.games : [],
+			reason: String(match.reportProposal.reason || '').trim().slice(0, 160),
+			at: String(match.reportProposal.at || ''),
+		};
+		if (!match.reportProposal.byEntryId) match.reportProposal = null;
+	} else {
+		match.reportProposal = null;
+	}
 	return match;
 }
 
@@ -561,7 +656,9 @@ function feeTotalUsd(entries) {
 function computePrizePool(tournament, entries) {
 	const fees = feeTotalUsd(entries);
 	if (sanitizePotFundMode(tournament && tournament.potFundMode, tournament) === 'percent') {
-		return roundCrypto(fees * PRIZE_POOL_PERCENT / 100, 2);
+		const fromFees = roundCrypto(fees * PRIZE_POOL_PERCENT / 100, 2);
+		const added = sanitizeHostPotUsd(tournament && tournament.addedPotUsd, 0);
+		return roundCrypto(fromFees + added, 2);
 	}
 	return sanitizeHostPotUsd(tournament && tournament.hostPotUsd, 0);
 }
@@ -636,9 +733,371 @@ function applyByeAdvance(store, match) {
 	match.score1 = null;
 	match.score2 = null;
 	const dest = findMatch(store, match.winnerGoesTo, match.tournamentId);
-	if (dest && match.winnerGoesTo && !destHasProgress(dest)) {
-		seat(dest, match.winnerGoesTo.slot, match.entry1Id);
+	const slot = match.winnerGoesTo && Number(match.winnerGoesTo.slot);
+	if (dest && slot && !slotEntry(dest, slot) && !destHasProgress(dest)) {
+		seat(dest, slot, match.entry1Id);
 	}
+}
+
+function matchClosed(match) {
+	return Boolean(match && (match.status === 'complete' || match.status === 'bye' || match.status === 'vacant'));
+}
+
+/** A bye counts as decided: the lone player still advanced out of that slot. */
+function decidedWinnerId(match) {
+	if (!match) return 0;
+	if (match.status !== 'complete' && match.status !== 'bye') return 0;
+	return Number(match.winnerId) || 0;
+}
+
+function deepestDecidedWinnerId(matches, sides) {
+	const decided = (matches || []).filter((m) => sides.includes(m.side) && decidedWinnerId(m));
+	if (!decided.length) return 0;
+	const deepest = decided.sort((a, b) => (
+		(Number(b.round) || 0) - (Number(a.round) || 0)
+		|| (Number(a.position) || 0) - (Number(b.position) || 0)
+	))[0];
+	return decidedWinnerId(deepest);
+}
+
+function feedsSlot(src, dest, slot) {
+	if (!src || !dest) return false;
+	const want = Number(slot);
+	for (const key of ['winnerGoesTo', 'loserGoesTo']) {
+		const d = src[key];
+		if (
+			d
+			&& d.side === dest.side
+			&& Number(d.round) === Number(dest.round)
+			&& Number(d.position) === Number(dest.position)
+			&& Number(d.slot) === want
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function slotWaiting(store, tournament, match, slot) {
+	if (slotEntry(match, slot)) return false;
+	return tournamentMatches(store, tournament).some((src) => {
+		if (!src || src.id === match.id) return false;
+		if (src.status === 'vacant') return false;
+		if (src.status === 'complete' || src.status === 'bye') return false;
+		return feedsSlot(src, match, slot);
+	});
+}
+
+/**
+ * A player the host already moved elsewhere is not missing, so the match that sent them
+ * on must not drag them back to its own `winnerGoesTo` seat.
+ */
+function seatedAhead(store, tournament, from, entryId) {
+	const id = Number(entryId);
+	if (!id) return false;
+	const after = Number(from.round) || 0;
+	return tournamentMatches(store, tournament).some((m) => (
+		m.id !== from.id
+		&& (Number(m.entry1Id) === id || Number(m.entry2Id) === id)
+		&& (m.side === 'title' || (Number(m.round) || 0) >= after)
+	));
+}
+
+function reseatClosedWinners(store, tournament) {
+	let changed = false;
+	for (const match of tournamentMatches(store, tournament)) {
+		if (match.status !== 'complete' && match.status !== 'bye') continue;
+		const winnerId = match.winnerId || match.entry1Id || match.entry2Id;
+		if (winnerId && match.winnerGoesTo && !seatedAhead(store, tournament, match, winnerId)) {
+			const dest = findMatch(store, match.winnerGoesTo, tournament.id);
+			const slot = Number(match.winnerGoesTo.slot) || 0;
+			if (dest && dest.status !== 'complete' && slot && !slotEntry(dest, slot) && !destHasProgress(dest)) {
+				if (dest.status === 'vacant') dest.status = 'pending';
+				seat(dest, slot, winnerId);
+				changed = true;
+			}
+		}
+		if (match.status !== 'complete' || !match.loserGoesTo) continue;
+		const loserId = Number(match.winnerId) === Number(match.entry1Id) ? match.entry2Id : match.entry1Id;
+		if (seatedAhead(store, tournament, match, loserId)) continue;
+		const loseDest = findMatch(store, match.loserGoesTo, tournament.id);
+		const loseSlot = Number(match.loserGoesTo.slot) || 0;
+		if (loseDest && loseDest.status !== 'complete' && loserId && loseSlot && !slotEntry(loseDest, loseSlot) && !destHasProgress(loseDest)) {
+			if (loseDest.status === 'vacant') loseDest.status = 'pending';
+			seat(loseDest, loseSlot, loserId);
+			changed = true;
+		}
+	}
+	return changed;
+}
+
+function collapseVacantMatches(store, tournament) {
+	let changed = false;
+	for (let guard = 0; guard < 64; guard += 1) {
+		let step = reseatClosedWinners(store, tournament);
+		for (const match of tournamentMatches(store, tournament)) {
+			if (matchClosed(match) || match.side === 'title') continue;
+			const a = match.entry1Id;
+			const b = match.entry2Id;
+			if (a && b) {
+				if (match.status === 'pending') {
+					match.status = 'ready';
+					match.winnerId = null;
+					step = true;
+				}
+				continue;
+			}
+			const wait1 = slotWaiting(store, tournament, match, 1);
+			const wait2 = slotWaiting(store, tournament, match, 2);
+			if (!a && !b && !wait1 && !wait2) {
+				match.status = 'vacant';
+				match.winnerId = null;
+				match.games = [];
+				match.score1 = null;
+				match.score2 = null;
+				step = true;
+				continue;
+			}
+			if ((a || b) && !wait1 && !wait2) {
+				applyByeAdvance(store, match);
+				step = true;
+			}
+		}
+		if (!step) break;
+		changed = true;
+	}
+	return changed;
+}
+
+/**
+ * Hand edits can leave one player sitting in two open matches at once, which keeps both
+ * of them un-closable. Keep the deepest seat and free the rest.
+ */
+function dropDuplicateSeats(store, tournament) {
+	const open = tournamentMatches(store, tournament)
+		.filter((m) => m.status !== 'complete' && m.status !== 'bye')
+		.sort((a, b) => (Number(b.round) || 0) - (Number(a.round) || 0)
+			|| (Number(a.position) || 0) - (Number(b.position) || 0));
+	const seen = new Set();
+	const touched = [];
+	for (const match of open) {
+		for (const slot of [1, 2]) {
+			const id = Number(slotEntry(match, slot));
+			if (!id) continue;
+			if (seen.has(id)) {
+				setSlotEntry(match, slot, null);
+				touched.push(match);
+				continue;
+			}
+			seen.add(id);
+		}
+	}
+	for (const match of touched) refreshEditedMatch(store, tournament, match);
+	return touched.length > 0;
+}
+
+/**
+ * Re-settle a bracket that host edits pushed out of shape: free duplicate seats, collapse
+ * empty slots into byes or vacancies, then advance or close. `force` also walks any match
+ * that can never be played (nobody in it, or a lone player with no opponent left) to a
+ * result, so an arena whose rounds are all recorded stops hanging in progress.
+ */
+function repairBracket(store, tournament, opts) {
+	const force = Boolean(opts && opts.force);
+	dropDuplicateSeats(store, tournament);
+	collapseVacantMatches(store, tournament);
+	maybeFinishOrAdvance(store, tournament);
+	if (!force) return { closed: tournament.status === 'completed', resolved: [] };
+	const resolved = [];
+	for (let guard = 0; guard < 64; guard += 1) {
+		const stuck = anyOpenMatches(store, tournament)
+			.filter((m) => !(m.entry1Id && m.entry2Id))
+			.sort((a, b) => (Number(a.round) || 0) - (Number(b.round) || 0)
+				|| (Number(a.position) || 0) - (Number(b.position) || 0))[0];
+		if (!stuck) break;
+		if (stuck.side === 'title') defendTitleByWalkover(store, tournament, stuck);
+		else if (stuck.entry1Id || stuck.entry2Id) applyByeAdvance(store, stuck);
+		else {
+			stuck.status = 'vacant';
+			stuck.winnerId = null;
+			stuck.games = [];
+			stuck.score1 = null;
+			stuck.score2 = null;
+		}
+		resolved.push(stuck.id);
+		collapseVacantMatches(store, tournament);
+		maybeFinishOrAdvance(store, tournament);
+	}
+	return { closed: tournament.status === 'completed', resolved };
+}
+
+function playOpenMatches(store, tournament) {
+	return tournamentMatches(store, tournament).filter((m) => m.side !== 'title' && !matchClosed(m));
+}
+
+function anyOpenMatches(store, tournament) {
+	return tournamentMatches(store, tournament).filter((m) => !matchClosed(m));
+}
+
+function fieldTerminalMatch(store, tournament) {
+	const matches = tournamentMatches(store, tournament).filter((m) => m.side !== 'title');
+	const grand = matches.find((m) => m.side === 'grand');
+	if (grand) return grand;
+	const winners = matches.filter((m) => m.side === 'winners');
+	if (!winners.length) return null;
+	const maxR = winners.reduce((n, m) => Math.max(n, Number(m.round) || 0), 0);
+	return winners.find((m) => Number(m.round) === maxR && Number(m.position) === 1) || winners[0];
+}
+
+function attachTitleDraft(drafts, champId, challengerId) {
+	const list = Array.isArray(drafts) ? drafts : [];
+	const title = {
+		side: 'title',
+		round: 1,
+		position: 1,
+		entry1Id: champId,
+		entry2Id: challengerId || null,
+	};
+	const grand = list.find((d) => d.side === 'grand');
+	const winners = list.filter((d) => d.side === 'winners');
+	const maxR = winners.reduce((n, d) => Math.max(n, Number(d.round) || 0), 0);
+	const terminal = grand || winners.find((d) => Number(d.round) === maxR && Number(d.position) === 1) || winners[0];
+	if (terminal) terminal.winnerGoesTo = { side: 'title', round: 1, position: 1, slot: 2 };
+	list.push(title);
+	return list;
+}
+
+function fieldChampion(store, tournament) {
+	return championFor(store, tournament, { fieldOnly: true });
+}
+
+/**
+ * Reigning Champ mode: the champ sits out the field bracket and meets whoever wins it.
+ * Once the field is done this seats the challenger. If the field collapsed to nobody —
+ * every slot vacated, or the only entrant was the champ — the champ keeps the belt by
+ * walkover, otherwise the title match stays open forever and the arena never closes.
+ */
+function seatTitleChallenger(store, tournament) {
+	if (!wantsReigningChamp(tournament)) return false;
+	const title = tournamentMatches(store, tournament).find((m) => m.side === 'title');
+	if (!title || title.status === 'complete') return false;
+	const champId = champEntryId(tournament);
+	if (champId && Number(title.entry1Id) !== champId && Number(title.entry2Id) !== champId) {
+		if (!title.entry1Id) title.entry1Id = champId;
+		else if (!title.entry2Id) title.entry2Id = champId;
+	}
+	if (playOpenMatches(store, tournament).length) return false;
+	if (title.entry1Id && title.entry2Id) {
+		if (title.status !== 'ready') {
+			title.status = 'ready';
+			title.winnerId = null;
+			return true;
+		}
+		return false;
+	}
+	const challenger = fieldChampion(store, tournament);
+	if (challenger && Number(challenger.id) !== Number(champId)) {
+		if (!title.entry2Id) title.entry2Id = challenger.id;
+		else if (!title.entry1Id) title.entry1Id = challenger.id;
+		title.status = 'ready';
+		title.winnerId = null;
+		return true;
+	}
+	return defendTitleByWalkover(store, tournament, title);
+}
+
+function defendTitleByWalkover(store, tournament, title) {
+	const champId = champEntryId(tournament);
+	const seated = Number(title.entry1Id) || Number(title.entry2Id) || champId;
+	if (!seated) {
+		title.status = 'vacant';
+		title.winnerId = null;
+		title.games = [];
+		title.score1 = null;
+		title.score2 = null;
+		return true;
+	}
+	title.entry1Id = seated;
+	title.entry2Id = null;
+	title.status = 'bye';
+	title.winnerId = seated;
+	title.games = [];
+	title.score1 = null;
+	title.score2 = null;
+	return true;
+}
+
+/** A title match left behind after Reigning Champ mode is switched off would block the close. */
+function dropOrphanTitleMatch(store, tournament) {
+	if (wantsReigningChamp(tournament)) return false;
+	const title = tournamentMatches(store, tournament).find((m) => m.side === 'title');
+	if (!title || title.status === 'complete') return false;
+	removeTitleMatch(store, tournament);
+	return true;
+}
+
+function removeTitleMatch(store, tournament) {
+	const title = tournamentMatches(store, tournament).find((m) => m.side === 'title');
+	if (!title) return false;
+	store.matches = store.matches.filter((m) => m !== title);
+	store.votes = (store.votes || []).filter((v) => v.tournamentId !== tournament.id || v.matchId !== title.id);
+	for (const match of tournamentMatches(store, tournament)) {
+		const dest = match.winnerGoesTo;
+		if (dest && dest.side === 'title') match.winnerGoesTo = null;
+		const lose = match.loserGoesTo;
+		if (lose && lose.side === 'title') match.loserGoesTo = null;
+	}
+	return true;
+}
+
+function ensureReigningChamp(store, tournament, entryId) {
+	const id = Number(entryId);
+	const entry = store.entries.find((e) => (
+		e.tournamentId === tournament.id
+		&& e.id === id
+		&& e.paid
+		&& !e.noShow
+		&& (!e.whitelist || e.subbedIn)
+	));
+	if (!entry) {
+		throw Object.assign(new Error('Pick a confirmed player as the Reigning Champ'), { status: 400 });
+	}
+	tournament.reigningChamp = true;
+	tournament.reigningChampEntryId = entry.id;
+	if (tournament.status === 'registration') return entry;
+	for (const match of tournamentMatches(store, tournament)) {
+		if (match.side === 'title' || match.status === 'complete') continue;
+		if (Number(match.entry1Id) !== entry.id && Number(match.entry2Id) !== entry.id) continue;
+		prepareMatchForRosterEdit(store, match);
+		if (Number(match.entry1Id) === entry.id) match.entry1Id = null;
+		if (Number(match.entry2Id) === entry.id) match.entry2Id = null;
+		refreshEditedMatch(store, tournament, match);
+	}
+	let title = tournamentMatches(store, tournament).find((m) => m.side === 'title');
+	if (!title) {
+		store.matches.push(...draftsToMatches(store, tournament, [{
+			side: 'title',
+			round: 1,
+			position: 1,
+			entry1Id: entry.id,
+			entry2Id: null,
+		}]));
+		title = tournamentMatches(store, tournament).find((m) => m.side === 'title');
+	} else {
+		if (Number(title.entry2Id) === entry.id) title.entry2Id = title.entry1Id === entry.id ? null : title.entry1Id;
+		title.entry1Id = entry.id;
+		if (Number(title.entry2Id) === entry.id) title.entry2Id = null;
+		title.status = (title.entry1Id && title.entry2Id) ? 'ready' : 'pending';
+		title.winnerId = null;
+	}
+	const terminal = fieldTerminalMatch(store, tournament);
+	if (terminal && terminal.side !== 'title') {
+		terminal.winnerGoesTo = { side: 'title', round: 1, position: 1, slot: 2 };
+	}
+	markBracketOpen(tournament);
+	collapseVacantMatches(store, tournament);
+	maybeFinishOrAdvance(store, tournament);
+	return entry;
 }
 
 function refreshEditedMatch(store, tournament, match) {
@@ -651,7 +1110,12 @@ function refreshEditedMatch(store, tournament, match) {
 		match.winnerId = null;
 		return;
 	}
-	if ((match.entry1Id || match.entry2Id) && isOpeningMatch(tournament, match)) {
+	if (match.side === 'title') {
+		match.status = 'pending';
+		match.winnerId = null;
+		return;
+	}
+	if ((match.entry1Id || match.entry2Id) && !slotWaiting(store, tournament, match, 1) && !slotWaiting(store, tournament, match, 2)) {
 		applyByeAdvance(store, match);
 		return;
 	}
@@ -672,6 +1136,11 @@ function prepareMatchForRosterEdit(store, match) {
 	}
 }
 
+/**
+ * A player on a bye sits in two places: the bye itself and the round it was pushed into.
+ * The bye is the one the host drew them into, so that is the seat we hand back — moving
+ * them from the pushed-forward copy would leave the bye still pointing at them.
+ */
 function liveSeatFor(matches, entryId) {
 	const id = Number(entryId);
 	const seats = [];
@@ -682,8 +1151,10 @@ function liveSeatFor(matches, entryId) {
 	}
 	if (!seats.length) return null;
 	seats.sort((a, b) => (
-		(Number(b.match.round) || 0) - (Number(a.match.round) || 0)
-		|| (a.match.status === 'bye' ? 1 : 0) - (b.match.status === 'bye' ? 1 : 0)
+		(b.match.status === 'bye' ? 1 : 0) - (a.match.status === 'bye' ? 1 : 0)
+		|| (a.match.status === 'bye'
+			? (Number(a.match.round) || 0) - (Number(b.match.round) || 0)
+			: (Number(b.match.round) || 0) - (Number(a.match.round) || 0))
 	));
 	return seats[0];
 }
@@ -778,6 +1249,8 @@ function swapSlots(store, tournament, seatA, seatB) {
 	clearMatchVotes(store, tournament, [matchA.id, matchB.id]);
 	markBracketOpen(tournament);
 	alignTournamentTree(store, tournament);
+	collapseVacantMatches(store, tournament);
+	maybeFinishOrAdvance(store, tournament);
 }
 
 function placeEntryInSlot(store, tournament, entry, seat) {
@@ -797,6 +1270,8 @@ function placeEntryInSlot(store, tournament, entry, seat) {
 	clearMatchVotes(store, tournament, [match.id]);
 	markBracketOpen(tournament);
 	alignTournamentTree(store, tournament);
+	collapseVacantMatches(store, tournament);
+	maybeFinishOrAdvance(store, tournament);
 }
 
 function tournamentMatches(store, tournament) {
@@ -942,6 +1417,8 @@ function pairPlayersTogether(store, tournament, a, b, opts) {
 	clearMatchVotes(store, tournament, roundRows.map((m) => m.id));
 	markBracketOpen(tournament);
 	alignTournamentTree(store, tournament);
+	collapseVacantMatches(store, tournament);
+	maybeFinishOrAdvance(store, tournament);
 }
 
 function swapPlayersInBracket(store, tournament, a, b) {
@@ -965,6 +1442,8 @@ function rewardView(tournament, prizePool, feesCollected) {
 	const pool = Math.max(0, Number(prizePool) || 0);
 	const fees = Math.max(0, Number(feesCollected) || 0);
 	const potFundMode = sanitizePotFundMode(tournament && tournament.potFundMode, tournament);
+	const addedPotUsd = potFundMode === 'percent' ? sanitizeHostPotUsd(tournament && tournament.addedPotUsd, 0) : 0;
+	const feePoolUsd = potFundMode === 'percent' ? roundCrypto(fees * PRIZE_POOL_PERCENT / 100, 2) : 0;
 	const payouts = Array.isArray(tournament && tournament.payouts) ? tournament.payouts : [];
 	const rows = [];
 	for (const p of payouts) {
@@ -974,24 +1453,35 @@ function rewardView(tournament, prizePool, feesCollected) {
 				place: p.place,
 				label: placeLabel(p.place),
 				text: p.prize,
+				prize: p.prize,
 				amountUsd: null,
+				addedUsd: 0,
+				totalUsd: null,
 				percent: null,
 			});
 			continue;
 		}
 		const percent = Number(p.percent) || 0;
-		if (!(percent > 0)) continue;
+		const addedUsd = sanitizeHostPotUsd(p.addedUsd, 0);
+		const prize = String(p.prize || '').trim();
+		if (!(percent > 0) && !prize && !(addedUsd > 0)) continue;
+		const amountUsd = percent > 0 ? roundCrypto(pool * percent / 100, 2) : 0;
 		rows.push({
 			place: p.place,
 			label: placeLabel(p.place),
-			text: `${percent}%`,
-			amountUsd: roundCrypto(pool * percent / 100, 2),
+			text: percent > 0 ? `${percent}%` : (prize || ''),
+			prize,
+			amountUsd,
+			addedUsd,
+			totalUsd: roundCrypto(amountUsd + addedUsd, 2),
 			percent,
 		});
 	}
 	return {
 		mode,
 		pool,
+		addedPotUsd,
+		feePoolUsd,
 		potFundMode,
 		poolPercent: PRIZE_POOL_PERCENT,
 		retainPercent: HOUSE_RETAIN_PERCENT,
@@ -1089,14 +1579,14 @@ function resolveHostPassword(dataDir) {
 }
 
 function assertHostPassword(dataDir, given) {
-	const { value: expected, source } = hostPasswordInfo(dataDir);
+	const { value: expected } = hostPasswordInfo(dataDir);
 	if (!expected) {
-		const err = new Error('Hosting is locked. Set TOURNEY_PASSWORD in Node, or put it on line 1 of public/server/data/.tourney-password');
+		const err = new Error('Hosting isn’t available right now.');
 		err.status = 403;
 		throw err;
 	}
 	if (!timingSafeEqualString(expected, cleanSecret(given))) {
-		const err = new Error(`Host password rejected — this server checks against ${source}. Clear any autofilled value and paste TOURNEY_PASSWORD exactly.`);
+		const err = new Error('Wrong password');
 		err.status = 403;
 		throw err;
 	}
@@ -1113,6 +1603,15 @@ function isHostRequest(dataDir, request) {
 	const { value: expected } = hostPasswordInfo(dataDir);
 	if (!expected) return false;
 	return timingSafeEqualString(expected, hostSecretFrom(request));
+}
+
+function sessionOwnsSeat(session, entry) {
+	if (!session || !session.discord_id || !entry) return false;
+	const uid = Number(session.user_id);
+	if (uid && Number(entry.userId) === uid) return true;
+	const linked = entryDiscordUser(entry);
+	if (linked && linked.discordId && String(session.discord_id) === String(linked.discordId)) return true;
+	return false;
 }
 
 function sessionMatchesEntry(session, entry) {
@@ -1155,7 +1654,7 @@ function createIrlSeatGuard(dataDir) {
 		if (!found) return false;
 		const entryId = seat === 2 ? found.entry2Id : found.entry1Id;
 		const entry = (store.entries || []).find((row) => Number(row.id) === Number(entryId));
-		return sessionMatchesEntry(session, entry);
+		return sessionOwnsSeat(session, entry);
 	};
 }
 
@@ -1191,6 +1690,207 @@ function assertAdminPassword(dataDir, given) {
 	}
 }
 
+function sanitizeXHandle(value) {
+	const raw = String(value == null ? '' : value).trim().replace(/^@+/, '');
+	if (!/^[A-Za-z0-9_]{1,15}$/.test(raw)) return '';
+	return raw;
+}
+
+function sanitizeDogeAddress(value, opts) {
+	const addr = String(value == null ? '' : value).trim();
+	if (!addr) return '';
+	if (!DOGE_ADDRESS_RE.test(addr)) {
+		if (opts && opts.soft) return '';
+		throw Object.assign(new Error('Enter a valid DOGE address (starts with D).'), { status: 400 });
+	}
+	return addr;
+}
+
+function looksLikeSolanaAddress(value) {
+	const addr = String(value == null ? '' : value).trim();
+	if (!SOLANA_ADDRESS_RE.test(addr)) return false;
+	if (DOGE_ADDRESS_RE.test(addr)) return false;
+	if (addr === USDC_SOL_MINT) return false;
+	return true;
+}
+
+function looksLikeSolanaSig(value) {
+	return SOLANA_SIG_RE.test(String(value == null ? '' : value).trim());
+}
+
+function sanitizeSolanaAddress(value, opts) {
+	const addr = String(value == null ? '' : value).trim();
+	if (!addr) return '';
+	if (!looksLikeSolanaAddress(addr)) {
+		if (opts && opts.soft) return '';
+		throw Object.assign(new Error('Enter a valid Solana wallet address for USDC.'), { status: 400 });
+	}
+	return addr;
+}
+
+function treasuryAddress(tournament) {
+	return sanitizeDogeAddress(tournament && tournament.treasury, { soft: true }) || PAY_TO.DOGE;
+}
+
+function dogePayToFor(tournament) {
+	if (tournament && tournament.acceptDoge === false) return '';
+	return treasuryAddress(tournament);
+}
+
+function xHandleOf(tournament) {
+	return sanitizeXHandle(tournament && tournament.xHandle);
+}
+
+function solanaTreasuryOf(tournament) {
+	return sanitizeSolanaAddress(tournament && tournament.solanaTreasury, { soft: true }) || (tournament && tournament.acceptUsdcSol ? solanaPayTo() : '');
+}
+
+function usdcSolPayToFor(tournament) {
+	if (!(tournament && tournament.acceptUsdcSol)) return '';
+	return solanaTreasuryOf(tournament);
+}
+
+function payToFor(tournament) {
+	return {
+		DOGE: dogePayToFor(tournament),
+		xHandle: xHandleOf(tournament),
+		USDC_SOL: usdcSolPayToFor(tournament),
+		usdcMint: USDC_SOL_MINT,
+	};
+}
+
+function pendingWatchEntries(store, tournament) {
+	return (store.entries || []).filter((entry) => {
+		if (!entry || entry.paid || entry.noShow) return false;
+		if (isHostConfirmAsset(entry.payAsset)) return false;
+		if (!(Number(entry.amountCrypto) > 0)) return false;
+		if (!dogePayWatch.looksLikeDogeAddress(entry.fromWallet) && !dogePayWatch.looksLikeTxid(entry.payTxid)) return false;
+		const t = tournament || (store.tournaments || []).find((row) => row.id === entry.tournamentId);
+		if (!t || t.feeMode !== 'paid') return false;
+		if (tournament && entry.tournamentId !== tournament.id) return false;
+		return t.status === 'registration';
+	});
+}
+
+function adminSecretFrom(request) {
+	const header = typeof request.get === 'function' ? request.get('x-tourney-admin') : '';
+	const body = request.body && (request.body.adminPassword || request.body.hostPassword);
+	return cleanSecret(header || body || '');
+}
+
+function isAdminRequest(dataDir, request) {
+	const expected = cleanSecret(resolveAdminPassword(dataDir));
+	if (!expected) return false;
+	return timingSafeEqualString(expected, adminSecretFrom(request));
+}
+
+function assertAdminRequest(dataDir, request) {
+	if (isAdminRequest(dataDir, request)) return;
+	assertAdminPassword(dataDir, adminSecretFrom(request));
+}
+
+function hostingProductEnabled(dataDir) {
+	return Boolean(resolveHostPassword(dataDir));
+}
+
+function hostingLockedError() {
+	const err = new Error('Hosting isn’t available right now.');
+	err.status = 403;
+	return err;
+}
+
+function sessionFrom(request) {
+	return authDex.getTourneySession(request && request.signedCookies);
+}
+
+function discordHostSession(request) {
+	const session = sessionFrom(request);
+	if (!session || !session.user_id || !session.discord_id) return null;
+	if (typeof authDex.userIsTourneyHost === 'function' && !authDex.userIsTourneyHost(session)) return null;
+	return session;
+}
+
+function staffRoleOf(dataDir, request, tournament) {
+	if (isAdminRequest(dataDir, request)) return 'admin';
+	if (!tournament) return null;
+	const session = sessionFrom(request);
+	if (!session || !session.user_id) return null;
+	const uid = Number(session.user_id);
+	if (Number(tournament.hostUserId) === uid) return 'owner';
+	if ((tournament.judgeUserIds || []).some((id) => Number(id) === uid)) return 'judge';
+	if ((tournament.streamUserIds || []).some((id) => Number(id) === uid)) return 'stream';
+	return null;
+}
+
+function canManageArena(dataDir, request, tournament) {
+	const role = staffRoleOf(dataDir, request, tournament);
+	return role === 'admin' || role === 'owner' || role === 'judge';
+}
+
+function canEditStream(dataDir, request, tournament) {
+	if (canManageArena(dataDir, request, tournament)) return true;
+	return staffRoleOf(dataDir, request, tournament) === 'stream';
+}
+
+function assertCanManageArena(dataDir, request, tournament) {
+	if (isAdminRequest(dataDir, request)) return { role: 'admin', session: sessionFrom(request) };
+	if (!hostingProductEnabled(dataDir)) throw hostingLockedError();
+	const session = sessionFrom(request);
+	if (!session || !session.user_id) {
+		throw Object.assign(new Error('Sign in with Discord to host this arena, or sign in as admin.'), { status: 401 });
+	}
+	if (!session.discord_id) {
+		throw Object.assign(new Error('Link Discord to this account before hosting.'), { status: 403 });
+	}
+	if (typeof authDex.userIsTourneyHost === 'function' && !authDex.userIsTourneyHost(session)) {
+		throw Object.assign(new Error('Hosting isn’t enabled on this account.'), { status: 403 });
+	}
+	if (!tournament || (Number(tournament.hostUserId) !== Number(session.user_id)
+		&& !(tournament.judgeUserIds || []).some((id) => Number(id) === Number(session.user_id)))) {
+		throw Object.assign(new Error('You can only change tournaments you created.'), { status: 403 });
+	}
+	const role = Number(tournament.hostUserId) === Number(session.user_id) ? 'host' : 'judge';
+	return { role, session };
+}
+
+function assertCanCreateArena(dataDir, request) {
+	if (isAdminRequest(dataDir, request)) return { role: 'admin', session: sessionFrom(request) };
+	if (!hostingProductEnabled(dataDir)) throw hostingLockedError();
+	const session = sessionFrom(request);
+	if (!session || !session.user_id) {
+		throw Object.assign(new Error('Sign in with Discord to create an arena, or sign in as admin.'), { status: 401 });
+	}
+	if (!session.discord_id) {
+		throw Object.assign(new Error('Link Discord to this account before hosting.'), { status: 403 });
+	}
+	if (typeof authDex.userIsTourneyHost === 'function' && !authDex.userIsTourneyHost(session)) {
+		throw Object.assign(new Error('Hosting isn’t enabled on this account.'), { status: 403 });
+	}
+	return { role: 'host', session };
+}
+
+function assertGrantedHostOrAdmin(dataDir, request) {
+	if (isAdminRequest(dataDir, request)) return { role: 'admin', session: sessionFrom(request) };
+	if (!hostingProductEnabled(dataDir)) throw hostingLockedError();
+	const session = discordHostSession(request);
+	if (session) return { role: 'host', session };
+	throw Object.assign(new Error('Sign in with Discord as a host, or sign in as admin.'), { status: 403 });
+}
+
+function viewerPayload(dataDir, request) {
+	const session = sessionFrom(request);
+	const admin = isAdminRequest(dataDir, request);
+	const hostingEnabled = hostingProductEnabled(dataDir);
+	const tourneyHost = typeof authDex.userIsTourneyHost === 'function' && authDex.userIsTourneyHost(session);
+	return {
+		signedIn: Boolean(session && session.user_id),
+		discordId: session && session.discord_id ? session.discord_id : null,
+		tourneyHost,
+		canCreate: admin || (tourneyHost && hostingEnabled),
+		admin,
+	};
+}
+
 function slugify(name) {
 	const base = String(name || '')
 		.toLowerCase()
@@ -1208,8 +1908,8 @@ function makeInvoiceCode() {
 	return code;
 }
 
-function makeTreasury(_slug) {
-	return PAY_TO.DOGE;
+function makeTreasury(raw) {
+	return sanitizeDogeAddress(raw, { soft: true }) || PAY_TO.DOGE;
 }
 
 function entryStatus(entry) {
@@ -1223,7 +1923,19 @@ function normalizeEntry(entry) {
 	entry.fromWallet = String(entry.fromWallet || entry.wallet || '').trim();
 	entry.wallet = entry.fromWallet;
 	entry.payAsset = KNOWN_PAY_ASSETS.includes(entry.payAsset) ? entry.payAsset : 'DOGE';
-	entry.payTo = LEGACY_PAY_TO[entry.payAsset] || PAY_TO.DOGE;
+	entry.xPayerHandle = sanitizeXHandle(entry.xPayerHandle);
+	const storedPayTo = String(entry.payTo || '').trim();
+	if (storedPayTo) {
+		entry.payTo = storedPayTo;
+	} else if (entry.payAsset === 'SOL') {
+		entry.payTo = LEGACY_PAY_TO.SOL;
+	} else if (entry.payAsset === 'XMONEY') {
+		entry.payTo = entry.payTo || '';
+	} else if (entry.payAsset === 'USDC_SOL') {
+		entry.payTo = storedPayTo || '';
+	} else {
+		entry.payTo = PAY_TO.DOGE;
+	}
 	entry.whitelist = Boolean(entry.whitelist);
 	entry.noShow = Boolean(entry.noShow);
 	entry.subbedIn = Boolean(entry.subbedIn);
@@ -1240,7 +1952,73 @@ function normalizeEntry(entry) {
 	entry.country = String(entry.country || '').trim();
 	entry.userId = entry.userId != null && Number(entry.userId) > 0 ? Number(entry.userId) : null;
 	entry.ddlClass = records.normalizeDdlClass(entry.ddlClass) || '';
+	entry.playName = playDecks.sanitizePlayName(entry.playName) || String(entry.playName || '').trim();
+	entry.registeredDeck = playDecks.sanitizeSnapshot(entry.registeredDeck);
+	if (entry.registeredDeck && !entry.playName) entry.playName = entry.registeredDeck.playName || '';
+	entry.payTxid = dogePayWatch.looksLikeTxid(entry.payTxid) ? String(entry.payTxid).trim().toLowerCase() : '';
+	entry.payConfirmations = Math.max(0, Number(entry.payConfirmations) || 0);
+	const watchStates = ['confirmed', 'seen', 'watching', 'mismatch'];
+	if (!watchStates.includes(entry.payWatchStatus)) {
+		entry.payWatchStatus = entry.paid
+			? 'confirmed'
+			: (entry.fromWallet && Number(entry.amountCrypto) > 0 ? 'watching' : '');
+	}
+	entry.payNote = String(entry.payNote || '').trim().slice(0, 160);
+	entry.payVerifiedAt = entry.payVerifiedAt || null;
 	return entry;
+}
+
+function attachRegisteredDeck(entry, body, tournament, opts) {
+	const required = Boolean(opts && opts.required);
+	const src = body && typeof body === 'object' ? body : {};
+	const text = String(src.deckText || src.listText || src.deckList || src.playList || '').trim();
+	const playName = playDecks.sanitizePlayName(src.playName || src.ddlPlayName || src.heroName);
+	const deckName = String(src.deckName || src.listName || '').trim().slice(0, 48);
+	let snap = null;
+	if (text) {
+		snap = playDecks.lockFromText(text, { playName, name: deckName });
+	} else if (src.counts || src.serials) {
+		snap = playDecks.lockFromText(playDecks.formatListText({
+			name: deckName || 'Play list',
+			counts: src.counts,
+			serials: src.serials,
+		}), { playName, name: deckName });
+	}
+	if (!snap) {
+		if (required) {
+			throw Object.assign(new Error('Paste a 40-card list exported from ddltcg.com/play'), { status: 400 });
+		}
+		return entry;
+	}
+	classQuota.assertDeckQuota(snap && snap.counts, tournament && tournament.deckClassQuota);
+	entry.playName = snap.playName || playName || entry.playName || '';
+	entry.registeredDeck = snap;
+	return entry;
+}
+
+function assertDeckMutable(tournament, entry, isHost) {
+	if (!tournament) throw Object.assign(new Error('Arena not found'), { status: 404 });
+	if (tournament.status === 'completed') {
+		throw Object.assign(new Error('This arena is finished — registered decks stay locked'), { status: 400 });
+	}
+	if (isHost) return;
+	if (eventPhase.listsLocked(tournament)) {
+		throw Object.assign(new Error('Lists are locked for this arena. Ask the host if you need a correction.'), { status: 400 });
+	}
+}
+
+function deckVisibleTo(tournament, entry, opts) {
+	const o = opts || {};
+	if (o.isHost || o.isOwner) return true;
+	if (eventPhase.listsPublic(tournament)) return true;
+	if (o.matchComplete && tournament && tournament.listsRevealOnMatchComplete !== false) return true;
+	return false;
+}
+
+function publicDeckView(entry, visible) {
+	if (!entry) return null;
+	if (!visible) return entry.registeredDeck ? { ready: true, cardCount: entry.registeredDeck.cardCount || 0, hidden: true } : null;
+	return entry.registeredDeck || null;
 }
 
 function readDdlClass(body) {
@@ -1325,6 +2103,7 @@ function addHostEntry(store, tournament, request, opts) {
 		team: String((request.body && request.body.team) || '').trim(),
 		ddlClass: readDdlClass(request.body),
 		payAsset: 'DOGE',
+		payTo: treasuryAddress(tournament),
 		seed: null,
 		paid: true,
 		status: 'confirmed',
@@ -1352,26 +2131,71 @@ function takeId(store) {
 	return id;
 }
 
-function loadStore(filePath) {
+function normalizeStore(parsed) {
+	if (!parsed || typeof parsed !== 'object') return emptyStore();
+	parsed.nextId = Number(parsed.nextId) || 1;
+	parsed.tournaments = (Array.isArray(parsed.tournaments) ? parsed.tournaments : []).map((t) => {
+		if (!t || typeof t !== 'object') return t;
+		const usd = Number(t.entryFeeUsd);
+		t.entryFeeUsd = Number.isFinite(usd) && usd >= 0 ? usd : 0;
+		return normalizeTournament(t);
+	});
+	parsed.entries = (Array.isArray(parsed.entries) ? parsed.entries : []).map(normalizeEntry);
+	const byId = new Map(parsed.tournaments.map((t) => [t.id, t]));
+	parsed.matches = (Array.isArray(parsed.matches) ? parsed.matches : []).map((m) => normalizeMatch(m, byId.get(m.tournamentId)));
+	parsed.votes = Array.isArray(parsed.votes) ? parsed.votes : [];
+	parsed.predictions = Array.isArray(parsed.predictions) ? parsed.predictions : [];
+	return parsed;
+}
+
+/** In-memory JSON store cache keyed by path + mtime. Avoids re-parse on every GET. */
+const storeFileCache = { filePath: '', mtimeMs: NaN, store: null };
+
+function readStoreFromDisk(filePath) {
 	try {
 		const raw = fs.readFileSync(filePath, 'utf8');
-		const parsed = JSON.parse(raw);
-		if (!parsed || typeof parsed !== 'object') return emptyStore();
-		parsed.nextId = Number(parsed.nextId) || 1;
-		parsed.tournaments = (Array.isArray(parsed.tournaments) ? parsed.tournaments : []).map((t) => {
-			if (!t || typeof t !== 'object') return t;
-			const usd = Number(t.entryFeeUsd);
-			t.entryFeeUsd = Number.isFinite(usd) && usd >= 0 ? usd : 0;
-			return normalizeTournament(t);
-		});
-		parsed.entries = (Array.isArray(parsed.entries) ? parsed.entries : []).map(normalizeEntry);
-		const byId = new Map(parsed.tournaments.map((t) => [t.id, t]));
-		parsed.matches = (Array.isArray(parsed.matches) ? parsed.matches : []).map((m) => normalizeMatch(m, byId.get(m.tournamentId)));
-		parsed.votes = Array.isArray(parsed.votes) ? parsed.votes : [];
-		parsed.predictions = Array.isArray(parsed.predictions) ? parsed.predictions : [];
-		return parsed;
+		return normalizeStore(JSON.parse(raw));
 	} catch (_err) {
 		return emptyStore();
+	}
+}
+
+function loadStore(filePath) {
+	let mtimeMs = NaN;
+	try {
+		mtimeMs = fs.statSync(filePath).mtimeMs;
+	} catch (_err) {
+		return emptyStore();
+	}
+	if (
+		storeFileCache.store
+		&& storeFileCache.filePath === filePath
+		&& Number.isFinite(mtimeMs)
+		&& storeFileCache.mtimeMs === mtimeMs
+	) {
+		return storeFileCache.store;
+	}
+	const store = readStoreFromDisk(filePath);
+	if (!storeHasArenas(store) && !fs.existsSync(filePath)) {
+		storeFileCache.filePath = filePath;
+		storeFileCache.mtimeMs = NaN;
+		storeFileCache.store = null;
+		return store;
+	}
+	storeFileCache.filePath = filePath;
+	storeFileCache.mtimeMs = mtimeMs;
+	storeFileCache.store = store;
+	return store;
+}
+
+function rememberStoreCache(filePath, store) {
+	if (!filePath || !store) return;
+	storeFileCache.filePath = filePath;
+	storeFileCache.store = store;
+	try {
+		storeFileCache.mtimeMs = fs.statSync(filePath).mtimeMs;
+	} catch (_err) {
+		storeFileCache.mtimeMs = NaN;
 	}
 }
 
@@ -1392,8 +2216,7 @@ function saveStore(filePath, store) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	if (storeHasArenas(store) && fs.existsSync(filePath)) {
 		try {
-			const bak = `${filePath}.bak`;
-			if (!fs.existsSync(bak)) fs.copyFileSync(filePath, bak);
+			persist.rotateLiveBak(filePath);
 		} catch (_err) {}
 	}
 	const tmp = `${filePath}.tmp`;
@@ -1403,6 +2226,15 @@ function saveStore(filePath, store) {
 	} catch (_err) {
 		fs.copyFileSync(tmp, filePath);
 		try { fs.unlinkSync(tmp); } catch (_e2) {}
+	}
+	rememberStoreCache(filePath, store);
+	try {
+		persist.afterJsonSave(filePath, store, {
+			database: records.getDb && records.getDb(),
+			skipTournament: (t) => isDemoTournament(store, t),
+		});
+	} catch (err) {
+		console.error('[tourney] archive:', err && err.message ? err.message : err);
 	}
 	return true;
 }
@@ -1414,6 +2246,9 @@ function isDemoTournament(store, tournament) {
 	const demoNames = new Set(['rise of the pack open', 'ember swiss', 'hearth round robin']);
 	if (demoNames.has(name)) return true;
 	if (demoSlugs.some((base) => slug === base || slug.startsWith(`${base}-`))) return true;
+	// Local / QA tables must never land on the public Hall of Fame.
+	if (/^irl-local(?:-|$)/.test(slug) || /^test-arena(?:-|$)/.test(slug) || slug.includes('vod-save')) return true;
+	if (/^irl local\b/.test(name) || name === 'vod save check' || /^test arena\b/.test(name)) return true;
 	const entries = store.entries.filter((e) => e.tournamentId === tournament.id);
 	if (!entries.length) return false;
 	const demoHandles = new Set(['ash', 'blaze', 'cinder', 'drift', 'ember', 'flint', 'glow', 'hearth']);
@@ -1459,8 +2294,81 @@ function draftsToMatches(store, tournament, drafts) {
 	return created;
 }
 
+function attachPlacement(drafts) {
+	if (typeof engine.attachPlacement === 'function') return engine.attachPlacement(drafts);
+	const list = Array.isArray(drafts) ? drafts : [];
+	if (list.some((d) => d.side === 'placement')) return list;
+	const ids = new Set();
+	for (const d of list) {
+		if (d.entry1Id) ids.add(d.entry1Id);
+		if (d.entry2Id) ids.add(d.entry2Id);
+	}
+	if (ids.size < 4) return list;
+	const winners = list.filter((d) => d.side === 'winners');
+	const maxRound = winners.reduce((n, d) => Math.max(n, d.round), 0);
+	if (maxRound < 2) return list;
+	const semis = winners.filter((d) => d.round === maxRound - 1).sort((a, b) => a.position - b.position);
+	if (semis.length < 2) return list;
+	list.push({ side: 'placement', round: 1, position: 1, entry1Id: null, entry2Id: null });
+	semis.forEach((m, i) => {
+		m.loserGoesTo = { side: 'placement', round: 1, position: 1, slot: (i % 2) + 1 };
+	});
+	return list;
+}
+
+function titleCountByHandle() {
+	const db = records.getDb && records.getDb();
+	if (!db) return new Map();
+	try {
+		const rows = db.prepare(`
+			SELECT LOWER(r.handle) AS handle, COUNT(*) AS n
+			FROM tourney_results r
+			JOIN tourney_events e ON e.tournament_id = r.tournament_id
+			WHERE r.placement = 1 AND e.official = 1
+			GROUP BY LOWER(r.handle)
+		`).all();
+		return new Map(rows.map((row) => [String(row.handle || ''), Number(row.n) || 0]));
+	} catch (_err) {
+		return new Map();
+	}
+}
+
+function seedFieldByRecords(field) {
+	const titles = titleCountByHandle();
+	return [...(field || [])].sort((a, b) => {
+		const ta = titles.get(String(a.handle || '').trim().toLowerCase()) || 0;
+		const tb = titles.get(String(b.handle || '').trim().toLowerCase()) || 0;
+		if (tb !== ta) return tb - ta;
+		const sa = Number(a.seed) || 9999;
+		const sb = Number(b.seed) || 9999;
+		if (sa !== sb) return sa - sb;
+		return String(a.handle || '').localeCompare(String(b.handle || ''), undefined, { sensitivity: 'base' });
+	});
+}
+
 function addMatches(store, tournament, paidEntries) {
-	const seeded = [...paidEntries].sort((a, b) => (a.seed || 99) - (b.seed || 99));
+	const champId = champEntryId(tournament);
+	const existingTitle = (store.matches || []).find((m) => m.tournamentId === tournament.id && m.side === 'title');
+	const field = champId
+		? paidEntries.filter((e) => e.id !== champId)
+		: paidEntries;
+	if (champId && field.length < 1) {
+		throw Object.assign(new Error('Reigning Champ mode needs at least one challenger besides the champ'), { status: 400 });
+	}
+	const seeded = [...field].sort((a, b) => (a.seed || 99) - (b.seed || 99));
+	const bindTitle = (drafts, challengerId) => {
+		const list = Array.isArray(drafts) ? drafts : [];
+		if (existingTitle) {
+			const grand = list.find((d) => d.side === 'grand');
+			const winners = list.filter((d) => d.side === 'winners');
+			const maxR = winners.reduce((n, d) => Math.max(n, Number(d.round) || 0), 0);
+			const terminal = grand || winners.find((d) => Number(d.round) === maxR && Number(d.position) === 1) || winners[0];
+			if (terminal) terminal.winnerGoesTo = { side: 'title', round: 1, position: 1, slot: 2 };
+			return list;
+		}
+		if (!list.some((d) => d.side === 'title')) attachTitleDraft(list, champId, challengerId || null);
+		return list;
+	};
 	if (tournament.stageType === 'two' && tournament.stage !== 'playoff') {
 		const size = tournament.groupSize || 4;
 		const groups = [];
@@ -1471,13 +2379,26 @@ function addMatches(store, tournament, paidEntries) {
 			const drafts = generateRoundRobin(groups[g].map((e) => e.id)).map((d) => ({ ...d, group: g + 1 }));
 			store.matches.push(...draftsToMatches(store, tournament, drafts));
 		}
+		if (champId && !existingTitle) {
+			store.matches.push(...draftsToMatches(store, tournament, attachTitleDraft([], champId, field.length === 1 ? field[0].id : null)));
+		}
 		return;
 	}
 	const ids = seeded.map((e) => e.id);
-	let drafts;
+	if (ids.length) tournament.bracketSize = eventPhase.treeSizeForField(ids.length);
+	let drafts = [];
 	const inPlayoff = tournament.stage === 'playoff';
 	const format = tournament.format;
-	if (!inPlayoff && format === 'round_robin') drafts = generateRoundRobin(ids);
+	if (ids.length === 1 && champId) {
+		if (existingTitle) {
+			if (!existingTitle.entry2Id && Number(existingTitle.entry1Id) !== ids[0]) existingTitle.entry2Id = ids[0];
+			existingTitle.status = (existingTitle.entry1Id && existingTitle.entry2Id) ? 'ready' : 'pending';
+			return;
+		}
+		drafts = attachTitleDraft([], champId, ids[0]);
+		store.matches.push(...draftsToMatches(store, tournament, drafts));
+		return;
+	} else if (!inPlayoff && format === 'round_robin') drafts = generateRoundRobin(ids);
 	else if (!inPlayoff && format === 'swiss') drafts = pairSwissRound(ids.map((id, i) => ({
 		id, seed: i + 1, wins: 0, buchholz: 0, played: [],
 	})), 1);
@@ -1486,6 +2407,7 @@ function addMatches(store, tournament, paidEntries) {
 	if (tournament.breakTies && !wantsLosersBracket(tournament) && drafts.some((d) => d.side === 'winners')) {
 		attachPlacement(drafts);
 	}
+	if (champId) bindTitle(drafts, ids.length === 1 ? ids[0] : null);
 	store.matches.push(...draftsToMatches(store, tournament, drafts));
 }
 
@@ -1667,8 +2589,8 @@ function standingsFor(store, tournament, group) {
 }
 
 function maybeFinishOrAdvance(store, t) {
-	const open = store.matches.filter((m) => m.tournamentId === t.id && m.status !== 'complete' && m.status !== 'bye');
-	if (open.length) return;
+	collapseVacantMatches(store, t);
+	if (playOpenMatches(store, t).length) return;
 	if (t.stageType === 'two' && t.stage === 'groups') {
 		const advance = t.advancePerGroup || 2;
 		const groups = t.groupCount || Math.max(...store.matches.filter((m) => m.tournamentId === t.id && m.group).map((m) => m.group), 0);
@@ -1686,7 +2608,8 @@ function maybeFinishOrAdvance(store, t) {
 		const rounds = store.matches.filter((m) => m.tournamentId === t.id && m.side === 'group').map((m) => m.round);
 		const maxRound = rounds.length ? Math.max(...rounds) : 0;
 		if (maxRound < (t.swissRounds || 3)) {
-			const table = standingsFor(store, t);
+			const skip = champEntryId(t);
+			const table = standingsFor(store, t).filter((s) => Number(s.entryId) !== skip);
 			const drafts = pairSwissRound(table.map((s) => ({
 				id: s.entryId,
 				seed: s.seed || 99,
@@ -1704,7 +2627,8 @@ function maybeFinishOrAdvance(store, t) {
 		&& t.stage !== 'playoff'
 		&& (t.format === 'swiss' || t.format === 'round_robin')
 	) {
-		const table = standingsFor(store, t);
+		const skip = champEntryId(t);
+		const table = standingsFor(store, t).filter((s) => Number(s.entryId) !== skip);
 		const seeded = table.map((s) => store.entries.find((e) => e.id === s.entryId)).filter(Boolean);
 		if (seeded.length >= 2) {
 			seeded.forEach((e, i) => { e.seed = i + 1; });
@@ -1713,6 +2637,26 @@ function maybeFinishOrAdvance(store, t) {
 			return;
 		}
 	}
+	seatTitleChallenger(store, t);
+	dropOrphanTitleMatch(store, t);
+	const leftover = anyOpenMatches(store, t);
+	const blocking = leftover.filter((m) => {
+		if (m.side === 'placement') return Boolean(m.entry1Id && m.entry2Id);
+		if (m.side === 'title') return Boolean((m.entry1Id && m.entry2Id) || wantsReigningChamp(t));
+		return true;
+	});
+	if (blocking.length) return;
+	for (const stuck of leftover) {
+		if (stuck.entry1Id || stuck.entry2Id) applyByeAdvance(store, stuck);
+		else {
+			stuck.status = 'vacant';
+			stuck.winnerId = null;
+			stuck.games = [];
+			stuck.score1 = null;
+			stuck.score2 = null;
+		}
+	}
+	if (anyOpenMatches(store, t).length) return;
 	t.status = 'completed';
 	try {
 		const db = records.getDb();
@@ -1744,13 +2688,11 @@ function podiumFor(store, tournament) {
 		};
 	}
 	const champ = championFor(store, tournament);
-	let final = matches.find((m) => m.side === 'grand' && m.status === 'complete');
-	if (!final) {
-		final = [...matches]
-			.filter((m) => m.side === 'winners' && m.status === 'complete')
-			.sort((a, b) => b.round - a.round || a.position - b.position)[0];
-	}
-	const secondId = final && champ ? (final.winnerId === final.entry1Id ? final.entry2Id : final.entry1Id) : null;
+	const deepestDecided = (side) => [...matches]
+		.filter((m) => m.side === side && decidedWinnerId(m))
+		.sort((a, b) => b.round - a.round || a.position - b.position)[0] || null;
+	const final = deepestDecided('title') || deepestDecided('grand') || deepestDecided('winners');
+	const secondId = final && champ ? (Number(final.winnerId) === Number(final.entry1Id) ? final.entry2Id : final.entry1Id) : null;
 	const place = matches.find((m) => m.side === 'placement' && m.status === 'complete');
 	let third = [];
 	let fourth = null;
@@ -1785,23 +2727,35 @@ function podiumFor(store, tournament) {
 	};
 }
 
-function championFor(store, tournament) {
-	const matches = store.matches.filter((m) => m.tournamentId === tournament.id);
+function championFor(store, tournament, opts) {
+	const fieldOnly = Boolean(opts && opts.fieldOnly);
+	const all = tournamentMatches(store, tournament);
+	const matches = fieldOnly ? all.filter((m) => m.side !== 'title') : all;
+	const asEntry = (id) => {
+		const entry = store.entries.find((e) => e.id === Number(id));
+		return entry ? { id: entry.id, handle: entry.handle } : null;
+	};
+	if (!fieldOnly && all.some((m) => m.side === 'title')) {
+		const title = all.find((m) => m.side === 'title' && decidedWinnerId(m));
+		return title ? asEntry(decidedWinnerId(title)) : null;
+	}
+	const settled = !playOpenMatches(store, tournament).length;
 	if (wantsLosersBracket(tournament) && matches.some((m) => m.side === 'grand')) {
-		const last = matches.find((m) => m.side === 'grand' && m.status === 'complete' && m.winnerId);
-		if (!last) return null;
-		const entry = store.entries.find((e) => e.id === last.winnerId);
-		return entry ? { id: entry.id, handle: entry.handle } : null;
+		const grand = deepestDecidedWinnerId(matches, ['grand']);
+		if (grand) return asEntry(grand);
+		if (!settled) return null;
 	}
-	if (hasElimTree(store, tournament)) {
-		const last = [...matches]
-			.filter((m) => m.side === 'winners' && m.status === 'complete' && m.winnerId)
-			.sort((a, b) => b.round - a.round || a.position - b.position)[0];
-		if (!last) return null;
-		const entry = store.entries.find((e) => e.id === last.winnerId);
-		return entry ? { id: entry.id, handle: entry.handle } : null;
+	if (matches.some((m) => ELIM_SIDES.includes(m.side))) {
+		const terminal = decidedWinnerId(fieldTerminalMatch(store, tournament));
+		if (terminal) return asEntry(terminal);
+		if (!settled) return null;
+		// Byes and vacated slots can collapse the tree short of the final. Whoever won
+		// the deepest match that did resolve is the last one standing.
+		const standing = deepestDecidedWinnerId(matches, ['grand', 'winners']);
+		return standing ? asEntry(standing) : null;
 	}
-	const table = standingsFor(store, tournament);
+	const skip = fieldOnly ? champEntryId(tournament) : 0;
+	const table = standingsFor(store, tournament).filter((row) => Number(row.entryId) !== skip);
 	if (!table.length) return null;
 	const top = table[0];
 	return { id: top.entryId, handle: top.handle };
@@ -1816,7 +2770,7 @@ function hostUserFor(tournament) {
 }
 
 function attachHostIdentity(request, tournament) {
-	const session = authDex.getTourneySession(request && request.signedCookies);
+	const session = sessionFrom(request);
 	if (session && session.user_id) {
 		tournament.hostUserId = Number(session.user_id);
 		const fromDiscord = String(session.tourney_handle || session.discord_username || '').trim();
@@ -1826,11 +2780,80 @@ function attachHostIdentity(request, tournament) {
 	return tournament;
 }
 
+function stampCreator(request, tournament, role) {
+	const session = sessionFrom(request);
+	if (role === 'host') {
+		if (!session || !session.user_id) {
+			throw Object.assign(new Error('Sign in with Discord to create an arena.'), { status: 401 });
+		}
+		tournament.hostUserId = Number(session.user_id);
+		const fromDiscord = String(session.tourney_handle || session.discord_username || '').trim();
+		const typed = String(tournament.hostName || '').trim();
+		if (fromDiscord && (!typed || typed === 'KushMetaX')) tournament.hostName = fromDiscord;
+		return tournament;
+	}
+	return attachHostIdentity(request, tournament);
+}
+
+function applyArenaHost(tournament, userRow) {
+	if (!tournament || !userRow) return tournament;
+	const payload = typeof authDex.authUserPayload === 'function' ? authDex.authUserPayload(userRow) : userRow;
+	const id = Number(payload && (payload.id != null ? payload.id : payload.user_id));
+	if (!(id > 0)) return tournament;
+	tournament.hostUserId = id;
+	const name = String((payload && (payload.tourneyHandle || payload.discordUsername)) || '').trim();
+	if (name) tournament.hostName = name;
+	return tournament;
+}
+
+function syncHostDisplay(tournament) {
+	const user = hostUserFor(tournament);
+	if (user) {
+		const name = String(user.tourneyHandle || user.discordUsername || '').trim();
+		if (name) tournament.hostName = name;
+	}
+	return tournament;
+}
+
+function keepCreator(current, next) {
+	if (!current || !next) return next;
+	next.hostUserId = current.hostUserId != null ? current.hostUserId : next.hostUserId;
+	next.hostName = current.hostName;
+	return syncHostDisplay(next);
+}
+
+function applyPendingArenaHosts(store, database) {
+	const db = database || records.getDb();
+	if (!db || typeof authDex.findUserForHostGrant !== 'function') return false;
+	store.meta = store.meta && typeof store.meta === 'object' ? store.meta : {};
+	store.meta.hostSwaps = store.meta.hostSwaps && typeof store.meta.hostSwaps === 'object' ? store.meta.hostSwaps : {};
+	let changed = false;
+	for (const swap of PENDING_ARENA_HOSTS) {
+		const key = `${swap.slug}:${String(swap.handle || '').toLowerCase()}`;
+		if (store.meta.hostSwaps[key]) continue;
+		const t = (store.tournaments || []).find((row) => row.slug === swap.slug);
+		if (!t) continue;
+		const user = authDex.findUserForHostGrant(db, swap);
+		if (!user) {
+			console.error('[tourney] pending host swap: no Discord user for', swap.handle);
+			continue;
+		}
+		applyArenaHost(t, user);
+		if (typeof authDex.setTourneyHost === 'function') {
+			try { authDex.setTourneyHost(db, user.user_id, true, null); } catch (_err) { /* display swap still applies */ }
+		}
+		store.meta.hostSwaps[key] = new Date().toISOString();
+		changed = true;
+	}
+	return changed;
+}
+
 function summarize(store, t) {
 	const entries = store.entries.filter((e) => e.tournamentId === t.id);
 	const paid = entries.filter((e) => e.paid && !e.noShow && (!e.whitelist || e.subbedIn));
 	const feesCollected = feeTotalUsd(entries);
 	const prizePool = computePrizePool(t, entries);
+	const schedule = eventPhase.scheduleView(t);
 	return {
 		...t,
 		hostUser: hostUserFor(t),
@@ -1839,6 +2862,10 @@ function summarize(store, t) {
 		prizePool,
 		rewards: rewardView(t, prizePool, feesCollected),
 		champion: t.status === 'completed' ? championFor(store, t) : null,
+		phase: schedule.phase,
+		schedule,
+		hiddenFromPublic: eventPhase.isTestOrScrim(t),
+		bracketSize: t.bracketSize || (t.status === 'registration' ? 0 : eventPhase.treeSizeForField(paid.length)),
 	};
 }
 
@@ -1850,34 +2877,109 @@ const PUBLIC_ENTRY_FIELDS = [
 	'id', 'tournamentId', 'handle', 'userId', 'team', 'seed', 'paid', 'status',
 	'checkedIn', 'payAsset', 'amountUsd', 'amountCrypto', 'createdAt', 'paidAt',
 	'whitelist', 'noShow', 'subbedIn', 'addedByHost', 'lateEntry', 'ddlClass',
+	'playName', 'registeredDeck', 'listSubmitted',
+];
+const OWNER_ENTRY_FIELDS = [
+	'fromWallet', 'wallet', 'invoiceCode', 'payTo', 'payTxid',
+	'xPayerHandle',
+	'payConfirmations', 'payWatchStatus', 'payVerifiedAt', 'usdPerCoin', 'quotedAt',
+	'payNote',
 ];
 
-function publicEntry(entry) {
+function publicEntry(entry, revealPay, deckOpts) {
 	const out = {};
 	for (const key of PUBLIC_ENTRY_FIELDS) out[key] = entry[key];
+	if (revealPay) {
+		for (const key of OWNER_ENTRY_FIELDS) out[key] = entry[key];
+	}
+	const showDeck = deckVisibleTo(deckOpts && deckOpts.tournament, entry, deckOpts);
+	const showClass = showDeck || (deckOpts && deckOpts.listsLocked);
+	out.registeredDeck = publicDeckView(entry, showDeck);
+	out.listSubmitted = Boolean(entry.registeredDeck && entry.registeredDeck.cardCount === playDecks.DECK_SIZE);
+	if (!showClass) out.ddlClass = '';
+	if (!showDeck) out.playName = '';
 	return out;
 }
 
-function detail(store, t, isHost) {
-	linkArenaEntries(store, t);
+function invoiceCodeFrom(request) {
+	if (!request) return '';
+	const header = typeof request.get === 'function' ? request.get('x-tourney-invoice') : '';
+	const query = request.query || {};
+	const body = request.body || {};
+	return String(header || query.invoice || query.invoiceCode || body.invoiceCode || '').trim();
+}
+
+function canRevealPay(isHost, session, entry, invoiceCode) {
+	if (isHost) return true;
+	if (sessionMatchesEntry(session, entry)) return true;
+	if (invoiceCode && entry && entry.invoiceCode && invoiceCode === entry.invoiceCode) return true;
+	return false;
+}
+
+function detail(store, t, isHost, request) {
 	const entries = store.entries.filter((e) => e.tournamentId === t.id);
 	const matches = store.matches.filter((m) => m.tournamentId === t.id);
 	const paid = entries.filter((e) => e.paid && (!e.whitelist || e.subbedIn));
 	const feesCollected = feeTotalUsd(entries);
 	const prizePool = computePrizePool(t, entries);
+	const session = request ? authDex.getTourneySession(request.signedCookies) : null;
+	const invoiceCode = invoiceCodeFrom(request);
+	const listsLocked = eventPhase.listsLocked(t);
+	const completedEntryIds = new Set();
+	for (const m of matches) {
+		if (m.status !== 'complete') continue;
+		const a = Number(m.entry1Id);
+		const b = Number(m.entry2Id);
+		if (a > 0) completedEntryIds.add(a);
+		if (b > 0) completedEntryIds.add(b);
+	}
+	const db = records.getDb();
+	const discordByEntry = records.publicDiscordUsersForEntries(db, entries);
+	const awards = db
+		? records.listAwardsForHandles(db, entries.map((e) => e.handle))
+		: [];
 	const listed = entries.map((entry) => {
-		const row = isHost ? { ...entry } : publicEntry(entry);
-		row.discordUser = entryDiscordUser(entry);
+		const revealPay = canRevealPay(isHost, session, entry, invoiceCode);
+		const isOwner = sessionMatchesEntry(session, entry);
+		const matchComplete = completedEntryIds.has(Number(entry.id));
+		const row = isHost
+			? { ...entry, listSubmitted: Boolean(entry.registeredDeck && entry.registeredDeck.cardCount === playDecks.DECK_SIZE) }
+			: publicEntry(entry, revealPay, {
+				tournament: t,
+				isHost,
+				isOwner,
+				listsLocked,
+				matchComplete,
+			});
+		row.discordUser = discordByEntry.get(entry.id) || null;
 		return row;
 	});
-	const db = records.getDb();
-	const awards = db ? records.listAwards(db) : [];
+	const schedule = eventPhase.scheduleView(t);
+	const uid = session && Number(session.user_id);
+	const viewerRole = isHost
+		? (uid && Number(t.hostUserId) === uid ? 'owner'
+			: (uid && (t.judgeUserIds || []).some((id) => Number(id) === uid) ? 'judge' : 'admin'))
+		: (uid && (t.streamUserIds || []).some((id) => Number(id) === uid) ? 'stream'
+			: (session && entries.some((e) => sessionMatchesEntry(session, e)) ? 'player' : 'public'));
 	return {
 		tournament: t,
 		hostUser: hostUserFor(t),
 		viewerIsHost: Boolean(isHost),
+		viewerRole,
+		phase: schedule.phase,
+		schedule,
+		listsLocked,
+		listsPublic: eventPhase.listsPublic(t),
 		entries: records.attachBadges(listed, awards),
-		matches,
+		matches: matches.map((m) => {
+			const copy = { ...m };
+			if (!isHost && copy.reportProposal) {
+				const mine = session && entries.some((e) => sessionMatchesEntry(session, e)
+					&& (Number(e.id) === Number(m.entry1Id) || Number(e.id) === Number(m.entry2Id)));
+				if (!mine) copy.reportProposal = { pending: true };
+			}
+			return copy;
+		}),
 		standings: standingsFor(store, t),
 		prizePool,
 		rewards: rewardView(t, prizePool, feesCollected),
@@ -1885,7 +2987,7 @@ function detail(store, t, isHost) {
 		podium: podiumFor(store, t),
 		votes: (store.votes || []).filter((v) => v.tournamentId === t.id),
 		predictions: (store.predictions || []).filter((p) => p.tournamentId === t.id),
-		payTo: PAY_TO,
+		payTo: payToFor(t),
 		claims: isHost ? records.listClaimsForTournament(records.getDb(), t.id) : [],
 	};
 }
@@ -1895,20 +2997,130 @@ function createRouter(options) {
 	const dataDir = options.dataDir;
 	const storeFile = path.join(dataDir, 'tourney-store.json');
 	const bracketDir = options.bracketDir || path.join(__dirname, '..', '..', '..', 'bracket');
-	const assetsDir = path.join(bracketDir, 'og-assets');
+	const irlAssets = path.join(bracketDir, 'irl', 'og-assets');
+	const assetsDir = fs.existsSync(path.join(irlAssets, 'base.rgba.gz'))
+		? irlAssets
+		: path.join(bracketDir, 'og-assets');
 	const router = express.Router();
 	router.use('/rtc', require('./rtc-signaling').createRouter({
 		canClaimSeat: createIrlSeatGuard(dataDir),
 	}));
+	const dogeWatchOpts = options.dogeWatch && typeof options.dogeWatch === 'object' ? options.dogeWatch : {};
+	const dogeWatchEnabled = dogeWatchOpts.enabled === true;
+	const watchHits = new Map();
+
+	async function incomingFor(address, extra) {
+		if (typeof dogeWatchOpts.fetchIncoming === 'function') {
+			return dogeWatchOpts.fetchIncoming(address, extra);
+		}
+		return dogePayWatch.fetchIncoming(address, extra);
+	}
+
+	function assertWatchRate(request, tournament) {
+		if (canManageArena(dataDir, request, tournament)) return;
+		const forwarded = request && request.headers && request.headers['x-forwarded-for'];
+		const ip = String((request && request.ip) || forwarded || 'local').split(',')[0].trim();
+		const now = Date.now();
+		const kept = (watchHits.get(ip) || []).filter((t) => now - t < 30000);
+		if (kept.length >= 8) {
+			throw Object.assign(new Error('Wait a few seconds before checking the chain again'), { status: 429 });
+		}
+		kept.push(now);
+		watchHits.set(ip, kept);
+	}
+
+	async function scanPayments(store, options) {
+		const opts = options || {};
+		const minConf = dogePayWatch.minConfirmationsFromEnv();
+		const focus = opts.entry || null;
+		const tournament = opts.tournament || (focus && (store.tournaments || []).find((row) => row.id === focus.tournamentId)) || null;
+		const pool = focus
+			? [focus]
+			: pendingWatchEntries(store, tournament);
+		if (focus && isHostConfirmAsset(focus.payAsset)) {
+			return { confirmed: 0, seen: 0 };
+		}
+		if (!pool.length) return { confirmed: 0, seen: 0 };
+		const addresses = [...new Set(pool.map((entry) => {
+			const t = (store.tournaments || []).find((row) => row.id === entry.tournamentId);
+			return entry.payTo || treasuryAddress(t);
+		}).filter(Boolean))];
+		let txs = [];
+		for (const address of addresses) {
+			const part = await incomingFor(address, { txid: opts.txid, fetch: dogeWatchOpts.fetch });
+			txs = txs.concat(part || []);
+		}
+		if (opts.txid && focus) {
+			const tx = dogePayWatch.findTxById(txs, opts.txid);
+			if (!tx) return { confirmed: 0, seen: 0, error: 'Transaction not found on the Dogecoin chain yet' };
+			const used = dogePayWatch.usedTxidSet(store.entries);
+			const matched = dogePayWatch.matchForcedTxid(focus, tx, { usedTxids: used });
+			if (!matched.ok && matched.reason === 'from-mismatch') {
+				focus.payWatchStatus = 'mismatch';
+				return { confirmed: 0, seen: 0, mismatchFrom: matched.actualFrom };
+			}
+			if (!matched.ok) {
+				const error = matched.reason === 'amount'
+					? 'That transaction does not cover the quoted entry amount'
+					: 'That transaction is already assigned to another entry';
+				return { confirmed: 0, seen: 0, error };
+			}
+			if (Number(tx.confirmations) >= minConf) {
+				dogePayWatch.stampConfirmed(focus, tx);
+				return { confirmed: 1, seen: 0 };
+			}
+			dogePayWatch.stampSeen(focus, tx);
+			return { confirmed: 0, seen: 1 };
+		}
+		const grouped = new Map();
+		for (const entry of pool) {
+			const t = (store.tournaments || []).find((row) => row.id === entry.tournamentId) || tournament;
+			const key = t ? t.id : 0;
+			if (!grouped.has(key)) grouped.set(key, { tournament: t, entries: [] });
+			grouped.get(key).entries.push(entry);
+		}
+		let confirmed = 0;
+		let seen = 0;
+		for (const group of grouped.values()) {
+			const result = dogePayWatch.applyIncomingPayments(group.entries, txs, {
+				payTo: treasuryAddress(group.tournament),
+				minConfirmations: minConf,
+				tournament: group.tournament,
+			});
+			dogePayWatch.applyMatchResult(store.entries, result);
+			confirmed += result.confirmed.length;
+			seen += result.seen.length;
+		}
+		return { confirmed, seen };
+	}
+
+	function findPayEntry(store, t, request) {
+		const host = canManageArena(dataDir, request, t);
+		const session = authDex.getTourneySession(request.signedCookies);
+		const invoiceCode = invoiceCodeFrom(request);
+		const entries = store.entries.filter((e) => e.tournamentId === t.id);
+		const askedId = Number(request.body && request.body.entryId);
+		if (host && Number.isFinite(askedId) && askedId > 0) {
+			return entries.find((e) => e.id === askedId) || null;
+		}
+		if (session) {
+			const mine = entries.find((e) => sessionMatchesEntry(session, e));
+			if (mine) return mine;
+		}
+		if (invoiceCode) {
+			return entries.find((e) => e.invoiceCode === invoiceCode) || null;
+		}
+		return null;
+	}
 
 	async function loadLiveStore() {
-		const store = loadStore(storeFile);
+		// Fresh parse — never mutate the GET cache object in place.
+		let store = readStoreFromDisk(storeFile);
 		stripDemoTournaments(store);
 		let dirty = false;
+		let db = null;
 		try {
-			const fromSnapshots = restoreMissingArenasFromRecords(store, null);
-			if (fromSnapshots && fromSnapshots.snapshots) dirty = true;
-			let db = records.getDb();
+			db = records.getDb();
 			if (!db && typeof authDex.openAuthDatabase === 'function') {
 				try {
 					db = await authDex.openAuthDatabase();
@@ -1917,7 +3129,28 @@ function createRouter(options) {
 					console.error('[tourney] open records db:', err && err.message ? err.message : err);
 				}
 			}
-			if (db) {
+		} catch (err) {
+			console.error('[tourney] records db:', err && err.message ? err.message : err);
+		}
+		try {
+			if (db && !storeHasArenas(store)) {
+				const hydrated = persist.hydrateStore(db);
+				if (hydrated && storeHasArenas(hydrated)) {
+					store = normalizeStore(hydrated);
+					stripDemoTournaments(store);
+					dirty = true;
+					console.warn('[tourney] rebuilt live store from sqlite archive');
+				}
+			}
+		} catch (err) {
+			console.error('[tourney] hydrate:', err && err.message ? err.message : err);
+		}
+		try {
+			const fromSnapshots = restoreMissingArenasFromRecords(store, null);
+			if (fromSnapshots && fromSnapshots.snapshots) dirty = true;
+			if (db && !storeHasArenas(store)) {
+				const fromArchive = persist.restoreMissingFromArchive(store, db);
+				if (fromArchive && (fromArchive.restored || fromArchive.upgraded)) dirty = true;
 				const recovered = restoreMissingArenasFromRecords(store, db);
 				if (recovered && (recovered.restored || recovered.snapshots)) dirty = true;
 			}
@@ -1929,6 +3162,52 @@ function createRouter(options) {
 		} catch (err) {
 			console.error('[tourney] repair:', err && err.message ? err.message : err);
 		}
+		try {
+			if (applyPendingArenaHosts(store, db)) dirty = true;
+		} catch (err) {
+			console.error('[tourney] host swap:', err && err.message ? err.message : err);
+		}
+		try {
+			for (const t of store.tournaments || []) {
+				if (t.status !== 'in_progress') continue;
+				const sig = () => `${t.status}|${(store.matches || [])
+					.filter((m) => m.tournamentId === t.id)
+					.map((m) => `${m.id}:${m.status}:${m.entry1Id}:${m.entry2Id}:${m.winnerId}`)
+					.join(';')}`;
+				const before = sig();
+				collapseVacantMatches(store, t);
+				maybeFinishOrAdvance(store, t);
+				if (sig() !== before) dirty = true;
+			}
+		} catch (err) {
+			console.error('[tourney] collapse:', err && err.message ? err.message : err);
+		}
+		if (db) {
+			try {
+				if (typeof records.seedHallIfEmpty === 'function') records.seedHallIfEmpty(db);
+			} catch (err) {
+				console.error('[tourney] seed hall:', err && err.message ? err.message : err);
+			}
+			const needsSeal = dirty || (typeof records.needsOfficialBackfill === 'function' && records.needsOfficialBackfill(db, store));
+			if (needsSeal) {
+				try {
+					persist.persistLiveStore(db, store, {
+						skipTournament: (t) => isDemoTournament(store, t),
+					});
+				} catch (err) {
+					console.error('[tourney] archive persist:', err && err.message ? err.message : err);
+				}
+				try {
+					const sealed = records.backfillWithFns(db, store, isDemoTournament, podiumFor, standingsFor);
+					if (sealed && (sealed.inserted || sealed.updated || sealed.stamped)) dirty = true;
+					if (typeof records.scrubPracticeEvents === 'function') {
+						records.scrubPracticeEvents(db);
+					}
+				} catch (err) {
+					console.error('[tourney] seal records:', err && err.message ? err.message : err);
+				}
+			}
+		}
 		store._persist = dirty;
 		return store;
 	}
@@ -1938,6 +3217,13 @@ function createRouter(options) {
 		if (store) delete store._persist;
 		if (!persist) return;
 		saveStore(storeFile, store);
+	}
+
+	function hostedArena(store, request) {
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		assertCanManageArena(dataDir, request, t);
+		return t;
 	}
 
 	function withStore(mutate) {
@@ -1954,15 +3240,11 @@ function createRouter(options) {
 		};
 	}
 
+	/** Public GETs: serve the live JSON store only — no archive hydrate/restore/backfill. */
 	function readOnly(fn) {
-		return async (request, response) => {
+		return (request, response) => {
 			try {
-				const store = await loadLiveStore();
-				try {
-					persistStore(store);
-				} catch (err) {
-					console.error('[tourney] persist:', err && err.message ? err.message : err);
-				}
+				const store = loadStore(storeFile);
 				response.set('Cache-Control', 'no-store, private');
 				response.json(fn(store, request));
 			} catch (err) {
@@ -1971,15 +3253,28 @@ function createRouter(options) {
 		};
 	}
 
+	/** Warm recovery after first requests so /arenas is not stuck behind sqlite. */
+	setTimeout(() => {
+		loadLiveStore()
+			.then((store) => {
+				try {
+					persistStore(store);
+				} catch (err) {
+					console.error('[tourney] warm persist:', err && err.message ? err.message : err);
+				}
+			})
+			.catch((err) => {
+				console.error('[tourney] warm load:', err && err.message ? err.message : err);
+			});
+	}, 2500);
+
 	router.get(['/share', '/share.jpg', '/share.png', '/og', '/og.jpg', '/og.png'], (request, response) => {
-		const slug = String(request.query.t || request.query.slug || '').trim();
-		const found = shareMetaForSlug(dataDir, slug);
 		const image = tourneyOg.tryRender({
 			assetsDir,
 			cacheDir: path.join(dataDir, 'og-cache'),
-			kicker: 'DDL Tourney',
-			title: found ? found.title : 'Legends Bracket',
-			slug: found ? found.slug : 'home',
+			kicker: 'Doginal Dogs',
+			title: 'Legends Brackets',
+			slug: 'home',
 		});
 		if (image && image.buffer) {
 			response.set({
@@ -2011,53 +3306,292 @@ function createRouter(options) {
 		}
 	});
 
-	router.get('/status', (_request, response) => {
+	router.get('/status', (request, response) => {
 		const stored = loadStore(storeFile);
+		const hostingEnabled = hostingProductEnabled(dataDir);
 		response.set('Cache-Control', 'no-store, private');
 		response.json({
 			ok: true,
 			mode: 'static',
 			rewards: true,
-			hostPasswordSet: Boolean(resolveHostPassword(dataDir)),
+			hostingEnabled,
+			hostPasswordSet: hostingEnabled,
 			adminPasswordSet: Boolean(resolveAdminPassword(dataDir)),
 			control: true,
 			payTo: PAY_TO,
+			paymentWatch: dogeWatchEnabled,
 			discordOAuth: authDex.discordOAuthConfigured(),
 			requireAccountDefault: true,
 			arenaCount: Array.isArray(stored.tournaments) ? stored.tournaments.length : 0,
+			viewer: viewerPayload(dataDir, request),
 		});
 	});
 
 	router.get('/host-auth', (_request, response) => {
 		const info = hostPasswordInfo(dataDir);
-		response.json({ configured: Boolean(info.value), source: info.source });
+		response.json({ configured: Boolean(info.value) });
 	});
 
+	router.post('/admin-auth', (request, response) => {
+		try {
+			assertAdminRequest(dataDir, request);
+		} catch (err) {
+			response.status(err.status || 403).json({ error: err.message, configured: Boolean(resolveAdminPassword(dataDir)) });
+			return;
+		}
+		response.json({ ok: true, role: 'admin' });
+	});
+
+	router.post('/host-unlock', (request, response) => {
+		try {
+			assertHostPassword(dataDir, request.body && request.body.hostPassword);
+			const session = sessionFrom(request);
+			if (!session || !session.user_id) {
+				throw Object.assign(new Error('Sign in with Discord first, then unlock hosting on this account.'), { status: 401 });
+			}
+			if (!session.discord_id) {
+				throw Object.assign(new Error('Link Discord to this account before unlocking hosting.'), { status: 403 });
+			}
+			const db = records.getDb();
+			if (!db || typeof authDex.setTourneyHost !== 'function') {
+				throw Object.assign(new Error('Account database unavailable.'), { status: 503 });
+			}
+			const row = authDex.setTourneyHost(db, session.user_id, true, null);
+			response.json({
+				ok: true,
+				user: typeof authDex.authUserPayload === 'function' ? authDex.authUserPayload(row) : row,
+			});
+		} catch (err) {
+			response.status(err.status || 403).json({ error: err.message });
+		}
+	});
+
+	/** Legacy path: host password no longer unlocks every arena. Discord hosts unlock their own account. */
 	router.post('/host-auth', (request, response) => {
 		const info = hostPasswordInfo(dataDir);
 		try {
 			assertHostPassword(dataDir, request.body && request.body.hostPassword);
 		} catch (err) {
-			response.status(err.status || 403).json({ error: err.message, configured: Boolean(info.value), source: info.source });
+			response.status(err.status || 403).json({ error: err.message, configured: Boolean(info.value) });
 			return;
 		}
-		response.json({ ok: true, source: info.source });
+		const session = sessionFrom(request);
+		if (session && session.discord_id && typeof authDex.setTourneyHost === 'function') {
+			try {
+				const db = records.getDb();
+				if (db) authDex.setTourneyHost(db, session.user_id, true, null);
+			} catch (_err) { /* grant is best-effort on this legacy path */ }
+		}
+		response.json({
+			ok: true,
+			legacy: true,
+			message: 'Host password accepted. Hosting is tied to your Discord account — you can only change arenas you create. Use admin sign-in to manage every arena.',
+		});
 	});
 
-	router.get('/arenas', readOnly((store) => (
-		store.tournaments
-			.map((t) => summarize(store, t))
-			.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-	)));
+	router.get('/hosts', (request, response) => {
+		try {
+			assertAdminRequest(dataDir, request);
+		} catch (err) {
+			response.status(err.status || 403).json({ error: err.message });
+			return;
+		}
+		const db = records.getDb();
+		if (!db || typeof authDex.listTourneyHosts !== 'function') {
+			response.json({ ok: true, hosts: [] });
+			return;
+		}
+		response.json({ ok: true, hosts: authDex.listTourneyHosts(db) });
+	});
+
+	router.post('/hosts', (request, response) => {
+		try {
+			assertAdminRequest(dataDir, request);
+			const db = records.getDb();
+			if (!db || typeof authDex.findUserForHostGrant !== 'function') {
+				throw Object.assign(new Error('Account database unavailable.'), { status: 503 });
+			}
+			const body = request.body || {};
+			const row = authDex.findUserForHostGrant(db, body);
+			if (!row) throw Object.assign(new Error('Pick a Discord-linked account'), { status: 404 });
+			const enabled = body.host !== false && body.enabled !== false;
+			const until = body.until != null ? body.until : body.tourneyHostUntil;
+			const next = authDex.setTourneyHost(db, row.user_id, enabled, until);
+			response.json({
+				ok: true,
+				user: authDex.authUserPayload(next),
+				hosts: authDex.listTourneyHosts(db),
+			});
+		} catch (err) {
+			response.status(err.status || 400).json({ error: err.message });
+		}
+	});
+
+	router.get('/play/search', async (request, response) => {
+		try {
+			playDecks.assertRateLimit(request);
+			const q = request.query && (request.query.q || request.query.name);
+			const pack = await playDecks.searchHeroes(q);
+			response.set('Cache-Control', 'no-store, private');
+			response.json(pack);
+		} catch (err) {
+			response.status(err.status || 400).json({ error: err.message || 'Play search failed' });
+		}
+	});
+
+	router.get('/arenas', readOnly((store, request) => {
+		const admin = isAdminRequest(dataDir, request);
+		return store.tournaments
+			.map((t) => ({ ...summarize(store, t), viewerIsHost: canManageArena(dataDir, request, t) }))
+			// Public lobby: only unofficial scrims stay hidden. Hosts/admins still see their own.
+			// Do not sniff name/slug/description for "test" — renamed nights keep old slugs.
+			.filter((t) => admin || t.viewerIsHost || t.official !== false)
+			.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+	}));
+
+	router.get('/arenas/featured', readOnly((store, request) => {
+		const admin = isAdminRequest(dataDir, request);
+		const arenas = store.tournaments
+			.map((t) => ({ ...summarize(store, t), viewerIsHost: canManageArena(dataDir, request, t) }))
+			.filter((t) => admin || t.viewerIsHost || t.official !== false);
+		const hot = arenas.find((t) => t.phase === 'live' && t.streamUrl);
+		if (hot) return { ok: true, mode: 'live', arena: hot };
+		const upcoming = arenas
+			.filter((t) => t.official !== false && (t.phase === 'registration' || t.phase === 'check_in'))
+			.sort((a, b) => {
+				const am = Date.parse((a.startAt) || (a.schedule && a.schedule.startAt) || '') || Number.MAX_SAFE_INTEGER;
+				const bm = Date.parse((b.startAt) || (b.schedule && b.schedule.startAt) || '') || Number.MAX_SAFE_INTEGER;
+				return am - bm;
+			});
+		if (upcoming[0]) return { ok: true, mode: 'next', arena: upcoming[0] };
+		const live = arenas.find((t) => t.phase === 'live');
+		if (live) return { ok: true, mode: 'live', arena: live };
+		return { ok: true, mode: null, arena: null };
+	}));
 
 	router.get('/arenas/:slug', readOnly((store, request) => {
 		const t = store.tournaments.find((row) => row.slug === request.params.slug);
 		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
-		return detail(store, t, isHostRequest(dataDir, request));
+		return detail(store, t, canManageArena(dataDir, request, t), request);
 	}));
 
+	function chatIdentity(store, tournament, request) {
+		const session = sessionFrom(request);
+		const signedIn = Boolean(session && session.user_id);
+		const handle = arenaChat.sanitizeHandle(
+			(session && (session.tourney_handle || session.discord_username)) || ''
+		);
+		const canModerate = canManageArena(dataDir, request, tournament);
+		let role = 'viewer';
+		if (canModerate) role = 'host';
+		else if (signedIn && (store.entries || []).some((entry) => (
+			entry.tournamentId === tournament.id && sessionMatchesEntry(session, entry)
+		))) role = 'player';
+		const payload = signedIn && typeof authDex.authUserPayload === 'function'
+			? authDex.authUserPayload(session)
+			: null;
+		return {
+			session,
+			signedIn,
+			canPost: Boolean(signedIn && handle.length >= 2),
+			canModerate,
+			role,
+			handle,
+			userId: signedIn ? Number(session.user_id) : 0,
+			avatarUrl: (payload && payload.avatarUrl) || (session && session.avatar_url) || '',
+		};
+	}
+
+	function chatPack(store, tournament, request, extra) {
+		const ident = chatIdentity(store, tournament, request);
+		const sinceRev = extra && extra.rev != null
+			? extra.rev
+			: Number(request.query && (request.query.rev || request.query.after));
+		const watching = arenaChat.heartbeat(tournament.slug, {
+			userId: ident.userId,
+			viewer: (request.query && request.query.viewer) || (request.body && request.body.viewer),
+		});
+		const snapshot = extra && extra.snapshot
+			? extra.snapshot
+			: arenaChat.readRoom(dataDir, tournament.slug, Number.isFinite(sinceRev) ? sinceRev : 0);
+		return {
+			rev: snapshot.rev,
+			unchanged: Boolean(snapshot.unchanged) && !extra,
+			messages: snapshot.unchanged && !extra ? [] : snapshot.messages,
+			watching,
+			signedIn: ident.signedIn,
+			canPost: ident.canPost,
+			canModerate: ident.canModerate,
+			viewerId: ident.userId,
+			handle: ident.handle,
+			...(extra && extra.message ? { message: extra.message } : {}),
+		};
+	}
+
+	function loadArenaOr404(request) {
+		const store = loadStore(storeFile);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		return { store, t };
+	}
+
+	router.get('/arenas/:slug/chat', (request, response) => {
+		try {
+			const { store, t } = loadArenaOr404(request);
+			response.set('Cache-Control', 'no-store, private');
+			response.json(chatPack(store, t, request));
+		} catch (err) {
+			response.status(err.status || 400).json({ error: err.message || 'Chat failed' });
+		}
+	});
+
+	router.post('/arenas/:slug/chat', (request, response) => {
+		try {
+			const { store, t } = loadArenaOr404(request);
+			const ident = chatIdentity(store, t, request);
+			if (!ident.signedIn) {
+				throw Object.assign(new Error('Sign in with Discord to chat.'), { status: 401 });
+			}
+			if (!ident.canPost) {
+				throw Object.assign(new Error('Set a tourney handle on your account before chatting.'), { status: 400 });
+			}
+			const message = arenaChat.addMessage(dataDir, t.slug, {
+				userId: ident.userId,
+				handle: ident.handle,
+				avatarUrl: ident.avatarUrl,
+				role: ident.role,
+				body: request.body && request.body.body,
+			});
+			response.json(chatPack(store, t, request, {
+				message,
+				snapshot: arenaChat.readRoom(dataDir, t.slug, 0),
+			}));
+		} catch (err) {
+			response.status(err.status || 400).json({ error: err.message || 'Chat failed' });
+		}
+	});
+
+	router.post('/arenas/:slug/chat/delete', (request, response) => {
+		try {
+			const { store, t } = loadArenaOr404(request);
+			const ident = chatIdentity(store, t, request);
+			if (!ident.signedIn) {
+				throw Object.assign(new Error('Sign in with Discord to moderate chat.'), { status: 401 });
+			}
+			arenaChat.deleteMessage(dataDir, t.slug, request.body && request.body.id, {
+				userId: ident.userId,
+				moderate: ident.canModerate,
+			});
+			response.json(chatPack(store, t, request, {
+				snapshot: arenaChat.readRoom(dataDir, t.slug, 0),
+			}));
+		} catch (err) {
+			response.status(err.status || 400).json({ error: err.message || 'Chat failed' });
+		}
+	});
+
 	router.post('/arenas', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		const access = assertCanCreateArena(dataDir, request);
 		const body = request.body || {};
 		const name = String(body.name || '').trim();
 		const format = String(body.format || '');
@@ -2085,8 +3619,18 @@ function createRouter(options) {
 		});
 		t.id = t.id || takeId(store);
 		t.slug = slug;
-		t.treasury = makeTreasury(t.slug);
-		attachHostIdentity(request, t);
+		if (t.acceptDoge === false) {
+			t.treasury = sanitizeDogeAddress(body.treasury || body.dogeAddress || t.treasury, { soft: true }) || '';
+			if (!t.xHandle && !t.acceptUsdcSol) {
+				throw Object.assign(new Error('Add an XMoney @handle, turn on USDC on Solana, or turn DOGE back on.'), { status: 400 });
+			}
+		} else {
+			t.treasury = makeTreasury(body.treasury || body.dogeAddress || t.treasury);
+		}
+		if (t.acceptUsdcSol) {
+			t.solanaTreasury = sanitizeSolanaAddress(body.solanaTreasury || t.solanaTreasury, { soft: true }) || solanaPayTo();
+		}
+		stampCreator(request, t, access.role);
 		store.tournaments.push(t);
 		return t;
 	}));
@@ -2098,7 +3642,8 @@ function createRouter(options) {
 		if (t.registrationMode === 'list') {
 			throw Object.assign(new Error('This arena uses a host list. Ask the organizer to add you.'), { status: 400 });
 		}
-		if (t.startAt && !t.startTentative && Date.parse(t.startAt) && Date.now() > Date.parse(t.startAt) + 86400000) {
+		const startMs = eventPhase.parseStartMs(t);
+		if (t.startAt && !t.startTentative && Number.isFinite(startMs) && Date.now() > startMs + 86400000) {
 			throw Object.assign(new Error('Registration window has closed'), { status: 400 });
 		}
 		const session = authDex.getTourneySession(request.signedCookies);
@@ -2134,15 +3679,63 @@ function createRouter(options) {
 			}
 		}
 		const fromWallet = String((request.body && (request.body.fromWallet || request.body.wallet)) || '').trim();
-		const usd = entryFeeUsd(t);
-		if (usd > 0 && (fromWallet.length < 8 || fromWallet.length > 64)) {
-			throw Object.assign(new Error('Enter the DOGE wallet address you sent from'), { status: 400 });
+		const xPayerHandle = sanitizeXHandle(request.body && request.body.xPayerHandle);
+		const usdBase = entryFeeUsd(t);
+		let usd = usdBase;
+		if (t.feeMode === 'charity' && usdBase > 0) {
+			const donate = Number(request.body && (request.body.donateUsd || request.body.amountUsd));
+			if (Number.isFinite(donate) && donate >= usdBase) usd = Math.round(donate * 100) / 100;
 		}
-		const requestedAsset = String((request.body && request.body.payAsset) || 'DOGE').trim().toUpperCase() || 'DOGE';
-		if (!PAY_ASSETS.includes(requestedAsset)) {
-			throw Object.assign(new Error('Registration is DOGE only. Swap to DOGE on K9SWAP, then send the quoted amount.'), { status: 400 });
+		const hostX = xHandleOf(t);
+		const dogeOn = t.acceptDoge !== false;
+		const usdcOn = Boolean(t.acceptUsdcSol) && Boolean(usdcSolPayToFor(t));
+		const requestedAsset = String((request.body && request.body.payAsset) || '').trim().toUpperCase();
+		let payAsset = 'DOGE';
+		if (usd > 0 && requestedAsset === 'XMONEY') {
+			if (!hostX) throw Object.assign(new Error('This arena is not taking XMoney.'), { status: 400 });
+			payAsset = 'XMONEY';
+		} else if (usd > 0 && (requestedAsset === 'USDC_SOL' || requestedAsset === 'USDC')) {
+			if (!usdcOn) throw Object.assign(new Error('This arena is not taking USDC on Solana.'), { status: 400 });
+			payAsset = 'USDC_SOL';
+		} else if (usd > 0 && !dogeOn) {
+			if (usdcOn) payAsset = 'USDC_SOL';
+			else if (hostX) payAsset = 'XMONEY';
+			else throw Object.assign(new Error('This arena has no payment rail set.'), { status: 400 });
 		}
-		const payAsset = 'DOGE';
+		if (payAsset === 'XMONEY' && !xPayerHandle) {
+			throw Object.assign(new Error('Enter the X @handle you will send from.'), { status: 400 });
+		}
+		const solFrom = payAsset === 'USDC_SOL' ? sanitizeSolanaAddress(fromWallet, { soft: true }) : '';
+		if (payAsset === 'USDC_SOL') {
+			if (!solFrom) {
+				throw Object.assign(new Error('Enter the Solana wallet you will send USDC from.'), { status: 400 });
+			}
+			if (solFrom === solanaTreasuryOf(t)) {
+				throw Object.assign(new Error('Enter the wallet you send FROM, not the tournament pay-to address'), { status: 400 });
+			}
+			const takenSol = entries.find((e) => !e.noShow && e.payAsset === 'USDC_SOL' && String(e.fromWallet || '') === solFrom);
+			if (takenSol) {
+				throw Object.assign(new Error('That sending wallet is already registered on this arena'), { status: 400 });
+			}
+		}
+		if (usd > 0 && payAsset === 'DOGE' && fromWallet) {
+			if (/^D/i.test(fromWallet) && !dogePayWatch.looksLikeDogeAddress(fromWallet)) {
+				throw Object.assign(new Error('Enter a valid DOGE address (starts with D).'), { status: 400 });
+			}
+			if (fromWallet.length < 8) {
+				throw Object.assign(new Error('Sending address looks too short'), { status: 400 });
+			}
+			if (fromWallet.length > 64) {
+				throw Object.assign(new Error('Sending address looks too long'), { status: 400 });
+			}
+			if (dogePayWatch.addrKey(fromWallet) === dogePayWatch.addrKey(treasuryAddress(t))) {
+				throw Object.assign(new Error('Enter the wallet you send FROM, not the tournament pay-to address'), { status: 400 });
+			}
+			const taken = entries.find((e) => !e.noShow && dogePayWatch.addrKey(e.fromWallet) === dogePayWatch.addrKey(fromWallet));
+			if (taken) {
+				throw Object.assign(new Error('That sending wallet is already registered on this arena'), { status: 400 });
+			}
+		}
 		if (t.capPlayers !== false && entries.filter((e) => !isWhitelistEntry(e)).length >= t.maxPlayers) {
 			throw Object.assign(new Error('This arena is full'), { status: 400 });
 		}
@@ -2150,12 +3743,14 @@ function createRouter(options) {
 			throw Object.assign(new Error('That handle is already in'), { status: 400 });
 		}
 		let quote = { usd: 0, DOGE: 0, dogeUsd: 0, quotedAt: new Date().toISOString() };
-		if (usd > 0) {
+		if (usd > 0 && payAsset === 'DOGE') {
 			const prices = await fetchUsdPrices();
 			quote = quoteAmounts(usd, prices);
+		} else if (usd > 0) {
+			quote = { usd, DOGE: 0, dogeUsd: 0, quotedAt: new Date().toISOString() };
 		}
-		const amountCrypto = quote.DOGE;
-		const usdPerCoin = quote.dogeUsd;
+		const amountCrypto = payAsset === 'DOGE' ? quote.DOGE : (payAsset === 'USDC_SOL' ? usd : 0);
+		const usdPerCoin = payAsset === 'DOGE' ? quote.dogeUsd : (payAsset === 'USDC_SOL' ? 1 : 0);
 		const autoPay = usd === 0;
 		const entry = normalizeEntry({
 			id: takeId(store),
@@ -2166,31 +3761,189 @@ function createRouter(options) {
 			team,
 			ddlClass: readDdlClass(request.body),
 			country,
-			fromWallet,
-			wallet: fromWallet,
+			fromWallet: payAsset === 'DOGE' ? fromWallet : (payAsset === 'USDC_SOL' ? solFrom : ''),
+			wallet: payAsset === 'DOGE' ? fromWallet : (payAsset === 'USDC_SOL' ? solFrom : ''),
+			xPayerHandle,
 			payAsset,
-			payTo: PAY_TO[payAsset],
+			payTo: payAsset === 'XMONEY' ? `@${hostX}` : (payAsset === 'USDC_SOL' ? solanaTreasuryOf(t) : treasuryAddress(t)),
 			seed: null,
 			paid: autoPay,
 			status: autoPay ? 'confirmed' : 'pending',
 			checkedIn: false,
 			invoiceCode: makeInvoiceCode(),
-			amountUsd: quote.usd,
+			amountUsd: usd,
 			amountCrypto,
 			usdPerCoin,
 			quotedAt: quote.quotedAt,
-			amountDoge: amountCrypto,
+			amountDoge: payAsset === 'DOGE' ? amountCrypto : 0,
+			payWatchStatus: autoPay ? 'confirmed' : (isHostConfirmAsset(payAsset) ? '' : 'watching'),
 			paidAt: autoPay ? new Date().toISOString() : null,
 			createdAt: new Date().toISOString(),
 		});
+		if (t.requireRegisteredDeck || String((request.body && (request.body.deckText || request.body.listText)) || '').trim()) {
+			await attachRegisteredDeck(entry, request.body, t, { required: Boolean(t.requireRegisteredDeck) });
+		}
 		store.entries.push(entry);
+		const claimedTxid = String((request.body && request.body.txid) || '').trim();
+		if (usd > 0 && payAsset === 'DOGE' && (dogePayWatch.looksLikeDogeAddress(fromWallet) || dogePayWatch.looksLikeTxid(claimedTxid))) {
+			try {
+				await scanPayments(store, { tournament: t, entry, txid: claimedTxid });
+			} catch (err) {
+				console.error('[doge-watch] enter', err && err.message ? err.message : err);
+			}
+		}
 		return entry;
 	}));
 
-	router.post('/arenas/:slug/pay', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+	router.post('/arenas/:slug/check-payment', withStore(async (store, request) => {
 		const t = store.tournaments.find((row) => row.slug === request.params.slug);
 		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		if (!(entryFeeUsd(t) > 0)) {
+			throw Object.assign(new Error('This arena has no entry fee'), { status: 400 });
+		}
+		assertWatchRate(request, t);
+		const host = canManageArena(dataDir, request, t);
+		const session = authDex.getTourneySession(request.signedCookies);
+		const invoiceCode = invoiceCodeFrom(request);
+		let entry = findPayEntry(store, t, request);
+		if (!entry && !host) {
+			throw Object.assign(new Error('Register first, then we can watch for your payment'), { status: 400 });
+		}
+		if (entry && !host && !sessionMatchesEntry(session, entry) && !(invoiceCode && invoiceCode === entry.invoiceCode)) {
+			throw Object.assign(new Error('You can only check your own payment'), { status: 403 });
+		}
+		const body = request.body || {};
+		const nextWallet = String(body.fromWallet || body.wallet || '').trim();
+		const nextTxid = String(body.txid || '').trim();
+		if (entry && !entry.paid && entry.payAsset === 'XMONEY') {
+			const nextX = sanitizeXHandle(body.xPayerHandle) || entry.xPayerHandle;
+			if (!nextX) throw Object.assign(new Error('Enter the X @handle you sent from.'), { status: 400 });
+			entry.xPayerHandle = nextX;
+			entry.payWatchStatus = 'seen';
+			entry.payNote = String(body.payNote || entry.payNote || 'Sent via XMoney').trim().slice(0, 160);
+			return {
+				ok: true,
+				paid: false,
+				payWatchStatus: 'seen',
+				xPayerHandle: nextX,
+				...detail(store, t, host, request),
+			};
+		}
+		if (entry && !entry.paid && entry.payAsset === 'USDC_SOL') {
+			const nextSol = sanitizeSolanaAddress(body.fromWallet || body.wallet || entry.fromWallet, { soft: true });
+			if (!nextSol) throw Object.assign(new Error('Enter the Solana wallet you sent USDC from.'), { status: 400 });
+			if (nextSol === solanaTreasuryOf(t)) {
+				throw Object.assign(new Error('Enter the wallet you send FROM, not the tournament pay-to address'), { status: 400 });
+			}
+			const takenSol = store.entries.find((row) => (
+				row.tournamentId === t.id
+				&& row.id !== entry.id
+				&& !row.noShow
+				&& row.payAsset === 'USDC_SOL'
+				&& String(row.fromWallet || '') === nextSol
+			));
+			if (takenSol) {
+				throw Object.assign(new Error('That sending wallet is already registered on this arena'), { status: 400 });
+			}
+			entry.fromWallet = nextSol;
+			entry.wallet = nextSol;
+			if (looksLikeSolanaSig(nextTxid)) entry.payTxid = String(nextTxid).trim();
+			entry.payWatchStatus = 'seen';
+			entry.payNote = String(body.payNote || entry.payNote || 'Sent USDC on Solana').trim().slice(0, 160);
+			return {
+				ok: true,
+				paid: false,
+				payWatchStatus: 'seen',
+				fromWallet: nextSol,
+				payTxid: entry.payTxid || '',
+				...detail(store, t, host, request),
+			};
+		}
+		if (entry && !entry.paid) {
+			if (nextWallet) {
+				if (/^D/i.test(nextWallet) && !dogePayWatch.looksLikeDogeAddress(nextWallet)) {
+					throw Object.assign(new Error('Enter a valid DOGE address (starts with D).'), { status: 400 });
+				}
+				if (dogePayWatch.addrKey(nextWallet) === dogePayWatch.addrKey(treasuryAddress(t))) {
+					throw Object.assign(new Error('Enter the wallet you send FROM, not the tournament pay-to address'), { status: 400 });
+				}
+				const taken = store.entries.find((row) => (
+					row.tournamentId === t.id
+					&& row.id !== entry.id
+					&& !row.noShow
+					&& dogePayWatch.addrKey(row.fromWallet) === dogePayWatch.addrKey(nextWallet)
+				));
+				if (taken) {
+					throw Object.assign(new Error('That sending wallet is already registered on this arena'), { status: 400 });
+				}
+				entry.fromWallet = nextWallet;
+				entry.wallet = nextWallet;
+			}
+			if (nextTxid) {
+				if (!dogePayWatch.looksLikeTxid(nextTxid)) {
+					throw Object.assign(new Error('Transaction ID should be 64 hex characters'), { status: 400 });
+				}
+				entry.payTxid = nextTxid.toLowerCase();
+			}
+			if (!entry.payWatchStatus || entry.payWatchStatus === 'mismatch') entry.payWatchStatus = 'watching';
+		}
+		let watch;
+		try {
+			watch = await scanPayments(store, {
+				tournament: t,
+				entry: host && !entry ? null : entry,
+				txid: nextTxid || (entry && entry.payTxid),
+			});
+		} catch (err) {
+			console.error('[doge-watch] check', err && err.message ? err.message : err);
+			watch = { confirmed: 0, seen: 0, error: err.message || 'Could not read the Dogecoin chain right now' };
+		}
+		const live = entry && store.entries.find((row) => row.id === entry.id);
+		return {
+			ok: true,
+			paid: Boolean(live && live.paid),
+			payWatchStatus: live ? live.payWatchStatus : '',
+			payTxid: live ? live.payTxid : '',
+			payConfirmations: live ? live.payConfirmations : 0,
+			fromWallet: live ? live.fromWallet : '',
+			mismatchFrom: watch.mismatchFrom || '',
+			watchError: watch.error || '',
+			confirmed: watch.confirmed || 0,
+			seen: watch.seen || 0,
+			...detail(store, t, host, request),
+		};
+	}));
+
+	router.post('/arenas/:slug/register-deck', withStore(async (store, request) => {
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const host = canManageArena(dataDir, request, t);
+		const session = authDex.getTourneySession(request.signedCookies);
+		const entries = store.entries.filter((e) => e.tournamentId === t.id);
+		let entry = null;
+		const askedId = Number(request.body && request.body.entryId);
+		if (host && Number.isFinite(askedId) && askedId > 0) {
+			entry = entries.find((e) => e.id === askedId) || null;
+		}
+		if (!entry && session) {
+			entry = entries.find((e) => sessionMatchesEntry(session, e)) || null;
+		}
+		if (!entry) {
+			throw Object.assign(new Error(host ? 'Pick a player to lock a deck for' : 'Register for this arena first'), { status: 400 });
+		}
+		if (!host && !sessionMatchesEntry(session, entry)) {
+			throw Object.assign(new Error('You can only lock a deck on your own entry'), { status: 403 });
+		}
+		assertDeckMutable(t, entry, host);
+		await attachRegisteredDeck(entry, request.body, t, { required: true });
+		if (request.body && request.body.ddlClass) {
+			entry.ddlClass = readDdlClass(request.body);
+		}
+		return host ? detail(store, t, true) : entry;
+	}));
+
+	router.post('/arenas/:slug/pay', withStore((store, request) => {
+		const t = hostedArena(store, request);
 		const code = String((request.body && request.body.invoiceCode) || '').trim();
 		const entry = store.entries.find((e) => e.tournamentId === t.id && e.invoiceCode === code);
 		if (!entry) throw Object.assign(new Error('Invoice not found'), { status: 404 });
@@ -2201,10 +3954,8 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/confirm', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
-		if (t.status !== 'registration') throw Object.assign(new Error('Registration is closed'), { status: 400 });
+		const t = hostedArena(store, request);
+		if (t.status === 'completed') throw Object.assign(new Error('This arena is finished'), { status: 400 });
 		const codes = new Set((Array.isArray(request.body && request.body.invoiceCodes) ? request.body.invoiceCodes : [])
 			.map((c) => String(c || '').trim())
 			.filter(Boolean));
@@ -2214,8 +3965,13 @@ function createRouter(options) {
 		const confirmAll = Boolean(request.body && request.body.confirmAll);
 		/** `paid: false` reverses a mistaken confirm and drops the entry back to pending. */
 		const wantPaid = !(request.body && request.body.paid === false);
+		const note = String((request.body && (request.body.note || request.body.payNote || request.body.txid)) || '').trim().slice(0, 160);
+		const txid = String((request.body && request.body.txid) || '').trim();
 		if (!confirmAll && !codes.size && !ids.size) {
 			throw Object.assign(new Error('Select at least one participant to confirm'), { status: 400 });
+		}
+		if (!wantPaid && t.status !== 'registration') {
+			throw Object.assign(new Error('Unpaid is only available while registration is open'), { status: 400 });
 		}
 		let confirmed = 0;
 		for (const entry of store.entries.filter((e) => e.tournamentId === t.id)) {
@@ -2224,44 +3980,51 @@ function createRouter(options) {
 			entry.paid = wantPaid;
 			entry.status = wantPaid ? 'confirmed' : 'pending';
 			entry.paidAt = wantPaid ? new Date().toISOString() : null;
-			if (!wantPaid) entry.checkedIn = false;
+			if (wantPaid) {
+				entry.payWatchStatus = 'confirmed';
+				if (dogePayWatch.looksLikeTxid(txid)) entry.payTxid = txid.toLowerCase();
+				else if (entry.payAsset === 'USDC_SOL' && looksLikeSolanaSig(txid)) entry.payTxid = txid.trim();
+				if (note) entry.payNote = note;
+				entry.payVerifiedAt = entry.paidAt;
+			} else {
+				entry.checkedIn = false;
+				entry.payNote = '';
+			}
 			confirmed += 1;
 		}
-		return { ok: true, confirmed, ...detail(store, t, true) };
+		return { ok: true, confirmed, ...detail(store, t, true, request) };
 	}));
 
 	/** Host-added player: covers list arenas, walk-ins, live late entries, and whitelist substitutes. */
-	router.post('/arenas/:slug/add-entry', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+	router.post('/arenas/:slug/add-entry', withStore(async (store, request) => {
+		const t = hostedArena(store, request);
 		const whitelist = Boolean(request.body && request.body.whitelist);
 		if (t.status === 'completed') {
 			throw Object.assign(new Error('This arena is finished — no new entries'), { status: 400 });
 		}
+		let entry;
 		if (t.status !== 'registration') {
 			if (whitelist) {
 				if (!(wantsWhitelist(t) && t.status === 'in_progress')) {
 					throw Object.assign(new Error('The bracket is locked — no new entries'), { status: 400 });
 				}
-				addHostEntry(store, t, request, { whitelist });
-				return detail(store, t, true);
+				entry = addHostEntry(store, t, request, { whitelist });
+			} else {
+				if (t.status !== 'in_progress') {
+					throw Object.assign(new Error('The bracket is locked — no new entries'), { status: 400 });
+				}
+				entry = addLateHostEntry(store, t, request);
 			}
-			if (t.status !== 'in_progress') {
-				throw Object.assign(new Error('The bracket is locked — no new entries'), { status: 400 });
-			}
-			addLateHostEntry(store, t, request);
-			return detail(store, t, true);
+		} else {
+			entry = addHostEntry(store, t, request, { whitelist });
 		}
-		addHostEntry(store, t, request, { whitelist });
+		await attachRegisteredDeck(entry, request.body, t, { required: false });
 		return detail(store, t, true);
 	}));
 
 	/** Put a whitelist substitute into a first-round slot: no-show, empty, or bye. */
 	router.post('/arenas/:slug/sub-round1', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		if (!wantsWhitelist(t)) {
 			throw Object.assign(new Error('Turn on whitelist spots to substitute a no-show'), { status: 400 });
 		}
@@ -2302,9 +4065,7 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/remove-entry', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const id = Number(request.body && request.body.entryId);
 		const entry = store.entries.find((e) => e.tournamentId === t.id && e.id === id);
 		if (!entry) throw Object.assign(new Error('Entry not found'), { status: 404 });
@@ -2321,9 +4082,7 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/generate', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		if (t.status !== 'registration') throw Object.assign(new Error('Bracket already generated'), { status: 400 });
 		const body = request.body || {};
 		const requestedIds = Array.isArray(body.entryIds)
@@ -2354,6 +4113,7 @@ function createRouter(options) {
 				? 'Need at least 2 checked-in participants to lock the bracket'
 				: 'Need at least 2 confirmed participants to lock the bracket'), { status: 400 });
 		}
+		classQuota.assertFieldQuota(paid, t.deckClassQuota);
 		t.bestOf = normalizeBestOf(body.bestOf, t.bestOf);
 		if (body.roundBestOf) t.roundBestOf = sanitizeRoundBestOf(body.roundBestOf);
 		if (Object.prototype.hasOwnProperty.call(body, 'finalsBestOf')) {
@@ -2364,20 +4124,71 @@ function createRouter(options) {
 		}
 		if (body.potFundMode != null) t.potFundMode = body.potFundMode === 'percent' ? 'percent' : 'usd';
 		if (body.hostPotUsd != null) t.hostPotUsd = sanitizeHostPotUsd(body.hostPotUsd, t.hostPotUsd);
+		if (body.addedPotUsd != null) t.addedPotUsd = sanitizeHostPotUsd(body.addedPotUsd, t.addedPotUsd);
 		normalizeTournament(t);
-		if (body.shuffle) paid = shuffleList(paid);
-		else paid = [...paid].sort((a, b) => (a.seed || a.id) - (b.seed || b.id));
+		if (body.reigningChamp != null) t.reigningChamp = Boolean(body.reigningChamp);
+		if (body.shuffle || body.seedBy === 'random') paid = shuffleList(paid);
+		else paid = seedFieldByRecords(paid);
 		paid.forEach((e, i) => { e.seed = i + 1; });
+		if (t.reigningChamp) {
+			const asked = Number(body.reigningChampEntryId != null ? body.reigningChampEntryId : t.reigningChampEntryId);
+			const champ = paid.find((e) => e.id === asked) || paid.find((e) => String(e.handle || '').toLowerCase() === String(body.reigningChampHandle || '').trim().toLowerCase());
+			if (!champ) {
+				throw Object.assign(new Error('Pick the Reigning Champ from the confirmed players'), { status: 400 });
+			}
+			t.reigningChamp = true;
+			t.reigningChampEntryId = champ.id;
+		} else {
+			t.reigningChampEntryId = null;
+		}
 		store.matches = store.matches.filter((m) => m.tournamentId !== t.id);
-		addMatches(store, t, paid);
+		try {
+			addMatches(store, t, paid);
+		} catch (err) {
+			throw Object.assign(
+				new Error(err && err.message ? err.message : 'Could not build the bracket'),
+				{ status: err && err.status ? err.status : 500 },
+			);
+		}
 		t.status = 'in_progress';
+		collapseVacantMatches(store, t);
+		maybeFinishOrAdvance(store, t);
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/reigning-champ', withStore((store, request) => {
+		const t = hostedArena(store, request);
+		if (t.eventKind === 'duel') {
+			throw Object.assign(new Error('Duels cannot use Reigning Champ mode'), { status: 400 });
+		}
+		const body = request.body || {};
+		if (body.reigningChamp === false || body.clear) {
+			t.reigningChamp = false;
+			t.reigningChampEntryId = null;
+			removeTitleMatch(store, t);
+			if (t.status !== 'registration') {
+				collapseVacantMatches(store, t);
+				maybeFinishOrAdvance(store, t);
+			}
+			return detail(store, t, true);
+		}
+		const asked = Number(body.entryId != null ? body.entryId : body.reigningChampEntryId);
+		ensureReigningChamp(store, t, asked);
+		return detail(store, t, true);
+	}));
+
+	router.post('/arenas/:slug/repair-bracket', withStore((store, request) => {
+		const t = hostedArena(store, request);
+		if (t.status === 'registration') {
+			throw Object.assign(new Error('Lock the bracket first, then fix it.'), { status: 400 });
+		}
+		const force = Boolean(request.body && (request.body.force || request.body.close));
+		repairBracket(store, t, { force });
 		return detail(store, t, true);
 	}));
 
 	router.post('/arenas/:slug/reshuffle', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const blocked = reshuffleBlockReason(store, t);
 		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
 		const field = store.entries.filter((e) => (
@@ -2386,18 +4197,18 @@ function createRouter(options) {
 		if (field.length < 2) {
 			throw Object.assign(new Error('Need at least 2 confirmed players to shuffle'), { status: 400 });
 		}
-		const shuffled = shuffleList(field);
-		shuffled.forEach((e, i) => { e.seed = i + 1; });
+		const seedBy = String((request.body && request.body.seedBy) || (request.body && request.body.shuffle === false ? 'records' : 'random'));
+		const ordered = seedBy === 'records' ? seedFieldByRecords(field) : shuffleList(field);
+		ordered.forEach((e, i) => { e.seed = i + 1; });
 		store.matches = store.matches.filter((m) => m.tournamentId !== t.id);
 		store.votes = (store.votes || []).filter((v) => v.tournamentId !== t.id);
-		addMatches(store, t, shuffled);
+		addMatches(store, t, ordered);
+		collapseVacantMatches(store, t);
 		return detail(store, t, true);
 	}));
 
 	router.post('/arenas/:slug/swap-seeds', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const blocked = swapBlockReason(t);
 		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
 		const idA = Number(request.body && request.body.entryIdA);
@@ -2418,9 +4229,7 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/pair-players', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const blocked = swapBlockReason(t);
 		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
 		const idA = Number(request.body && request.body.entryIdA);
@@ -2446,9 +4255,7 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/they-play', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const blocked = swapBlockReason(t);
 		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
 		const idA = Number(request.body && request.body.entryIdA);
@@ -2474,9 +4281,7 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/swap-slots', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const blocked = swapBlockReason(t);
 		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
 		const body = request.body || {};
@@ -2487,9 +4292,7 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/place-entry', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const blocked = swapBlockReason(t);
 		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
 		const body = request.body || {};
@@ -2505,6 +4308,8 @@ function createRouter(options) {
 			refreshEditedMatch(store, t, match);
 			clearMatchVotes(store, t, [match.id]);
 			markBracketOpen(t);
+			collapseVacantMatches(store, t);
+			maybeFinishOrAdvance(store, t);
 			return detail(store, t, true);
 		}
 		const entryId = Number(rawId);
@@ -2518,22 +4323,20 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/reset-match', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const blocked = swapBlockReason(t);
 		if (blocked) throw Object.assign(new Error(blocked), { status: 400 });
 		const matchId = Number(request.body && request.body.matchId);
 		const match = store.matches.find((m) => m.tournamentId === t.id && m.id === matchId);
 		if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
 		resetMatchTree(store, t, match);
+		collapseVacantMatches(store, t);
+		maybeFinishOrAdvance(store, t);
 		return detail(store, t, true);
 	}));
 
 	router.post('/arenas/:slug/round-rules', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const body = request.body || {};
 		if (body.bestOf != null) t.bestOf = normalizeBestOf(body.bestOf, t.bestOf);
 		if (body.roundBestOf) t.roundBestOf = { ...t.roundBestOf, ...sanitizeRoundBestOf(body.roundBestOf) };
@@ -2548,9 +4351,7 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/games', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const matchId = Number(request.body && request.body.matchId);
 		const match = store.matches.find((m) => m.tournamentId === t.id && m.id === matchId);
 		if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
@@ -2559,30 +4360,62 @@ function createRouter(options) {
 	}));
 
 	router.post('/arenas/:slug/report', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
 		const t = store.tournaments.find((row) => row.slug === request.params.slug);
 		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const asHost = canManageArena(dataDir, request, t);
+		const session = sessionFrom(request);
 		const matchId = Number(request.body && request.body.matchId);
 		const match = store.matches.find((m) => m.tournamentId === t.id && m.id === matchId);
 		if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
 		if (request.body && request.body.bestOf && match.status !== 'complete' && match.status !== 'bye') {
 			match.bestOf = normalizeBestOf(request.body.bestOf, match.bestOf);
 		}
-		reportMatch(
-			store,
-			match,
-			Number(request.body && request.body.score1),
-			Number(request.body && request.body.score2),
-			request.body && request.body.games,
-		);
-		maybeFinishOrAdvance(store, t);
-		return detail(store, t, true);
+		const games = request.body && request.body.games;
+		let score1 = Number(request.body && request.body.score1);
+		let score2 = Number(request.body && request.body.score2);
+		if (Array.isArray(games) && games.length && (!Number.isFinite(score1) || !Number.isFinite(score2))) {
+			const tally = tallyGames(games.map((game) => ({ winnerSlot: Number(game && game.winnerSlot) === 2 ? 2 : 1 })));
+			score1 = tally.s1;
+			score2 = tally.s2;
+		}
+		if (asHost) {
+			match.reportProposal = null;
+			reportMatch(store, match, score1, score2, games);
+			if (request.body && request.body.reason) match.reportReason = String(request.body.reason).trim().slice(0, 160);
+			maybeFinishOrAdvance(store, t);
+			return detail(store, t, true, request);
+		}
+		if (!session) throw Object.assign(new Error('Sign in with Discord to report this match'), { status: 401 });
+		const seated = store.entries.find((e) => (
+			e.tournamentId === t.id
+			&& sessionOwnsSeat(session, e)
+			&& (Number(e.id) === Number(match.entry1Id) || Number(e.id) === Number(match.entry2Id))
+		));
+		if (!seated) throw Object.assign(new Error('Only the seated players or the host can report this match'), { status: 403 });
+		const proposal = match.reportProposal;
+		const sameScore = proposal
+			&& Number(proposal.score1) === score1
+			&& Number(proposal.score2) === score2;
+		if (proposal && Number(proposal.byEntryId) !== Number(seated.id) && sameScore) {
+			match.reportProposal = null;
+			reportMatch(store, match, score1, score2, games || proposal.games);
+			maybeFinishOrAdvance(store, t);
+			return detail(store, t, false, request);
+		}
+		match.reportProposal = {
+			byEntryId: seated.id,
+			score1,
+			score2,
+			games: Array.isArray(games) ? games : [],
+			at: new Date().toISOString(),
+		};
+		return detail(store, t, false, request);
 	}));
 
 	router.post('/arenas/:slug/table-lock', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
 		const t = store.tournaments.find((row) => row.slug === request.params.slug);
 		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const asHost = canManageArena(dataDir, request, t);
 		const matchId = Number(request.body && request.body.matchId);
 		const match = store.matches.find((m) => m.tournamentId === t.id && m.id === matchId);
 		if (!match) throw Object.assign(new Error('Match not found'), { status: 404 });
@@ -2592,54 +4425,143 @@ function createRouter(options) {
 		if (body.bestOf && match.status !== 'complete' && match.status !== 'bye') {
 			match.bestOf = normalizeBestOf(body.bestOf, match.bestOf);
 		}
+		if (!asHost) {
+			request.body = { ...body, score1: s1, score2: s2 };
+			const session = sessionFrom(request);
+			const seated = store.entries.find((e) => (
+				e.tournamentId === t.id
+				&& sessionOwnsSeat(session, e)
+				&& (Number(e.id) === Number(match.entry1Id) || Number(e.id) === Number(match.entry2Id))
+			));
+			if (!seated) throw Object.assign(new Error('Only the seated players or the host can lock this table'), { status: 403 });
+			if (!(Number.isFinite(s1) && Number.isFinite(s2))) {
+				throw Object.assign(new Error('Enter both game scores'), { status: 400 });
+			}
+			const proposal = match.reportProposal;
+			const sameScore = proposal && Number(proposal.score1) === s1 && Number(proposal.score2) === s2;
+			if (proposal && Number(proposal.byEntryId) !== Number(seated.id) && sameScore) {
+				match.reportProposal = null;
+				reportMatch(store, match, s1, s2, body.games || proposal.games);
+				maybeFinishOrAdvance(store, t);
+				return detail(store, t, false, request);
+			}
+			match.reportProposal = {
+				byEntryId: seated.id,
+				score1: s1,
+				score2: s2,
+				games: Array.isArray(body.games) ? body.games : [],
+				at: new Date().toISOString(),
+			};
+			return detail(store, t, false, request);
+		}
 		if (Number.isFinite(s1) && Number.isFinite(s2)) {
+			match.reportProposal = null;
 			reportMatch(store, match, s1, s2, body.games);
 			maybeFinishOrAdvance(store, t);
-			return detail(store, t, isHostRequest(dataDir, request));
+			return detail(store, t, true, request);
 		}
 		const winnerId = Number(body.winnerId);
 		if (winnerId !== match.entry1Id && winnerId !== match.entry2Id) {
 			throw Object.assign(new Error('Pick a player in this match'), { status: 400 });
 		}
-		if (request.body && request.body.bestOf && match.status !== 'complete' && match.status !== 'bye') {
-			match.bestOf = normalizeBestOf(request.body.bestOf, match.bestOf);
-		}
 		const need = winsNeeded(match.bestOf);
 		const winnerSlot = winnerId === match.entry1Id ? 1 : 2;
 		const games = Array.from({ length: need }, () => ({ winnerSlot }));
+		match.reportProposal = null;
 		reportMatch(store, match, winnerSlot === 1 ? need : 0, winnerSlot === 2 ? need : 0, games);
 		maybeFinishOrAdvance(store, t);
-		return detail(store, t, isHostRequest(dataDir, request));
+		return detail(store, t, true, request);
 	}));
 
 	router.post('/arenas/:slug/settings', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
 		const t = store.tournaments.find((row) => row.slug === request.params.slug);
 		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
-		const next = readSettings(request.body, t);
+		if (!canManageArena(dataDir, request, t)) {
+			if (!canEditStream(dataDir, request, t)) {
+				throw Object.assign(new Error('You can only change tournaments you created.'), { status: 403 });
+			}
+			if (request.body && request.body.streamUrl != null) {
+				t.streamUrl = sanitizeKickStream(request.body.streamUrl);
+			}
+			return detail(store, t, false, request);
+		}
+		const next = keepCreator(t, readSettings(request.body, t));
 		Object.assign(t, next);
 		t.slug = request.params.slug;
 		t.id = next.id;
-		attachHostIdentity(request, t);
-		return detail(store, t, true);
+		return detail(store, t, true, request);
+	}));
+
+	router.post('/arenas/:slug/staff', withStore((store, request) => {
+		const t = hostedArena(store, request);
+		const access = assertCanManageArena(dataDir, request, t);
+		if (access.role === 'judge') {
+			throw Object.assign(new Error('Only the owner can assign judge and stream roles'), { status: 403 });
+		}
+		const body = request.body || {};
+		const role = body.role === 'stream' ? 'stream' : 'judge';
+		const key = role === 'stream' ? 'streamUserIds' : 'judgeUserIds';
+		const ids = eventPhase.sanitizeUserIdList(t[key]);
+		const db = records.getDb();
+		let userId = Number(body.userId);
+		if (!(userId > 0) && db && typeof authDex.findUserForHostGrant === 'function') {
+			const row = authDex.findUserForHostGrant(db, body);
+			userId = row ? Number(row.user_id) : 0;
+		}
+		if (!(userId > 0)) throw Object.assign(new Error('Pick a Discord-linked account'), { status: 404 });
+		if (body.remove) t[key] = ids.filter((id) => id !== userId);
+		else if (!ids.includes(userId)) t[key] = ids.concat([userId]);
+		else t[key] = ids;
+		return detail(store, t, true, request);
+	}));
+
+	router.post('/arenas/:slug/assign-host', withStore((store, request) => {
+		assertAdminRequest(dataDir, request);
+		const t = store.tournaments.find((row) => row.slug === request.params.slug);
+		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const db = records.getDb();
+		if (!db || typeof authDex.findUserForHostGrant !== 'function') {
+			throw Object.assign(new Error('Account database unavailable.'), { status: 503 });
+		}
+		const row = authDex.findUserForHostGrant(db, request.body || {});
+		if (!row) throw Object.assign(new Error('Pick a Discord-linked account'), { status: 404 });
+		applyArenaHost(t, row);
+		if (typeof authDex.setTourneyHost === 'function') {
+			try { authDex.setTourneyHost(db, row.user_id, true, null); } catch (_err) { /* ownership still moves */ }
+		}
+		return detail(store, t, true, request);
 	}));
 
 	router.post('/arenas/:slug/check-in', withStore((store, request) => {
 		const t = store.tournaments.find((row) => row.slug === request.params.slug);
 		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
 		const body = request.body || {};
-		if (body.hostPassword) assertHostPassword(dataDir, body.hostPassword);
+		const asHost = canManageArena(dataDir, request, t);
+		const session = sessionFrom(request);
 		const ids = Array.isArray(body.entryIds) ? body.entryIds.map(Number) : [];
 		const handle = String(body.handle || '').trim().toLowerCase();
 		let n = 0;
 		for (const entry of store.entries.filter((e) => e.tournamentId === t.id)) {
 			const hit = ids.includes(entry.id) || (handle && entry.handle.toLowerCase() === handle);
 			if (!hit) continue;
-			entry.checkedIn = body.checkedIn !== false;
+			if (!asHost && !sessionMatchesEntry(session, entry)) {
+				throw Object.assign(new Error('You can only check yourself in'), { status: 403 });
+			}
+			if (asHost && body.noShow) {
+				entry.noShow = true;
+				entry.checkedIn = false;
+				entry.status = 'no_show';
+			} else {
+				entry.checkedIn = body.checkedIn !== false;
+				if (entry.checkedIn && entry.noShow) {
+					entry.noShow = false;
+					entry.status = entryStatus(entry);
+				}
+			}
 			n += 1;
 		}
 		if (!n) throw Object.assign(new Error('No matching participants to check in'), { status: 400 });
-		return detail(store, t, isHostRequest(dataDir, request));
+		return detail(store, t, asHost);
 	}));
 
 	router.post('/arenas/:slug/vote', withStore((store, request) => {
@@ -2660,7 +4582,7 @@ function createRouter(options) {
 		store.votes = store.votes || [];
 		store.votes = store.votes.filter((v) => !(v.tournamentId === t.id && v.matchId === matchId && v.voter.toLowerCase() === voter.toLowerCase()));
 		store.votes.push({ tournamentId: t.id, matchId, voter, winnerId });
-		return detail(store, t, isHostRequest(dataDir, request));
+		return detail(store, t, canManageArena(dataDir, request, t));
 	}));
 
 	router.post('/arenas/:slug/predict', withStore((store, request) => {
@@ -2676,22 +4598,26 @@ function createRouter(options) {
 		store.predictions = store.predictions || [];
 		store.predictions = store.predictions.filter((p) => !(p.tournamentId === t.id && p.voter.toLowerCase() === voter.toLowerCase()));
 		store.predictions.push({ tournamentId: t.id, voter, championId, note });
-		return detail(store, t, isHostRequest(dataDir, request));
+		return detail(store, t, canManageArena(dataDir, request, t));
 	}));
 
 	const removeArena = withStore((store, request) => {
-		assertAdminPassword(dataDir, request.body && (request.body.adminPassword || request.body.hostPassword));
+		assertAdminRequest(dataDir, request);
 		const slug = String((request.body && request.body.slug) || request.body.arena || '').trim();
 		const t = store.tournaments.find((row) => row.slug === slug);
 		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
 		removeTournament(store, t);
+		arenaChat.removeRoom(dataDir, t.slug);
 		return { ok: true, removed: slug };
 	});
 	const purgeDemos = withStore((store, request) => {
-		assertAdminPassword(dataDir, request.body && (request.body.adminPassword || request.body.hostPassword));
-		const before = store.tournaments.length;
+		assertAdminRequest(dataDir, request);
+		const before = new Set(store.tournaments.map((row) => row.slug));
 		stripDemoTournaments(store);
-		return { ok: true, removed: before - store.tournaments.length };
+		for (const slug of before) {
+			if (!store.tournaments.some((row) => row.slug === slug)) arenaChat.removeRoom(dataDir, slug);
+		}
+		return { ok: true, removed: before.size - store.tournaments.length };
 	});
 	router.post('/control/remove-arena', removeArena);
 	router.post('/remove-arena', removeArena);
@@ -2729,7 +4655,7 @@ function createRouter(options) {
 
 	router.get('/players/search', (request, response) => {
 		try {
-			assertHostPassword(dataDir, hostSecretFrom(request));
+			assertGrantedHostOrAdmin(dataDir, request);
 		} catch (err) {
 			response.status(err.status || 403).json({ error: err.message });
 			return;
@@ -2743,13 +4669,43 @@ function createRouter(options) {
 		response.json({ ok: true, players: records.searchDiscordPlayers(db, q) });
 	});
 
-	router.get('/records', (_request, response) => {
-		const db = records.getDb();
-		if (!db) {
-			response.json(emptyHall());
+	router.get('/records', async (_request, response) => {
+		let db = records.getDb();
+		if (!db && typeof authDex.openAuthDatabase === 'function') {
+			try {
+				db = await authDex.openAuthDatabase();
+				if (db && typeof records.ensureSchemaOnce === 'function') records.ensureSchemaOnce(db);
+				else if (db && typeof records.ensureSchema === 'function') records.ensureSchema(db);
+			} catch (err) {
+				console.error('[tourney] records open:', err && err.message ? err.message : err);
+			}
+		}
+		if (db) {
+			try {
+				if (typeof records.seedHallIfEmpty === 'function') records.seedHallIfEmpty(db);
+			} catch (err) {
+				console.error('[tourney] records seed:', err && err.message ? err.message : err);
+			}
+			setImmediate(() => {
+				loadLiveStore()
+					.then((store) => {
+						try { persistStore(store); } catch (_err) {}
+					})
+					.catch((err) => {
+						console.error('[tourney] records seal:', err && err.message ? err.message : err);
+					});
+			});
+			response.set('Cache-Control', 'no-store, private');
+			response.json({ ok: true, ...records.hallOfFame(db, 80) });
 			return;
 		}
-		response.json({ ok: true, ...records.hallOfFame(db, 80) });
+		const seeded = typeof records.hallFromSeed === 'function' ? records.hallFromSeed() : null;
+		if (seeded) {
+			response.set('Cache-Control', 'no-store, private');
+			response.json({ ok: true, ...seeded });
+			return;
+		}
+		response.json(emptyHall());
 	});
 
 	router.get('/records/awards', (_request, response) => {
@@ -2762,24 +4718,32 @@ function createRouter(options) {
 	});
 
 	router.post('/records/restore-arenas', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
+		assertAdminRequest(dataDir, request);
 		const db = records.getDb();
 		if (!db) {
 			throw Object.assign(new Error('Records database unavailable'), { status: 503 });
 		}
+		const fromArchive = persist.restoreMissingFromArchive(store, db, { includeIdle: true });
 		const recovered = restoreMissingArenasFromRecords(store, db);
 		repairKnownBracketHistory(store);
+		persist.persistLiveStore(db, store, {
+			skipTournament: (t) => isDemoTournament(store, t),
+		});
+		const sealed = records.backfillWithFns(db, store, isDemoTournament, podiumFor, standingsFor);
 		return {
 			ok: true,
-			restored: recovered.restored || 0,
+			restored: Number(fromArchive && fromArchive.restored) + Number(recovered && recovered.restored),
+			upgraded: Number(fromArchive && fromArchive.upgraded) || 0,
 			snapshots: recovered.snapshots || 0,
+			sealed: Number(sealed && (sealed.inserted || 0)) + Number(sealed && (sealed.updated || 0)),
 			arenas: (store.tournaments || []).length,
+			archive: persist.stats(db),
 		};
 	}));
 
 	router.post('/records/host', (request, response) => {
 		try {
-			assertHostPassword(dataDir, request.body && request.body.hostPassword);
+			assertAdminRequest(dataDir, request);
 		} catch (err) {
 			response.status(err.status || 403).json({ error: err.message });
 			return;
@@ -2867,9 +4831,7 @@ function createRouter(options) {
 	});
 
 	router.post('/arenas/:slug/claims/:id/resolve', withStore((store, request) => {
-		assertHostPassword(dataDir, request.body && request.body.hostPassword);
-		const t = store.tournaments.find((row) => row.slug === request.params.slug);
-		if (!t) throw Object.assign(new Error('Arena not found'), { status: 404 });
+		const t = hostedArena(store, request);
 		const db = records.getDb();
 		if (!db) throw Object.assign(new Error(authDex.lastDdDatabaseError && authDex.lastDdDatabaseError()
 			? `Records database unavailable (${authDex.lastDdDatabaseError()})`
@@ -2882,9 +4844,41 @@ function createRouter(options) {
 		return { ...result, ...detail(store, t, true) };
 	}));
 
+	router.get('/records/health', (request, response) => {
+		try {
+			assertAdminRequest(dataDir, request);
+		} catch (err) {
+			response.status(err.status || 403).json({ error: err.message });
+			return;
+		}
+		const db = records.getDb();
+		const store = loadStore(storeFile);
+		const richness = persist.storeRichness(store);
+		const archive = persist.stats(db);
+		const backups = persist.backupInventory(storeFile);
+		const gaps = persist.sealGaps(db, store);
+		let hydratedRichness = null;
+		if (db) {
+			try {
+				const hydrated = persist.hydrateStore(db);
+				if (hydrated) hydratedRichness = persist.storeRichness(hydrated);
+			} catch (_err) {}
+		}
+		response.json({
+			ok: true,
+			sqliteReady: Boolean(db),
+			live: richness,
+			blob: hydratedRichness,
+			archive,
+			backups,
+			sealGaps: gaps,
+			tight: gaps.length === 0 && archive.blob && archive.events >= richness.completed,
+		});
+	});
+
 	router.post('/control/backfill-results', (request, response) => {
 		try {
-			assertHostPassword(dataDir, request.body && request.body.hostPassword);
+			assertAdminRequest(dataDir, request);
 		} catch (err) {
 			response.status(err.status || 403).json({ error: err.message });
 			return;
@@ -2895,7 +4889,23 @@ function createRouter(options) {
 			return;
 		}
 		const store = loadStore(storeFile);
-		response.json(records.backfillWithFns(db, store, isDemoTournament, podiumFor, standingsFor));
+		persist.persistLiveStore(db, store, {
+			skipTournament: (t) => isDemoTournament(store, t),
+		});
+		const backups = persist.rotateTimestampedBackups(storeFile, {
+			force: true,
+			sqlitePath: persist.sqlitePathNear(storeFile),
+			database: db,
+		});
+		const sealed = records.backfillWithFns(db, store, isDemoTournament, podiumFor, standingsFor);
+		if (sealed && sealed.stamped) saveStore(storeFile, store);
+		response.json({
+			...sealed,
+			archive: persist.stats(db),
+			backups,
+			sealGaps: persist.sealGaps(db, store),
+			inventory: persist.backupInventory(storeFile),
+		});
 	});
 
 	/**
@@ -2910,11 +4920,62 @@ function createRouter(options) {
 		});
 	});
 
+	if (dogeWatchEnabled) {
+		const ms = Math.max(8000, Number(dogeWatchOpts.intervalMs) || 30000);
+		let watchBusy = false;
+		const tick = async () => {
+			if (watchBusy) return;
+			watchBusy = true;
+			try {
+				const snapshot = loadStore(storeFile);
+				if (!pendingWatchEntries(snapshot).length) return;
+				const addresses = [...new Set(pendingWatchEntries(snapshot).map((entry) => {
+					const t = (snapshot.tournaments || []).find((row) => row.id === entry.tournamentId);
+					return entry.payTo || treasuryAddress(t);
+				}).filter(Boolean))];
+				let txs = [];
+				for (const address of addresses) {
+					txs = txs.concat(await incomingFor(address, {}) || []);
+				}
+				const live = loadStore(storeFile);
+				const grouped = new Map();
+				for (const entry of pendingWatchEntries(live)) {
+					const t = (live.tournaments || []).find((row) => row.id === entry.tournamentId);
+					const key = t ? t.id : 0;
+					if (!grouped.has(key)) grouped.set(key, { tournament: t, entries: [] });
+					grouped.get(key).entries.push(entry);
+				}
+				let changed = 0;
+				const minConf = dogePayWatch.minConfirmationsFromEnv();
+				for (const group of grouped.values()) {
+					const result = dogePayWatch.applyIncomingPayments(group.entries, txs, {
+						payTo: treasuryAddress(group.tournament),
+						minConfirmations: minConf,
+						tournament: group.tournament,
+					});
+					changed += dogePayWatch.applyMatchResult(live.entries, result);
+					if (result.confirmed.length) {
+						console.log('[doge-watch] confirmed', result.confirmed.map((row) => row.entry.handle).join(', '));
+					}
+				}
+				if (changed) saveStore(storeFile, live);
+			} catch (err) {
+				console.error('[doge-watch]', err && err.message ? err.message : err);
+			} finally {
+				watchBusy = false;
+			}
+		};
+		router._dogeWatchTimer = setInterval(() => { tick(); }, ms);
+		if (typeof router._dogeWatchTimer.unref === 'function') router._dogeWatchTimer.unref();
+		const starter = setTimeout(() => { tick(); }, 8000);
+		if (starter && typeof starter.unref === 'function') starter.unref();
+	}
+
 	return router;
 }
 
-const TOOL_TITLE = 'DDL Tourney - Legends Bracket';
-const TOOL_DESCRIPTION = 'Host Doginal Dogs Legends pack tournaments. DOGE entry, paid roster, live brackets.';
+const TOOL_TITLE = 'Legends Brackets — DDL fight night';
+const TOOL_DESCRIPTION = 'Official DDL nights. Discord seats, DOGE entry, live brackets, IRL table.';
 
 function escapeAttr(value) {
 	return String(value == null ? '' : value)
@@ -2937,8 +4998,8 @@ function publicOrigin(request) {
 	).split(',')[0].trim() || 'https';
 	const host = String(
 		(request.get && (request.get('x-forwarded-host') || request.get('host')))
-		|| 'kushmedia.xyz'
-	).split(',')[0].trim() || 'kushmedia.xyz';
+		|| 'legendsbrackets.com'
+	).split(',')[0].trim() || 'legendsbrackets.com';
 	return `${proto}://${host}`;
 }
 
@@ -2992,7 +5053,7 @@ function applyShareMeta(html, meta) {
 	out = replaceNamedMeta(out, 'property', 'og:description', meta.description);
 	out = replaceNamedMeta(out, 'property', 'og:url', meta.url);
 	out = replaceNamedMeta(out, 'property', 'og:image', meta.image);
-	out = replaceNamedMeta(out, 'property', 'og:image:alt', meta.title);
+	out = replaceNamedMeta(out, 'property', 'og:image:alt', meta.imageAlt || 'Doginal Dogs Legends Brackets');
 	const canonical = `<link rel="canonical" href="${escapeAttr(meta.url)}">`;
 	if (/<link rel="canonical" href="[^"]*">/i.test(out)) {
 		out = out.replace(/<link rel="canonical" href="[^"]*">/i, canonical);
@@ -3017,19 +5078,18 @@ function sendAppPage(options) {
 	}
 	const origin = publicOrigin(request);
 	const found = shareMetaForSlug(dataDir, slugFromRequest(request));
-	const title = found ? found.title : TOOL_TITLE;
+	const title = found ? found.title : 'Doginal Dogs Legends Brackets';
 	const description = found ? found.description : TOOL_DESCRIPTION;
 	const url = found
 		? `${origin}/tourney/?t=${encodeURIComponent(found.slug)}`
 		: `${origin}/tourney/`;
-	const image = found
-		? `${origin}/tourney-api/share?t=${encodeURIComponent(found.slug)}&v=2`
-		: `${origin}/bracket/share.jpg?v=2`;
+	const image = `${origin}/tourney-api/share.jpg?v=3`;
 	html = applyShareMeta(html, {
 		title,
 		description,
 		url,
 		image,
+		imageAlt: 'Doginal Dogs Legends Brackets',
 	});
 	response.set({
 		'Cache-Control': 'no-store, private',
@@ -3041,5 +5101,11 @@ function sendAppPage(options) {
 createRouter.sendAppPage = sendAppPage;
 createRouter.TOOL_TITLE = TOOL_TITLE;
 createRouter.createIrlSeatGuard = createIrlSeatGuard;
+createRouter.loadStore = loadStore;
+createRouter.normalizeStore = normalizeStore;
+createRouter.standingsFor = standingsFor;
+createRouter.podiumFor = podiumFor;
+createRouter.isDemoTournament = isDemoTournament;
+createRouter.storeHasArenas = storeHasArenas;
 
 module.exports = createRouter;

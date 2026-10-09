@@ -4,14 +4,15 @@
  */
 (function (global) {
   const SRC = [
-    '/bracket/ddl-cards.js',
-    '/ddl/data/ddl.js',
-    'https://ddltcg.kushmetax.com/data/ddl.js',
+    '/bracket/ddl-cards.js?v=bracket-ui-124',
   ];
+  const LOAD_MS = 8000;
   const CUSTOM_KEY = 'ddl-custom-decks';
   const DECK_SIZE = 40;
   const MAX_COPIES = 3;
   const CLASSES = ['Crown', 'Bow', 'Wizard', 'Zombie', 'Pirate'];
+  /** Wayne is pulled from the ddltcg.com builder, lists, and play. Their parser drops it silently. */
+  const UNPLAYABLE_SERIALS = { V029: 1 };
 
   let loadPromise = null;
 
@@ -32,9 +33,12 @@
   }
 
   function byName(name) {
-    const key = String(name || '').trim().toLowerCase();
+    const key = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
     if (!key) return null;
-    return cards().find((c) => String(c.name).toLowerCase() === key) || null;
+    return cards().find((c) => (
+      !UNPLAYABLE_SERIALS[String(c.id).toUpperCase()]
+      && String(c.name).trim().toLowerCase().replace(/\s+/g, ' ') === key
+    )) || null;
   }
 
   function load() {
@@ -42,22 +46,38 @@
     if (loadPromise) return loadPromise;
     loadPromise = new Promise((resolve, reject) => {
       const urls = SRC.slice();
+      let timer = 0;
+      const finishErr = (err) => {
+        loadPromise = null;
+        reject(err);
+      };
       const tryNext = () => {
+        window.clearTimeout(timer);
+        if (catalog()) {
+          resolve(catalog());
+          return;
+        }
         const url = urls.shift();
         if (!url) {
-          loadPromise = null;
-          reject(new Error('Companion catalog did not load'));
+          finishErr(new Error('Companion catalog did not load'));
           return;
         }
         const el = document.createElement('script');
         el.src = url;
         el.async = true;
         el.dataset.ddlCatalog = '1';
-        el.onload = () => {
+        let settled = false;
+        const settle = () => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          el.onload = el.onerror = null;
           if (catalog()) resolve(catalog());
           else tryNext();
         };
-        el.onerror = () => tryNext();
+        el.onload = settle;
+        el.onerror = settle;
+        timer = window.setTimeout(settle, LOAD_MS);
         document.head.appendChild(el);
       };
       tryNext();
@@ -136,35 +156,109 @@
   }
 
   function parseDeckText(raw) {
-    const counts = {};
-    String(raw || '').split(/\r?\n/).forEach((line) => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) return;
-      const m = trimmed.match(/^(V\d{3})\s*[x×*]?\s*(\d{1,2})?$/i)
-        || trimmed.match(/^(\d{1,2})\s*[x×]?\s*(V\d{3})$/i)
-        || trimmed.match(/^(.+?)\s+[x×]?\s*(\d{1,2})$/);
-      if (!m) {
-        const named = byName(trimmed) || byId(trimmed);
-        if (named) counts[named.id] = (counts[named.id] || 0) + 1;
+    return parsePlayList(raw).counts;
+  }
+
+  function parsePlayList(raw) {
+    const unknown = [];
+    const dropped = [];
+    let deckName = '';
+    let serials = [];
+    const text = String(raw || '');
+    const stripped = text.trim();
+    if (stripped.charAt(0) === '[') {
+      try {
+        const arr = JSON.parse(stripped);
+        if (Array.isArray(arr)) serials = arr.map((x) => String(x || '').trim().toUpperCase()).filter(Boolean);
+      } catch (_err) {
+        serials = [];
+      }
+    }
+    if (!serials.length) {
+      const fromLine = [];
+      const fromBody = [];
+      text.split(/\r?\n/).forEach((line) => {
+        const s = String(line || '').trim();
+        if (!s) return;
+        const low = s.toLowerCase();
+        if (low.indexOf('# name:') === 0) {
+          deckName = s.split(':').slice(1).join(':').trim();
+          return;
+        }
+        if (low.indexOf('# serials:') === 0) {
+          const found = s.match(/\bV\d{3}\b/ig) || [];
+          found.forEach((tok) => fromLine.push(tok.toUpperCase()));
+          return;
+        }
+        if (s.charAt(0) === '#') return;
+        const tokens = s.match(/\bV\d{3}\b/ig) || [];
+        const restLetters = s.replace(/V\d{3}/ig, '').replace(/[^A-Za-z]/g, '');
+        if (tokens.length && restLetters.length < 3) {
+          tokens.forEach((tok) => fromBody.push(tok.toUpperCase()));
+          return;
+        }
+        let count = 1;
+        let label = s;
+        let m = s.match(/^\s*(\d+)\s*[x×]\s+(.+?)\s*$/i);
+        if (m) {
+          count = parseInt(m[1], 10) || 1;
+          label = m[2];
+        } else {
+          m = s.match(/^\s*(.+?)\s*[x×]\s*(\d+)\s*$/i);
+          if (m) {
+            label = m[1];
+            count = parseInt(m[2], 10) || 1;
+          } else {
+            m = s.match(/^\s*(\d+)\s+(.+?)\s*$/);
+            if (m) {
+              count = parseInt(m[1], 10) || 1;
+              label = m[2];
+            }
+          }
+        }
+        label = String(label || '').replace(/\s+/g, ' ').replace(/\s*\(V\d{3}\)\s*$/i, '').trim();
+        const named = byName(label) || (/^V\d{3}$/i.test(label) ? byId(label) : null);
+        if (!named) {
+          if (/^V\d{3}$/i.test(label)) fromBody.push(label.toUpperCase());
+          else unknown.push(label || s);
+          return;
+        }
+        const n = Math.max(1, Math.min(MAX_COPIES, count | 0));
+        for (let i = 0; i < n; i++) fromBody.push(named.id);
+      });
+      serials = fromLine.length ? fromLine : fromBody;
+      if (fromLine.length) unknown.length = 0;
+    }
+    const out = [];
+    const seen = {};
+    const packReady = Boolean(catalog());
+    serials.forEach((s) => {
+      const key = String(s || '').trim().toUpperCase();
+      if (!/^V\d{3}$/.test(key)) return;
+      if (UNPLAYABLE_SERIALS[key]) {
+        dropped.push(key);
         return;
       }
-      let id = '';
-      let qty = 1;
-      if (/^V\d{3}$/i.test(m[1])) {
-        id = m[1].toUpperCase();
-        qty = Number(m[2]) || 1;
-      } else if (/^V\d{3}$/i.test(m[2])) {
-        id = m[2].toUpperCase();
-        qty = Number(m[1]) || 1;
-      } else {
-        const card = byName(m[1]);
-        if (!card) return;
-        id = card.id;
-        qty = Number(m[2]) || 1;
+      if (packReady && !byId(key)) {
+        unknown.push(key);
+        return;
       }
-      counts[id] = (counts[id] || 0) + qty;
+      const n = seen[key] | 0;
+      if (n >= MAX_COPIES) return;
+      seen[key] = n + 1;
+      out.push(key);
     });
-    return counts;
+    const counts = {};
+    out.forEach((id) => { counts[id] = (counts[id] || 0) + 1; });
+    return {
+      ok: out.length > 0,
+      serials: out,
+      name: deckName,
+      unknown,
+      dropped,
+      count: out.length,
+      counts,
+    };
   }
 
   function customDecks() {
@@ -181,6 +275,185 @@
     } catch (_err) {
       return [];
     }
+  }
+
+  function rowsFromCounts(counts) {
+    const rows = [];
+    Object.keys(counts || {}).forEach((id) => {
+      const qty = Math.max(0, Number(counts[id]) || 0);
+      if (!qty) return;
+      const card = byId(id);
+      rows.push({
+        id: String(id || '').toUpperCase(),
+        qty,
+        name: (card && card.name) || String(id).toUpperCase(),
+        type: (card && card.type) || 'Creature',
+        class: (card && card.class) || '',
+        mana: Number(card && card.mana) || 0,
+      });
+    });
+    return rows.sort((a, b) => a.mana - b.mana || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  }
+
+  function heroesFromCounts(counts) {
+    const tally = {};
+    Object.keys(counts || {}).forEach((id) => {
+      const qty = Math.max(0, Number(counts[id]) || 0);
+      if (!qty) return;
+      const card = byId(id);
+      if (!card || card.all_class) return;
+      const cls = String(card.class || '');
+      if (!cls || cls === 'Neutral' || cls === 'All' || CLASSES.indexOf(cls) === -1) return;
+      tally[cls] = (tally[cls] || 0) + qty;
+    });
+    return Object.entries(tally)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map((row) => row[0]);
+  }
+
+  const QUOTA_CLASSES = CLASSES.concat('Neutral');
+
+  function canonQuotaClass(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return QUOTA_CLASSES.find((id) => id.toLowerCase() === raw.toLowerCase()) || '';
+  }
+
+  function sanitizeClassQuota(src) {
+    if (!src || src === false) return null;
+    const raw = typeof src === 'object' ? src : {};
+    const klass = canonQuotaClass(raw.class || raw.deckClass || src);
+    const n = Number(raw.percent != null ? raw.percent : raw.deckClassPercent);
+    const percent = Number.isFinite(n) ? Math.min(100, Math.max(1, Math.round(n))) : 0;
+    if (!klass || !(percent > 0)) return null;
+    return { class: klass, percent };
+  }
+
+  function cardCountsAsClass(card, klass) {
+    const want = canonQuotaClass(klass);
+    if (!card || !want) return false;
+    const printed = String(card.class || '');
+    if (card.all_class || printed === 'All') return want !== 'Neutral';
+    if (printed === want) return true;
+    return (card.classes || []).some((c) => String(c) === want);
+  }
+
+  function classShareFromCounts(counts, klass) {
+    const want = canonQuotaClass(klass);
+    let total = 0;
+    let matching = 0;
+    Object.keys(counts || {}).forEach((id) => {
+      const qty = Math.max(0, Number(counts[id]) || 0);
+      if (!qty) return;
+      total += qty;
+      const card = byId(id);
+      if (card && cardCountsAsClass(card, want)) matching += qty;
+    });
+    return {
+      class: want,
+      matching,
+      total,
+      percent: total > 0 ? (matching / total) * 100 : 0,
+    };
+  }
+
+  function evaluateClassQuota(counts, quota) {
+    const rule = sanitizeClassQuota(quota);
+    if (!rule) return { required: false, ok: true, rule: null, need: 0, share: null, message: '' };
+    const share = classShareFromCounts(counts, rule.class);
+    const size = share.total || DECK_SIZE;
+    const need = Math.ceil((rule.percent / 100) * size);
+    const ok = share.total > 0 && share.matching >= need;
+    const havePct = share.total ? Math.round((share.matching / share.total) * 100) : 0;
+    const message = ok
+      ? ''
+      : `Needs at least ${rule.percent}% ${rule.class} (${need} of ${size}). This list has ${share.matching} ${rule.class} (${havePct}%). Mini, Midi, and Mega count as every hero class. Neutral only counts when Neutral is the required class.`;
+    return { required: true, ok, rule, need, share, message };
+  }
+
+  function classQuotaLabel(quota) {
+    const rule = sanitizeClassQuota(quota);
+    return rule ? `${rule.percent}% ${rule.class}` : '';
+  }
+
+  function deckFileName(playName, deckName) {
+    const raw = [playName, deckName].filter(Boolean).join('-') || 'play-deck';
+    const slug = String(raw)
+      .replace(/[^A-Za-z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48);
+    return `ddl-${slug || 'play-deck'}.txt`;
+  }
+
+  /** Byte-for-byte the same shape the ddltcg.com/play builder writes, so a list round-trips either way. */
+  function exportDeckText(pack) {
+    const src = pack && typeof pack === 'object' ? pack : {};
+    const counts = src.counts && typeof src.counts === 'object'
+      ? src.counts
+      : (src.cards && typeof src.cards === 'object' ? src.cards : {});
+    const raw = Array.isArray(src.serials) && src.serials.length
+      ? src.serials.map((id) => String(id || '').toUpperCase()).filter((id) => /^V\d{3}$/.test(id))
+      : serialsFromCounts(counts);
+    const tally = {};
+    raw.forEach((id) => {
+      if (UNPLAYABLE_SERIALS[id]) return;
+      tally[id] = Math.min(MAX_COPIES, (tally[id] || 0) + 1);
+    });
+    const serials = serialsFromCounts(tally);
+    const by = {};
+    serials.forEach((id) => { by[id] = (by[id] || 0) + 1; });
+    const name = String(src.name || 'Custom').trim() || 'Custom';
+    const lines = ['# DDL TCG', `# name: ${name}`, `# count: ${serials.length}/${DECK_SIZE}`, ''];
+    Object.keys(by)
+      .sort((a, b) => {
+        const na = (byId(a) && byId(a).name) || a;
+        const nb = (byId(b) && byId(b).name) || b;
+        return na.localeCompare(nb);
+      })
+      .forEach((id) => {
+        const card = byId(id);
+        lines.push(`${by[id]}× ${(card && card.name) || id}`);
+      });
+    lines.push('');
+    lines.push(`# serials: ${serials.join(',')}`);
+    return `${lines.join('\n')}\n`;
+  }
+
+  function serialsFromCounts(counts) {
+    const out = [];
+    Object.keys(counts || {}).sort().forEach((id) => {
+      const n = Math.max(0, Math.min(MAX_COPIES, Number(counts[id]) || 0));
+      for (let i = 0; i < n; i++) out.push(String(id).toUpperCase());
+    });
+    return out;
+  }
+
+  async function copyText(text, btn) {
+    const body = String(text || '');
+    try {
+      await navigator.clipboard.writeText(body);
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+      }
+      return true;
+    } catch (_err) {
+      window.prompt('Copy this list', body);
+      return false;
+    }
+  }
+
+  function downloadText(filename, text) {
+    const body = String(text || '');
+    const blob = new Blob([body.endsWith('\n') ? body : `${body}\n`], { type: 'text/plain;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename || 'ddl-play-deck.txt';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
   }
 
   function deckSummary(pack) {
@@ -405,6 +678,8 @@
     DECK_SIZE,
     MAX_COPIES,
     CLASSES,
+    QUOTA_CLASSES,
+    UNPLAYABLE_SERIALS,
     load,
     catalog,
     cards,
@@ -415,7 +690,19 @@
     statsLine,
     validateDeck,
     parseDeckText,
+    parsePlayList,
     customDecks,
+    rowsFromCounts,
+    heroesFromCounts,
+    sanitizeClassQuota,
+    cardCountsAsClass,
+    classShareFromCounts,
+    evaluateClassQuota,
+    classQuotaLabel,
+    deckFileName,
+    exportDeckText,
+    copyText,
+    downloadText,
     deckSummary,
     countMap,
     peekHtml,

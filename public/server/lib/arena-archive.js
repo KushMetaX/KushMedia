@@ -325,8 +325,9 @@ function baseTournament(event) {
 		bestOf: known.bestOf || 3,
 		rewardMode: known.rewardMode || 'pot',
 		hostPotUsd: known.hostPotUsd || 0,
+		addedPotUsd: known.addedPotUsd || 0,
 		potFundMode: known.potFundMode || (Number(known.hostPotUsd) > 0 || known.feeMode === 'free' ? 'usd' : 'percent'),
-		payouts: known.payouts || [{ place: 1, percent: 100, prize: '' }],
+		payouts: known.payouts || [{ place: 1, percent: 100, prize: '', addedUsd: 0 }],
 		eventKind: event.event_kind || known.eventKind || (field <= 2 ? 'duel' : 'tournament'),
 		roundBestOf: known.roundBestOf || {},
 		hostUserId: known.hostUserId || null,
@@ -435,6 +436,13 @@ const SNAPSHOT_SLUGS = new Set([
 	'doginal-dogs-legends-tcg-ddnyc-2026-irl-to-xdvs',
 	'ddl-alpha-arena-vrnr',
 ]);
+
+function isEphemeralTestEvent(event) {
+	const slug = String(event && event.slug || '').toLowerCase();
+	const name = String(event && event.name || '').toLowerCase();
+	if (/^(irl-local-|vod-save-|test-)/.test(slug)) return true;
+	return /ui smoke|bye bracket|champ off|empty field|vod save check|irl local table/.test(name);
+}
 
 function snapshotEntry(tournamentId, row, stamp) {
 	return {
@@ -582,6 +590,7 @@ function restoreMissingArenasFromRecords(store, database) {
 		const slug = String(event.slug || '');
 		if (!id || !slug) continue;
 		if (SNAPSHOT_SLUGS.has(slug)) continue;
+		if (isEphemeralTestEvent(event)) continue;
 		if (hasTournament(store, id, slug)) continue;
 		try {
 			insertArchivedArena(store, event, byTid.get(id) || []);

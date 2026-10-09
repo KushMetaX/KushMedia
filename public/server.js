@@ -8,6 +8,7 @@
 require('dotenv').config();
 
 const ddEvaluatorRouter = require('./server/routes/dd-evaluator');
+const ddlMarketRouter = require('./server/routes/ddl-market');
 const { adminHtmlConfigured } = require('./server/admin-html-gate');
 const app = require('./server/index.js');
 
@@ -22,6 +23,7 @@ function startServer() {
 	const cb = () => {
 		console.log('KushBrand server listening (passenger=' + Boolean(process.env.PASSENGER_BASE_URI || process.env.PORT) + ')');
 		ddEvaluatorRouter.initEvaluator().catch(err => console.error('[dd-evaluator] Init failed:', err.message));
+		ddlMarketRouter.initDdlMarket();
 		const uiPw = ddEvaluatorRouter.getAdminUiPassword();
 		const traitPw = ddEvaluatorRouter.getExpectedDdAdminPassword();
 		if (uiPw && traitPw && uiPw !== traitPw) {

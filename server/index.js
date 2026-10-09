@@ -170,6 +170,7 @@ const tourneyDataDir = path.join(__dirname, 'data');
 const createTourneyRouter = require('../public/server/routes/tourney-bracket');
 const tourneyApi = createTourneyRouter({
 	dataDir: tourneyDataDir,
+	dogeWatch: { enabled: !/^(0|false|off|no)$/i.test(String(process.env.DOGE_WATCH || '1')) },
 });
 function sendBracketPage(request, response) {
 	if (typeof createTourneyRouter.sendAppPage === 'function') {

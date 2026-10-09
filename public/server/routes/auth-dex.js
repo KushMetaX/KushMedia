@@ -269,6 +269,8 @@ function migrateOauthIdentity(database) {
 		['discord_username', 'TEXT'],
 		['avatar_url', 'TEXT'],
 		['tourney_handle', 'TEXT'],
+		['tourney_host', 'INTEGER'],
+		['tourney_host_until', 'INTEGER'],
 	];
 	for (const [name, type] of extra) {
 		try {
@@ -388,6 +390,14 @@ function discordAvatarUrl(discordUser) {
 	return defaultDiscordAvatarUrl(discordUser.id, discordUser.discriminator);
 }
 
+function userIsTourneyHost(row) {
+	if (!row) return false;
+	if (!Number(row.tourney_host)) return false;
+	const until = Number(row.tourney_host_until);
+	if (Number.isFinite(until) && until > 0 && until < Date.now()) return false;
+	return true;
+}
+
 function authUserPayload(row) {
 	if (!row) return null;
 	const email = String(row.email || '').trim();
@@ -395,6 +405,7 @@ function authUserPayload(row) {
 	if (!avatarUrl && row.discord_id) {
 		avatarUrl = defaultDiscordAvatarUrl(row.discord_id, '0');
 	}
+	const until = Number(row.tourney_host_until);
 	return {
 		id: Number(row.user_id != null ? row.user_id : row.id),
 		email: email && !isPlaceholderEmail(email) ? email : null,
@@ -402,6 +413,8 @@ function authUserPayload(row) {
 		discordUsername: row.discord_username || null,
 		tourneyHandle: row.tourney_handle || null,
 		avatarUrl,
+		tourneyHost: userIsTourneyHost(row),
+		tourneyHostUntil: Number.isFinite(until) && until > 0 ? until : null,
 	};
 }
 
@@ -412,11 +425,67 @@ function issueSession(database, res, userId) {
 	setSessionCookie(res, sid);
 }
 
+const USER_HOST_COLUMNS = `id AS user_id, email, discord_id, discord_username, avatar_url, tourney_handle, tourney_host, tourney_host_until`;
+
 function loadUserRow(database, userId) {
 	return database.prepare(
-		`SELECT id AS user_id, email, discord_id, discord_username, avatar_url, tourney_handle
+		`SELECT ${USER_HOST_COLUMNS}
 		 FROM users WHERE id = ?`
 	).get(userId);
+}
+
+function setTourneyHost(database, userId, enabled, until) {
+	const id = Number(userId);
+	if (!database || !Number.isFinite(id) || id <= 0) {
+		throw Object.assign(new Error('Pick a Discord account'), { status: 400 });
+	}
+	const row = loadUserRow(database, id);
+	if (!row) throw Object.assign(new Error('Account not found'), { status: 404 });
+	if (!row.discord_id) {
+		throw Object.assign(new Error('That account is not linked to Discord'), { status: 400 });
+	}
+	const flag = enabled ? 1 : 0;
+	let expiry = null;
+	if (flag && until != null && until !== '') {
+		const n = Number(until);
+		if (Number.isFinite(n) && n > 0) expiry = Math.round(n);
+	}
+	database.prepare(
+		'UPDATE users SET tourney_host = ?, tourney_host_until = ? WHERE id = ?'
+	).run(flag, expiry, id);
+	return loadUserRow(database, id);
+}
+
+function listTourneyHosts(database) {
+	if (!database) return [];
+	const rows = database.prepare(
+		`SELECT ${USER_HOST_COLUMNS}
+		 FROM users
+		 WHERE discord_id IS NOT NULL AND discord_id != ''
+		   AND IFNULL(tourney_host, 0) != 0
+		 ORDER BY IFNULL(tourney_handle, discord_username) COLLATE NOCASE`
+	).all();
+	return rows.filter(userIsTourneyHost).map(authUserPayload);
+}
+
+function findUserForHostGrant(database, body) {
+	if (!database || !body) return null;
+	const askedId = Number(body.userId || body.playerId || body.id);
+	if (Number.isFinite(askedId) && askedId > 0) return loadUserRow(database, askedId);
+	const discordId = String(body.discordId || '').trim();
+	if (discordId) {
+		return database.prepare(
+			`SELECT ${USER_HOST_COLUMNS} FROM users WHERE discord_id = ?`
+		).get(discordId) || null;
+	}
+	const handle = String(body.handle || body.tourneyHandle || body.discordUsername || '').trim();
+	if (handle.length < 2) return null;
+	return database.prepare(
+		`SELECT ${USER_HOST_COLUMNS}
+		 FROM users
+		 WHERE tourney_handle = ? COLLATE NOCASE
+		    OR discord_username = ? COLLATE NOCASE`
+	).get(handle, handle) || null;
 }
 
 function uniqueHandleOrNull(database, candidate, exceptUserId) {
@@ -765,7 +834,8 @@ function getUserForSession(database, signedCookies) {
 	const row = database.prepare(
 		`SELECT u.id AS user_id, u.email AS email,
 		        u.discord_id AS discord_id, u.discord_username AS discord_username,
-		        u.avatar_url AS avatar_url, u.tourney_handle AS tourney_handle
+		        u.avatar_url AS avatar_url, u.tourney_handle AS tourney_handle,
+		        u.tourney_host AS tourney_host, u.tourney_host_until AS tourney_host_until
 		 FROM sessions s JOIN users u ON u.id = s.user_id
 		 WHERE s.id = ? AND s.expires_at > ?`
 	).get(sid, Date.now());
@@ -1649,3 +1719,9 @@ module.exports.getTourneySession = function getTourneySession(signedCookies) {
 	}
 };
 module.exports.normalizeTourneyHandle = normalizeTourneyHandle;
+module.exports.userIsTourneyHost = userIsTourneyHost;
+module.exports.authUserPayload = authUserPayload;
+module.exports.setTourneyHost = setTourneyHost;
+module.exports.listTourneyHosts = listTourneyHosts;
+module.exports.findUserForHostGrant = findUserForHostGrant;
+module.exports.loadUserRow = loadUserRow;

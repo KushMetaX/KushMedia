@@ -4,12 +4,17 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const http = require('http');
-const express = require(path.join(__dirname, '..', 'public', 'node_modules', 'express'));
-const createRouter = require('../public/server/routes/tourney-bracket');
 
 const HOST_PW = 'test-host-pw';
+const ADMIN_PW = 'test-admin-pw';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddl-tourney-losers-'));
 fs.writeFileSync(path.join(dataDir, '.tourney-password'), `${HOST_PW}\n`);
+fs.writeFileSync(path.join(dataDir, '.dd-admin-password'), `${ADMIN_PW}\n`);
+// Keep the accounts DB out of this run; nothing here needs Discord links.
+process.env.DEX_DB_PATH = path.join(dataDir, 'accounts.sqlite');
+
+const express = require(path.join(__dirname, '..', 'public', 'node_modules', 'express'));
+const createRouter = require('../public/server/routes/tourney-bracket');
 
 const app = express();
 app.use(express.json());
@@ -34,6 +39,7 @@ function call(server, method, urlPath, body) {
 			headers: {
 				'Content-Type': 'application/json',
 				'x-tourney-host': HOST_PW,
+				'x-tourney-admin': ADMIN_PW,
 				...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
 			},
 		}, (res) => {

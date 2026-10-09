@@ -1,0 +1,1714 @@
+{
+  "nextId": 3916,
+  "tournaments": [
+    {
+      "id": 140,
+      "name": "Doginal Dogs Legends TCG - DDNYC 2026 IRL Tournament",
+      "format": "single_elim",
+      "status": "completed",
+      "entryFeeUsd": 0,
+      "entryFeeDoge": 0,
+      "maxPlayers": 16,
+      "swissRounds": 4,
+      "treasury": "DD4KcuppEUBR8vETG46d4w8BcgvDkzbss2",
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "stage": "main",
+      "description": "The first Doginal Dogs Legends TCG Tournament Live in DDNYC 2026",
+      "hostName": "Doginal Dogs",
+      "streamUrl": "https://kick.com/guytypeaura",
+      "game": "Doginal Dogs Legends TCG",
+      "stageType": "single",
+      "losersBracket": false,
+      "breakTies": true,
+      "registrationMode": "list",
+      "whitelistSpots": 0,
+      "feeMode": "free",
+      "requireTeams": false,
+      "capPlayers": true,
+      "startAt": "2026-09-03T19:00",
+      "timezone": "America/New_York",
+      "requireAccount": false,
+      "official": true,
+      "bestOf": 1,
+      "rewardMode": "prize",
+      "hostPotUsd": 0,
+      "payouts": [
+        {
+          "place": 1,
+          "percent": 100,
+          "prize": "3 Boxes DDL TCG + Doginal Dog Figurine + A Doginal Dog"
+        },
+        {
+          "place": 2,
+          "percent": 0,
+          "prize": "2 Boxes DDL TCG + Doginal Dog Figurine"
+        },
+        {
+          "place": 3,
+          "percent": 0,
+          "prize": "1 Box DDL TCG + Doginal Dog Figurine"
+        }
+      ],
+      "eventKind": "tournament",
+      "roundBestOf": {
+        "winners:1": 1,
+        "winners:2": 1,
+        "winners:3": 1,
+        "winners:4": 3,
+        "placement:1": 3
+      },
+      "playoffFormat": "single_elim",
+      "slug": "doginal-dogs-legends-tcg-ddnyc-2026-irl-to-xdvs",
+      "restoredFromRecords": true,
+      "restoredAt": "2026-09-29T23:17:51.741Z"
+    },
+    {
+      "id": 39,
+      "name": "DDL Alpha Arena",
+      "format": "single_elim",
+      "status": "completed",
+      "entryFeeUsd": 5,
+      "maxPlayers": 32,
+      "swissRounds": 4,
+      "treasury": "DD4KcuppEUBR8vETG46d4w8BcgvDkzbss2",
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "stage": "main",
+      "description": "Players will compete for official DDL TCG packs! 🐶",
+      "hostName": "Kush",
+      "streamUrl": "https://kick.com/kushmetax",
+      "game": "Doginal Dogs Legends TCG",
+      "stageType": "single",
+      "losersBracket": false,
+      "breakTies": false,
+      "registrationMode": "signup",
+      "whitelistSpots": 5,
+      "feeMode": "paid",
+      "capPlayers": true,
+      "startAt": "2026-08-29T14:30",
+      "timezone": "America/Halifax",
+      "votingEnabled": true,
+      "predictionsEnabled": true,
+      "requireAccount": true,
+      "official": true,
+      "bestOf": 3,
+      "rewardMode": "prize",
+      "payouts": [
+        {
+          "place": 1,
+          "percent": 0,
+          "prize": "3 Packs of DDL TCG Cards"
+        },
+        {
+          "place": 2,
+          "percent": 0,
+          "prize": "2 Packs of DDL TCG Cards"
+        },
+        {
+          "place": 3,
+          "percent": 0,
+          "prize": "1 Pack of DDL TCG Cards"
+        }
+      ],
+      "eventKind": "tournament",
+      "roundBestOf": {
+        "winners:1": 3,
+        "winners:2": 3,
+        "winners:3": 3,
+        "winners:4": 5
+      },
+      "hostUserId": 2,
+      "playoffFormat": "single_elim",
+      "slug": "ddl-alpha-arena-vrnr",
+      "restoredFromRecords": true,
+      "restoredAt": "2026-09-29T23:17:51.741Z"
+    }
+  ],
+  "entries": [
+    {
+      "id": 141,
+      "tournamentId": 140,
+      "handle": "DickTheDev",
+      "userId": 8,
+      "team": "",
+      "seed": 7,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 142,
+      "tournamentId": 140,
+      "handle": "And",
+      "userId": 3,
+      "team": "",
+      "seed": 10,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 143,
+      "tournamentId": 140,
+      "handle": "Rus",
+      "userId": null,
+      "team": "",
+      "seed": 16,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 144,
+      "tournamentId": 140,
+      "handle": "Duck",
+      "userId": 15,
+      "team": "",
+      "seed": 1,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 145,
+      "tournamentId": 140,
+      "handle": "Boo",
+      "userId": null,
+      "team": "",
+      "seed": 12,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 146,
+      "tournamentId": 140,
+      "handle": "hofer",
+      "userId": 12,
+      "team": "",
+      "seed": 5,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 147,
+      "tournamentId": 140,
+      "handle": "Scad",
+      "userId": null,
+      "team": "",
+      "seed": 15,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 148,
+      "tournamentId": 140,
+      "handle": "Fifi",
+      "userId": null,
+      "team": "",
+      "seed": 2,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 149,
+      "tournamentId": 140,
+      "handle": "Dro",
+      "userId": null,
+      "team": "",
+      "seed": 3,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 150,
+      "tournamentId": 140,
+      "handle": "Paws",
+      "userId": null,
+      "team": "",
+      "seed": 14,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 151,
+      "tournamentId": 140,
+      "handle": "Vee",
+      "userId": 13,
+      "team": "",
+      "seed": 13,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 152,
+      "tournamentId": 140,
+      "handle": "Corn",
+      "userId": null,
+      "team": "",
+      "seed": 4,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 153,
+      "tournamentId": 140,
+      "handle": "Jag",
+      "userId": null,
+      "team": "",
+      "seed": 6,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 154,
+      "tournamentId": 140,
+      "handle": "Ammon",
+      "userId": null,
+      "team": "",
+      "seed": 11,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 155,
+      "tournamentId": 140,
+      "handle": "Shekels",
+      "userId": null,
+      "team": "",
+      "seed": 8,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 156,
+      "tournamentId": 140,
+      "handle": "Devin",
+      "userId": null,
+      "team": "",
+      "seed": 9,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-09-03T21:20:12.918Z",
+      "paidAt": "2026-09-03T21:20:12.918Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": null
+    },
+    {
+      "id": 45,
+      "tournamentId": 39,
+      "handle": "Vegas",
+      "userId": 6,
+      "team": "",
+      "seed": 1,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": "0-1"
+    },
+    {
+      "id": 63,
+      "tournamentId": 39,
+      "handle": "hofer",
+      "userId": 12,
+      "team": "",
+      "seed": 2,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": "1-1"
+    },
+    {
+      "id": 51,
+      "tournamentId": 39,
+      "handle": "Shock",
+      "userId": 9,
+      "team": "",
+      "seed": 3,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": 1,
+      "record": "4-0"
+    },
+    {
+      "id": 43,
+      "tournamentId": 39,
+      "handle": "And",
+      "userId": 3,
+      "team": "",
+      "seed": 4,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": "1-1"
+    },
+    {
+      "id": 40,
+      "tournamentId": 39,
+      "handle": "Kush",
+      "userId": 2,
+      "team": "",
+      "seed": 5,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": "0-1"
+    },
+    {
+      "id": 78,
+      "tournamentId": 39,
+      "handle": "Vee",
+      "userId": 13,
+      "team": "",
+      "seed": 6,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": "0-1"
+    },
+    {
+      "id": 42,
+      "tournamentId": 39,
+      "handle": "Giga",
+      "userId": 4,
+      "team": "",
+      "seed": 7,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": 3,
+      "record": "2-1"
+    },
+    {
+      "id": 46,
+      "tournamentId": 39,
+      "handle": "Home",
+      "userId": 7,
+      "team": "",
+      "seed": 8,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": "0-1"
+    },
+    {
+      "id": 80,
+      "tournamentId": 39,
+      "handle": "Rus",
+      "userId": null,
+      "team": "",
+      "seed": 9,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": 4,
+      "record": "1-1"
+    },
+    {
+      "id": 61,
+      "tournamentId": 39,
+      "handle": "DickTheDev",
+      "userId": 8,
+      "team": "",
+      "seed": 10,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": null,
+      "record": "0-1"
+    },
+    {
+      "id": 62,
+      "tournamentId": 39,
+      "handle": "Rylan",
+      "userId": 11,
+      "team": "",
+      "seed": 11,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": 5,
+      "record": "1-1"
+    },
+    {
+      "id": 79,
+      "tournamentId": 39,
+      "handle": "Reef",
+      "userId": 14,
+      "team": "",
+      "seed": 12,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": 2,
+      "record": "3-1"
+    },
+    {
+      "id": 96,
+      "tournamentId": 39,
+      "handle": "Duck",
+      "userId": 15,
+      "team": "",
+      "seed": 13,
+      "paid": true,
+      "status": "confirmed",
+      "checkedIn": true,
+      "payAsset": "DOGE",
+      "amountUsd": 0,
+      "amountCrypto": 0,
+      "createdAt": "2026-08-25T22:39:08.783Z",
+      "paidAt": "2026-08-25T22:39:08.783Z",
+      "whitelist": false,
+      "noShow": false,
+      "subbedIn": false,
+      "addedByHost": true,
+      "lateEntry": false,
+      "ddlClass": "Undeclared",
+      "placement": 3,
+      "record": "2-1"
+    }
+  ],
+  "matches": [
+    {
+      "id": 189,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 1,
+      "entry1Id": 144,
+      "entry2Id": 143,
+      "group": null,
+      "winnerId": 144,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 1,
+        "slot": 1
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 190,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 7,
+      "entry1Id": 155,
+      "entry2Id": 156,
+      "group": null,
+      "winnerId": 156,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 4,
+        "slot": 1
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 191,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 6,
+      "entry1Id": 152,
+      "entry2Id": 151,
+      "group": null,
+      "winnerId": 152,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 3,
+        "slot": 2
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 192,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 4,
+      "entry1Id": 146,
+      "entry2Id": 145,
+      "group": null,
+      "winnerId": 146,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 2,
+        "slot": 2
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 193,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 3,
+      "entry1Id": 148,
+      "entry2Id": 147,
+      "group": null,
+      "winnerId": 147,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 2,
+        "slot": 1
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 194,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 2,
+      "entry1Id": 141,
+      "entry2Id": 142,
+      "group": null,
+      "winnerId": 141,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 1,
+        "slot": 2
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 195,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 5,
+      "entry1Id": 149,
+      "entry2Id": 150,
+      "group": null,
+      "winnerId": 149,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 3,
+        "slot": 1
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 196,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 1,
+      "position": 8,
+      "entry1Id": 153,
+      "entry2Id": 154,
+      "group": null,
+      "winnerId": 154,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 4,
+        "slot": 2
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 197,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 2,
+      "position": 1,
+      "entry1Id": 144,
+      "entry2Id": 141,
+      "group": null,
+      "winnerId": 141,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 1,
+        "slot": 1
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 198,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 2,
+      "position": 3,
+      "entry1Id": 149,
+      "entry2Id": 152,
+      "group": null,
+      "winnerId": 152,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 2,
+        "slot": 1
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 199,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 2,
+      "position": 2,
+      "entry1Id": 147,
+      "entry2Id": 146,
+      "group": null,
+      "winnerId": 146,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 1,
+        "slot": 2
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 200,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 2,
+      "position": 4,
+      "entry1Id": 156,
+      "entry2Id": 154,
+      "group": null,
+      "winnerId": 154,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 2,
+        "slot": 2
+      },
+      "loserGoesTo": null
+    },
+    {
+      "id": 201,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 3,
+      "position": 1,
+      "entry1Id": 141,
+      "entry2Id": 146,
+      "group": null,
+      "winnerId": 141,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 4,
+        "position": 1,
+        "slot": 1
+      },
+      "loserGoesTo": {
+        "side": "placement",
+        "round": 1,
+        "position": 1,
+        "slot": 2
+      }
+    },
+    {
+      "id": 202,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 3,
+      "position": 2,
+      "entry1Id": 152,
+      "entry2Id": 154,
+      "group": null,
+      "winnerId": 154,
+      "score1": 0,
+      "score2": 1,
+      "bestOf": 1,
+      "games": [
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 4,
+        "position": 1,
+        "slot": 2
+      },
+      "loserGoesTo": {
+        "side": "placement",
+        "round": 1,
+        "position": 1,
+        "slot": 1
+      }
+    },
+    {
+      "id": 203,
+      "tournamentId": 140,
+      "side": "winners",
+      "round": 4,
+      "position": 1,
+      "entry1Id": 141,
+      "entry2Id": 154,
+      "group": null,
+      "winnerId": 141,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": null,
+      "loserGoesTo": null
+    },
+    {
+      "id": 204,
+      "tournamentId": 140,
+      "side": "placement",
+      "round": 1,
+      "position": 1,
+      "entry1Id": 152,
+      "entry2Id": 146,
+      "group": null,
+      "winnerId": 152,
+      "score1": 2,
+      "score2": 1,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 2
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": null,
+      "loserGoesTo": null
+    },
+    {
+      "id": 3901,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 5,
+      "entry1Id": 45,
+      "entry2Id": 96,
+      "group": null,
+      "winnerId": 96,
+      "score1": 0,
+      "score2": 2,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 2
+        },
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 3,
+        "slot": 1
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3902,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 6,
+      "entry1Id": 46,
+      "entry2Id": 80,
+      "group": null,
+      "winnerId": 80,
+      "score1": 1,
+      "score2": 2,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 2
+        },
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 3,
+        "slot": 2
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3903,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 7,
+      "entry1Id": 43,
+      "entry2Id": null,
+      "group": null,
+      "winnerId": 43,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 4,
+        "slot": 1
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": true
+    },
+    {
+      "id": 3904,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 8,
+      "entry1Id": 40,
+      "entry2Id": 79,
+      "group": null,
+      "winnerId": 79,
+      "score1": 0,
+      "score2": 2,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 2
+        },
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 4,
+        "slot": 2
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3905,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 1,
+      "entry1Id": 63,
+      "entry2Id": null,
+      "group": null,
+      "winnerId": 63,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 1,
+        "slot": 1
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": true
+    },
+    {
+      "id": 3906,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 2,
+      "entry1Id": 42,
+      "entry2Id": 61,
+      "group": null,
+      "winnerId": 42,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 1,
+        "slot": 2
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3907,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 3,
+      "entry1Id": 51,
+      "entry2Id": null,
+      "group": null,
+      "winnerId": 51,
+      "score1": 1,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 2,
+        "slot": 1
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": true
+    },
+    {
+      "id": 3908,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 1,
+      "position": 4,
+      "entry1Id": 78,
+      "entry2Id": 62,
+      "group": null,
+      "winnerId": 62,
+      "score1": 0,
+      "score2": 2,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 2
+        },
+        {
+          "winnerSlot": 2
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 2,
+        "position": 2,
+        "slot": 2
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3909,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 2,
+      "position": 3,
+      "entry1Id": 96,
+      "entry2Id": 80,
+      "group": null,
+      "winnerId": 96,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 2,
+        "slot": 1
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3910,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 2,
+      "position": 4,
+      "entry1Id": 43,
+      "entry2Id": 79,
+      "group": null,
+      "winnerId": 79,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 2,
+        "slot": 2
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3911,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 2,
+      "position": 1,
+      "entry1Id": 63,
+      "entry2Id": 42,
+      "group": null,
+      "winnerId": 42,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 1,
+        "slot": 1
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3912,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 2,
+      "position": 2,
+      "entry1Id": 51,
+      "entry2Id": 62,
+      "group": null,
+      "winnerId": 51,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 3,
+        "position": 1,
+        "slot": 2
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3913,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 3,
+      "position": 2,
+      "entry1Id": 96,
+      "entry2Id": 79,
+      "group": null,
+      "winnerId": 79,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 4,
+        "position": 1,
+        "slot": 2
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3914,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 3,
+      "position": 1,
+      "entry1Id": 42,
+      "entry2Id": 51,
+      "group": null,
+      "winnerId": 51,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": {
+        "side": "winners",
+        "round": 4,
+        "position": 1,
+        "slot": 1
+      },
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    },
+    {
+      "id": 3915,
+      "tournamentId": 39,
+      "side": "winners",
+      "round": 4,
+      "position": 1,
+      "entry1Id": 51,
+      "entry2Id": 79,
+      "group": null,
+      "winnerId": 51,
+      "score1": 2,
+      "score2": 0,
+      "bestOf": 3,
+      "games": [
+        {
+          "winnerSlot": 1
+        },
+        {
+          "winnerSlot": 1
+        }
+      ],
+      "status": "complete",
+      "winnerGoesTo": null,
+      "loserGoesTo": null,
+      "byeAdvanced": false
+    }
+  ],
+  "votes": [],
+  "predictions": [],
+  "meta": {
+    "hostSwaps": {}
+  }
+}

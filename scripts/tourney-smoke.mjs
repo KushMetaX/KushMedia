@@ -164,6 +164,20 @@ async function main() {
 		streamUrl: 'https://kick.com/kushmetax',
 	});
 	check('host can set a Kick stream on a live arena', stream.status === 200 && stream.data.tournament.streamUrl === 'https://kick.com/kushmetax', stream.text.slice(0, 200));
+	const vod = await call('POST', `/arenas/${arena}/settings`, {
+		hostPassword: HOST_PW,
+		streamUrl: 'https://kick.com/kushmetax/videos/019ff886-1688-78c9-89ee-d2d2a1e09019?t=1h2m',
+	});
+	check(
+		'host can save a Kick VOD URL on the bracket',
+		vod.status === 200 && vod.data.tournament.streamUrl === 'https://kick.com/kushmetax/videos/019ff886-1688-78c9-89ee-d2d2a1e09019?t=1h2m',
+		vod.text.slice(0, 200),
+	);
+	const restoreLive = await call('POST', `/arenas/${arena}/settings`, {
+		hostPassword: HOST_PW,
+		streamUrl: 'https://kick.com/kushmetax',
+	});
+	check('host can restore the live Kick channel', restoreLive.status === 200 && restoreLive.data.tournament.streamUrl === 'https://kick.com/kushmetax', restoreLive.text.slice(0, 200));
 	const badStream = await call('POST', `/arenas/${arena}/settings`, {
 		hostPassword: HOST_PW,
 		streamUrl: 'https://twitch.tv/nope',

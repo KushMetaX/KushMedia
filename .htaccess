@@ -72,6 +72,11 @@ ErrorDocument 404 /404.html
 # -----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # Force HTTPS first so path-specific [L] rewrites never leave http:// "Not secure".
+  # LiteSpeed/cPanel has no APISIX edge redirect; X-Forwarded-Proto avoids proxy loops.
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
   # NovaScotiaVoyage map: do NOT short-circuit to map/index.html here.
   # Every /map/* request is gated by the Express server (HTTP Basic Auth via
   # VOYAGER_PASSWORD). The map/.htaccess inside that directory rewrites all
@@ -201,18 +206,6 @@ AddDefaultCharset utf-8
   RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK)$
   RewriteRule .* - [F,L]
 </IfModule>
-# -----------------------------------------------------------------------------
-# 9. Force HTTPS - DISABLED by default
-#    The probe agent confirmed the APISIX edge already 301-redirects
-#    http -> https. Enabling this here without verifying that APISIX sets
-#    X-Forwarded-Proto: https would create a redirect loop. If you confirm
-#    the header is set (or move off APISIX), uncomment to add belt+suspenders.
-# -----------------------------------------------------------------------------
-# <IfModule mod_rewrite.c>
-#   RewriteCond %{HTTPS} !=on
-#   RewriteCond %{HTTP:X-Forwarded-Proto} !=https
-#   RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
-# </IfModule>
 # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
 PassengerAppRoot "/home/kushmetax/public_html/public"
 PassengerBaseURI "/"

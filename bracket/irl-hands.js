@@ -128,6 +128,7 @@
       const hit = Array.isArray(row) ? row[0] : row;
       return (hit && (hit.categoryName || hit.displayName)) || 'Hand';
     });
+    feed.landmarks = hands;
     if (count !== feed.count) {
       feed.count = count;
       feed.labels = labels;
@@ -139,6 +140,17 @@
     if (!raf) raf = requestAnimationFrame(loop);
   }
 
+  function peek(video) {
+    const feed = video && feeds.get(video);
+    if (!feed) return { count: 0, labels: [], landmarks: [] };
+    const count = feed.count > 0 ? feed.count : 0;
+    return {
+      count,
+      labels: feed.labels || [],
+      landmarks: feed.landmarks || [],
+    };
+  }
+
   function watch(video, canvas, onHands) {
     if (!video || !canvas) return { stop() {} };
     const key = video;
@@ -148,6 +160,7 @@
       onHands,
       count: -1,
       labels: [],
+      landmarks: [],
       lastTs: -1,
     });
     load().then(() => {
@@ -184,5 +197,5 @@
     }
   }
 
-  global.DdlIrlHands = { load, watch, stopAll };
+  global.DdlIrlHands = { load, watch, stopAll, peek };
 })(window);

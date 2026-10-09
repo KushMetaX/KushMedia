@@ -1,0 +1,2955 @@
+{
+  "configured": true,
+  "set": "Rise of the Pack",
+  "edition": "1st Edition",
+  "refreshedAt": "2026-10-09T20:17:18.814Z",
+  "nextRefreshAt": "2026-10-10T02:17:18.814Z",
+  "refreshHours": 6,
+  "askDiscount": 0.85,
+  "sources": {
+    "browse": {
+      "ok": false,
+      "error": "",
+      "mode": "listings.csv"
+    }
+  },
+  "box": {
+    "usd": 179,
+    "source": "msrp",
+    "n": 0,
+    "msrpUsd": 179
+  },
+  "pack": {
+    "usd": 7.46,
+    "source": "model",
+    "n": 0,
+    "msrpUsd": 7.46
+  },
+  "counts": {
+    "activeListings": 2,
+    "matchedSold": 0,
+    "names": 111,
+    "master": 203
+  },
+  "disclaimer": "Sold comps beat asks. Asks are booked at 85% of the lowest single-card ask. Cards with no single-card listing stay on pack-math and are badged Estimate. Lots are ignored.",
+  "cards": [
+    {
+      "id": "V001",
+      "name": "Chico",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V002",
+      "name": "Daisy",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V003",
+      "name": "Dash",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V004",
+      "name": "Gary",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V005",
+      "name": "Ginger",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V006",
+      "name": "Icy",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V007",
+      "name": "Jones",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V008",
+      "name": "Mini",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V009",
+      "name": "Poke",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V010",
+      "name": "Prince",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V011",
+      "name": "Pumpy",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V012",
+      "name": "Stump",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V013",
+      "name": "Thumpy",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V014",
+      "name": "Web",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V015",
+      "name": "Blade",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V016",
+      "name": "Bone",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V017",
+      "name": "Chart",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V018",
+      "name": "Digger",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V019",
+      "name": "Doom",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V020",
+      "name": "Dumpy",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V021",
+      "name": "Flame",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V022",
+      "name": "Helios",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V023",
+      "name": "Hunter",
+      "tier": "GIGA",
+      "prints": {
+        "fa": {
+          "usd": 106.25,
+          "source": "asks",
+          "sold": 0,
+          "asks": 1,
+          "low": 125,
+          "high": 125,
+          "lowestAskUsd": 125,
+          "estimateUsd": 90
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V024",
+      "name": "Loopy",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V025",
+      "name": "Midi",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V026",
+      "name": "Scroll",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V027",
+      "name": "Stone",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V028",
+      "name": "Sunny",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V029",
+      "name": "Wayne",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V030",
+      "name": "Champ",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V031",
+      "name": "Dusty",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V032",
+      "name": "Fitch",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V033",
+      "name": "Goji",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V034",
+      "name": "Mary",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V035",
+      "name": "Mega",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V036",
+      "name": "Plague",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V037",
+      "name": "Scout",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V038",
+      "name": "Shepherd",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V039",
+      "name": "Skip",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V040",
+      "name": "Spark",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V041",
+      "name": "Surge",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V042",
+      "name": "Sweetie",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V043",
+      "name": "Yang",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V044",
+      "name": "Boogie",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V045",
+      "name": "Buster",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V046",
+      "name": "Cherry",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V047",
+      "name": "Houdini",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V048",
+      "name": "Mama Light",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V049",
+      "name": "Mento",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V050",
+      "name": "Pulse",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V051",
+      "name": "Reaper",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V052",
+      "name": "Renza",
+      "tier": "GIGA",
+      "prints": {
+        "fa": {
+          "usd": 90,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 90
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V053",
+      "name": "Seeker",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V054",
+      "name": "Shiboshi",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V055",
+      "name": "Turbo",
+      "tier": "GIGA",
+      "prints": {
+        "fa": {
+          "usd": 90,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 90
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V056",
+      "name": "Bender",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V057",
+      "name": "Gummy",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V058",
+      "name": "Shield",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V059",
+      "name": "Toot",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V060",
+      "name": "Volt",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V061",
+      "name": "Cookie",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V062",
+      "name": "Mama Bark",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V063",
+      "name": "Penny",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 85,
+          "source": "asks",
+          "sold": 0,
+          "asks": 1,
+          "low": 100,
+          "high": 100,
+          "lowestAskUsd": 100,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V064",
+      "name": "Aria",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V065",
+      "name": "Atlas",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V066",
+      "name": "Manic",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V067",
+      "name": "Wiggles",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V068",
+      "name": "Bamba",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V069",
+      "name": "Bark",
+      "tier": "GIGA",
+      "prints": {
+        "fa": {
+          "usd": 90,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 90
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V070",
+      "name": "Barron",
+      "tier": "UR",
+      "prints": {
+        "fa": {
+          "usd": 45,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 45
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V071",
+      "name": "Gigatron",
+      "tier": "GIGA",
+      "prints": {
+        "fa": {
+          "usd": 90,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 90
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V072",
+      "name": "Boost",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V073",
+      "name": "Frostbolt",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V074",
+      "name": "Quickdraw",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V075",
+      "name": "Sacrifice",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V076",
+      "name": "Snake Venom",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V077",
+      "name": "Typhoon",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V078",
+      "name": "Connection",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V079",
+      "name": "Cull",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V080",
+      "name": "Feast",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V081",
+      "name": "Fireball",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V082",
+      "name": "Haunted House",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V083",
+      "name": "Love Bomb",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V084",
+      "name": "Love Shot",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V085",
+      "name": "Pact",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V086",
+      "name": "Vanish",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V087",
+      "name": "Airdrop",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V088",
+      "name": "Cauldron",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V089",
+      "name": "Chum The Water",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V090",
+      "name": "Garden",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V091",
+      "name": "Judgement",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V092",
+      "name": "Meditation",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V093",
+      "name": "Reborn",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V094",
+      "name": "Scheme",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V095",
+      "name": "Spearfish",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V096",
+      "name": "Takedown",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V097",
+      "name": "Swipe",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V098",
+      "name": "Avenge",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V099",
+      "name": "Booty Raid",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V100",
+      "name": "Siphon",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V101",
+      "name": "Black Hole",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V102",
+      "name": "Ambush",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V103",
+      "name": "Blast",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V104",
+      "name": "Counterspell",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V105",
+      "name": "Divine Shield",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V106",
+      "name": "Frost Lock",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V107",
+      "name": "Landmine",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V108",
+      "name": "Pitfall",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V109",
+      "name": "Intel",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V110",
+      "name": "Spring Trap",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    },
+    {
+      "id": "V111",
+      "name": "Tidal Wave",
+      "tier": "CR",
+      "prints": {
+        "base": {
+          "usd": 1.5,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 1.5
+        },
+        "holo": {
+          "usd": 6,
+          "source": "model",
+          "sold": 0,
+          "asks": 0,
+          "low": null,
+          "high": null,
+          "lowestAskUsd": null,
+          "estimateUsd": 6
+        }
+      },
+      "graded": {}
+    }
+  ]
+}

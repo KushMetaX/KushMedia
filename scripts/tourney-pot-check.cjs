@@ -7,9 +7,11 @@ const express = require(path.join(__dirname, '..', 'public', 'node_modules', 'ex
 const createRouter = require('../public/server/routes/tourney-bracket');
 
 const HOST_PW = 'test-host-pw';
+const ADMIN_PW = 'test-admin-pw';
 const dataDir = path.join(__dirname, '..', 'public', 'server', 'data', 'pot-check-tmp');
 fs.mkdirSync(dataDir, { recursive: true });
 fs.writeFileSync(path.join(dataDir, '.tourney-password'), `${HOST_PW}\n`);
+fs.writeFileSync(path.join(dataDir, '.dd-admin-password'), `${ADMIN_PW}\n`);
 fs.writeFileSync(path.join(dataDir, 'tourney-store.json'), JSON.stringify({
 	nextId: 1,
 	tournaments: [],
@@ -42,6 +44,7 @@ function call(server, method, urlPath, body) {
 			headers: {
 				'Content-Type': 'application/json',
 				'x-tourney-host': HOST_PW,
+				'x-tourney-admin': ADMIN_PW,
 				...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
 			},
 		}, (res) => {
@@ -117,6 +120,43 @@ async function main() {
 		await fillRoster(server, 'house-dollars', ['Casa', 'Casa2']);
 		const houseOpen = await call(server, 'GET', '/arenas/house-dollars');
 		check('free roster does not add onto a dollar pot', houseOpen.status === 200 && houseOpen.data.prizePool === 100, String(houseOpen.data && houseOpen.data.prizePool));
+
+		const extras = await call(server, 'POST', '/arenas', {
+			hostPassword: HOST_PW,
+			name: 'Percent Plus Extras',
+			slug: 'percent-plus',
+			format: 'single_elim',
+			feeMode: 'paid',
+			entryFeeUsd: 10,
+			registrationMode: 'list',
+			requireAccount: false,
+			rewardMode: 'pot',
+			potFundMode: 'percent',
+			addedPotUsd: 20,
+			payouts: [
+				{ place: 1, percent: 70, addedUsd: 5, prize: 'playmat' },
+				{ place: 2, percent: 30, prize: '2 packs' },
+			],
+			maxPlayers: 8,
+		});
+		check('added cash does not kick a percent pool onto a dollar pot', extras.status === 200 && extras.data.potFundMode === 'percent' && extras.data.addedPotUsd === 20, extras.text.slice(0, 220));
+		await fillRoster(server, 'percent-plus', ['Echo', 'Foxtrot']);
+		const extrasOpen = await call(server, 'GET', '/arenas/percent-plus');
+		const extraRewards = extrasOpen.data && extrasOpen.data.rewards;
+		const first = extraRewards && extraRewards.rows && extraRewards.rows[0];
+		const second = extraRewards && extraRewards.rows && extraRewards.rows[1];
+		check('percent pot plus added contribution is 65% of $20 plus $20', extrasOpen.status === 200 && extrasOpen.data.prizePool === 33 && extraRewards.addedPotUsd === 20 && extraRewards.feePoolUsd === 13, JSON.stringify(extraRewards));
+		check('place percents split the combined pot and keep per-place extras', first && first.amountUsd === 23.1 && first.addedUsd === 5 && first.totalUsd === 28.1 && first.prize === 'playmat' && second && second.prize === '2 packs' && second.addedUsd === 0, JSON.stringify(extraRewards && extraRewards.rows));
+
+		const onlyPrize = await call(server, 'POST', '/arenas/percent-plus/settings', {
+			hostPassword: HOST_PW,
+			payouts: [
+				{ place: 1, percent: 100 },
+				{ place: 4, prize: 'booster' },
+			],
+		});
+		const fourth = onlyPrize.data && onlyPrize.data.rewards && onlyPrize.data.rewards.rows && onlyPrize.data.rewards.rows.find((r) => r.place === 4);
+		check('a place can get an added prize with 0% of the pot', onlyPrize.status === 200 && fourth && fourth.prize === 'booster' && fourth.percent === 0 && fourth.amountUsd === 0, JSON.stringify(onlyPrize.data && onlyPrize.data.rewards && onlyPrize.data.rewards.rows));
 	} finally {
 		server.close();
 		try {

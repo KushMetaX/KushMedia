@@ -10,6 +10,8 @@ const cookieParser = require('cookie-parser');
 const { curateDiscoveredPois } = require('./voyager-curate');
 
 const ddEvaluatorRouter = require('./routes/dd-evaluator');
+const ddlMarketRouter = require('./routes/ddl-market');
+const ddlCollectionRouter = require('./routes/ddl-collection');
 const coingeckoRouter = require('./routes/coingecko');
 const btcPublicRouter = require('./routes/btc-public');
 const authDexRouter = require('./routes/auth-dex');
@@ -76,8 +78,10 @@ app.use(cookieParser(resolveSessionSecret() || ''));
 function permissionsPolicyFor(request) {
 	const pathOnly = String((request && request.path) || '');
 	const tourneyMedia = /\/(tourney|__tourney_gate|bracket)(\/|$)/i.test(pathOnly);
-	const cam = tourneyMedia ? '(self)' : '()';
-	return `accelerometer=(), camera=${cam}, geolocation=(), gyroscope=(), magnetometer=(), microphone=${cam}, payment=(), usb=()`;
+	const cardScanner = /^\/(dd-evaluator|ddl|__ddl_gate)(\/|$)/i.test(pathOnly) || isDdlTcgHost(request);
+	const mic = tourneyMedia ? '(self)' : '()';
+	const cam = tourneyMedia || cardScanner ? '(self)' : '()';
+	return `accelerometer=(), camera=${cam}, geolocation=(), gyroscope=(), magnetometer=(), microphone=${mic}, payment=(), usb=()`;
 }
 
 function pathLooksSensitive(rawPath) {
@@ -179,6 +183,12 @@ app.use((request, response, next) => {
 });
 
 app.use('/api/dd-evaluator', ddEvaluatorRouter);
+app.use('/api/ddl-market', ddlMarketRouter);
+/** Same router under the evaluator prefix for hosts that hand `/api/*` to PHP. */
+app.use('/dd-evaluator/ddl-market', ddlMarketRouter);
+/** Signed-in DDL checklist + collector profile (km_sid session from auth-dex). */
+app.use('/dd-evaluator/ddl-collection', ddlCollectionRouter);
+app.use('/api/ddl-collection', ddlCollectionRouter);
 /** Keyless BTC spot + OHLC proxy (Coinbase + ECB FX). Mirrors match `/kk-auth`, `/kmx-*`, `/dd-evaluator/auth` routing quirks on LiteSpeed/APISIX. */
 app.use('/btc-public', btcPublicRouter);
 app.use('/kk-btc', btcPublicRouter);
@@ -244,6 +254,7 @@ const createTourneyRouter = require('./routes/tourney-bracket');
 const tourneyApi = createTourneyRouter({
 	dataDir: tourneyDataDir,
 	bracketDir,
+	dogeWatch: { enabled: !/^(0|false|off|no)$/i.test(String(process.env.DOGE_WATCH || '1')) },
 });
 function sendBracketPage(request, response) {
 	if (typeof createTourneyRouter.sendAppPage === 'function') {
@@ -518,11 +529,35 @@ function ddlGate(request, response, next) {
 	return next();
 }
 
+/** Card-scanner files the companion borrows from other folders; the gate only serves ddl/. */
+const DDL_SHARED_FILES = {
+	'shared/ddl-prints.js': path.join(siteRoot, 'bracket', 'ddl-prints.js'),
+	'shared/ddl-name-prints.js': path.join(siteRoot, 'bracket', 'ddl-name-prints.js'),
+	'shared/irl-watch.js': path.join(siteRoot, 'bracket', 'irl-watch.js'),
+	'shared/ddl-checklist.js': path.join(siteRoot, 'dd-evaluator', 'ddl-checklist.js'),
+	'shared/ddl-checklist-pdf.js': path.join(siteRoot, 'dd-evaluator', 'ddl-checklist-pdf.js'),
+};
+
+function sendDdlShared(sub, response, next) {
+	const filePath = DDL_SHARED_FILES[sub];
+	if (!filePath) return false;
+	response.sendFile(filePath, {
+		headers: {
+			'Cache-Control': 'private, max-age=86400',
+			'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive'
+		}
+	}, (err) => {
+		if (err) next();
+	});
+	return true;
+}
+
 app.use('/__ddl_gate', ddlGate, (request, response, next) => {
 	const p = String(request.path || '/');
 	if (p === '/' || p === '/index.html') {
 		return sendDdlIndex(response);
 	}
+	if (sendDdlShared(p.replace(/^\//, ''), response, next)) return;
 	next();
 }, express.static(path.join(siteRoot, 'ddl'), {
 	dotfiles: 'deny',
@@ -550,6 +585,7 @@ app.get(/^\/ddl\/.+$/, ddlGate, (request, response, next) => {
 	if (sub === 'index.html' || sub === 'index.htm') {
 		return sendDdlIndex(response);
 	}
+	if (sendDdlShared(sub, response, next)) return;
 	response.sendFile(filePath, {
 		headers: {
 			'Cache-Control': 'no-store, private',
@@ -714,6 +750,7 @@ if (require.main === module) {
 	const cb = () => {
 		console.log('KushBrand server listening (passenger=' + Boolean(process.env.PASSENGER_BASE_URI || process.env.PORT) + ')');
 		ddEvaluatorRouter.initEvaluator().catch(err => console.error('[dd-evaluator] Init failed:', err.message));
+		ddlMarketRouter.initDdlMarket();
 		const uiPw = ddEvaluatorRouter.getAdminUiPassword();
 		const traitPw = ddEvaluatorRouter.getExpectedDdAdminPassword();
 		if (uiPw && traitPw && uiPw !== traitPw) {

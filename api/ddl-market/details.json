@@ -1,0 +1,688 @@
+{
+  "V001": {
+    "id": "V001",
+    "name": "Chico",
+    "sold": [],
+    "asks": []
+  },
+  "V002": {
+    "id": "V002",
+    "name": "Daisy",
+    "sold": [],
+    "asks": []
+  },
+  "V003": {
+    "id": "V003",
+    "name": "Dash",
+    "sold": [],
+    "asks": []
+  },
+  "V004": {
+    "id": "V004",
+    "name": "Gary",
+    "sold": [],
+    "asks": []
+  },
+  "V005": {
+    "id": "V005",
+    "name": "Ginger",
+    "sold": [],
+    "asks": []
+  },
+  "V006": {
+    "id": "V006",
+    "name": "Icy",
+    "sold": [],
+    "asks": []
+  },
+  "V007": {
+    "id": "V007",
+    "name": "Jones",
+    "sold": [],
+    "asks": []
+  },
+  "V008": {
+    "id": "V008",
+    "name": "Mini",
+    "sold": [],
+    "asks": []
+  },
+  "V009": {
+    "id": "V009",
+    "name": "Poke",
+    "sold": [],
+    "asks": []
+  },
+  "V010": {
+    "id": "V010",
+    "name": "Prince",
+    "sold": [],
+    "asks": []
+  },
+  "V011": {
+    "id": "V011",
+    "name": "Pumpy",
+    "sold": [],
+    "asks": []
+  },
+  "V012": {
+    "id": "V012",
+    "name": "Stump",
+    "sold": [],
+    "asks": []
+  },
+  "V013": {
+    "id": "V013",
+    "name": "Thumpy",
+    "sold": [],
+    "asks": []
+  },
+  "V014": {
+    "id": "V014",
+    "name": "Web",
+    "sold": [],
+    "asks": []
+  },
+  "V015": {
+    "id": "V015",
+    "name": "Blade",
+    "sold": [],
+    "asks": []
+  },
+  "V016": {
+    "id": "V016",
+    "name": "Bone",
+    "sold": [],
+    "asks": []
+  },
+  "V017": {
+    "id": "V017",
+    "name": "Chart",
+    "sold": [],
+    "asks": []
+  },
+  "V018": {
+    "id": "V018",
+    "name": "Digger",
+    "sold": [],
+    "asks": []
+  },
+  "V019": {
+    "id": "V019",
+    "name": "Doom",
+    "sold": [],
+    "asks": []
+  },
+  "V020": {
+    "id": "V020",
+    "name": "Dumpy",
+    "sold": [],
+    "asks": []
+  },
+  "V021": {
+    "id": "V021",
+    "name": "Flame",
+    "sold": [],
+    "asks": []
+  },
+  "V022": {
+    "id": "V022",
+    "name": "Helios",
+    "sold": [],
+    "asks": []
+  },
+  "V023": {
+    "id": "V023",
+    "name": "Hunter",
+    "sold": [],
+    "asks": [
+      {
+        "usd": 125,
+        "print": "fa",
+        "grade": "raw",
+        "at": "2026-10-06",
+        "title": "2026 Doginal Dogs Legends TCG ROTP Hunter V023 Giga Rare First Edition Full Art Holo",
+        "url": "https://www.ebay.com/itm/407268741866",
+        "source": "ask"
+      }
+    ]
+  },
+  "V024": {
+    "id": "V024",
+    "name": "Loopy",
+    "sold": [],
+    "asks": []
+  },
+  "V025": {
+    "id": "V025",
+    "name": "Midi",
+    "sold": [],
+    "asks": []
+  },
+  "V026": {
+    "id": "V026",
+    "name": "Scroll",
+    "sold": [],
+    "asks": []
+  },
+  "V027": {
+    "id": "V027",
+    "name": "Stone",
+    "sold": [],
+    "asks": []
+  },
+  "V028": {
+    "id": "V028",
+    "name": "Sunny",
+    "sold": [],
+    "asks": []
+  },
+  "V029": {
+    "id": "V029",
+    "name": "Wayne",
+    "sold": [],
+    "asks": []
+  },
+  "V030": {
+    "id": "V030",
+    "name": "Champ",
+    "sold": [],
+    "asks": []
+  },
+  "V031": {
+    "id": "V031",
+    "name": "Dusty",
+    "sold": [],
+    "asks": []
+  },
+  "V032": {
+    "id": "V032",
+    "name": "Fitch",
+    "sold": [],
+    "asks": []
+  },
+  "V033": {
+    "id": "V033",
+    "name": "Goji",
+    "sold": [],
+    "asks": []
+  },
+  "V034": {
+    "id": "V034",
+    "name": "Mary",
+    "sold": [],
+    "asks": []
+  },
+  "V035": {
+    "id": "V035",
+    "name": "Mega",
+    "sold": [],
+    "asks": []
+  },
+  "V036": {
+    "id": "V036",
+    "name": "Plague",
+    "sold": [],
+    "asks": []
+  },
+  "V037": {
+    "id": "V037",
+    "name": "Scout",
+    "sold": [],
+    "asks": []
+  },
+  "V038": {
+    "id": "V038",
+    "name": "Shepherd",
+    "sold": [],
+    "asks": []
+  },
+  "V039": {
+    "id": "V039",
+    "name": "Skip",
+    "sold": [],
+    "asks": []
+  },
+  "V040": {
+    "id": "V040",
+    "name": "Spark",
+    "sold": [],
+    "asks": []
+  },
+  "V041": {
+    "id": "V041",
+    "name": "Surge",
+    "sold": [],
+    "asks": []
+  },
+  "V042": {
+    "id": "V042",
+    "name": "Sweetie",
+    "sold": [],
+    "asks": []
+  },
+  "V043": {
+    "id": "V043",
+    "name": "Yang",
+    "sold": [],
+    "asks": []
+  },
+  "V044": {
+    "id": "V044",
+    "name": "Boogie",
+    "sold": [],
+    "asks": []
+  },
+  "V045": {
+    "id": "V045",
+    "name": "Buster",
+    "sold": [],
+    "asks": []
+  },
+  "V046": {
+    "id": "V046",
+    "name": "Cherry",
+    "sold": [],
+    "asks": []
+  },
+  "V047": {
+    "id": "V047",
+    "name": "Houdini",
+    "sold": [],
+    "asks": []
+  },
+  "V048": {
+    "id": "V048",
+    "name": "Mama Light",
+    "sold": [],
+    "asks": []
+  },
+  "V049": {
+    "id": "V049",
+    "name": "Mento",
+    "sold": [],
+    "asks": []
+  },
+  "V050": {
+    "id": "V050",
+    "name": "Pulse",
+    "sold": [],
+    "asks": []
+  },
+  "V051": {
+    "id": "V051",
+    "name": "Reaper",
+    "sold": [],
+    "asks": []
+  },
+  "V052": {
+    "id": "V052",
+    "name": "Renza",
+    "sold": [],
+    "asks": []
+  },
+  "V053": {
+    "id": "V053",
+    "name": "Seeker",
+    "sold": [],
+    "asks": []
+  },
+  "V054": {
+    "id": "V054",
+    "name": "Shiboshi",
+    "sold": [],
+    "asks": []
+  },
+  "V055": {
+    "id": "V055",
+    "name": "Turbo",
+    "sold": [],
+    "asks": []
+  },
+  "V056": {
+    "id": "V056",
+    "name": "Bender",
+    "sold": [],
+    "asks": []
+  },
+  "V057": {
+    "id": "V057",
+    "name": "Gummy",
+    "sold": [],
+    "asks": []
+  },
+  "V058": {
+    "id": "V058",
+    "name": "Shield",
+    "sold": [],
+    "asks": []
+  },
+  "V059": {
+    "id": "V059",
+    "name": "Toot",
+    "sold": [],
+    "asks": []
+  },
+  "V060": {
+    "id": "V060",
+    "name": "Volt",
+    "sold": [],
+    "asks": []
+  },
+  "V061": {
+    "id": "V061",
+    "name": "Cookie",
+    "sold": [],
+    "asks": []
+  },
+  "V062": {
+    "id": "V062",
+    "name": "Mama Bark",
+    "sold": [],
+    "asks": []
+  },
+  "V063": {
+    "id": "V063",
+    "name": "Penny",
+    "sold": [],
+    "asks": [
+      {
+        "usd": 100,
+        "print": "fa",
+        "grade": "raw",
+        "at": "2026-10-06",
+        "title": "2026 Doginal Dogs Legends TCG ROTP Penny V063 Ultra Rare First Edition Full Art Holo",
+        "url": "https://www.ebay.com/itm/407268614874",
+        "source": "ask"
+      }
+    ]
+  },
+  "V064": {
+    "id": "V064",
+    "name": "Aria",
+    "sold": [],
+    "asks": []
+  },
+  "V065": {
+    "id": "V065",
+    "name": "Atlas",
+    "sold": [],
+    "asks": []
+  },
+  "V066": {
+    "id": "V066",
+    "name": "Manic",
+    "sold": [],
+    "asks": []
+  },
+  "V067": {
+    "id": "V067",
+    "name": "Wiggles",
+    "sold": [],
+    "asks": []
+  },
+  "V068": {
+    "id": "V068",
+    "name": "Bamba",
+    "sold": [],
+    "asks": []
+  },
+  "V069": {
+    "id": "V069",
+    "name": "Bark",
+    "sold": [],
+    "asks": []
+  },
+  "V070": {
+    "id": "V070",
+    "name": "Barron",
+    "sold": [],
+    "asks": []
+  },
+  "V071": {
+    "id": "V071",
+    "name": "Gigatron",
+    "sold": [],
+    "asks": []
+  },
+  "V072": {
+    "id": "V072",
+    "name": "Boost",
+    "sold": [],
+    "asks": []
+  },
+  "V073": {
+    "id": "V073",
+    "name": "Frostbolt",
+    "sold": [],
+    "asks": []
+  },
+  "V074": {
+    "id": "V074",
+    "name": "Quickdraw",
+    "sold": [],
+    "asks": []
+  },
+  "V075": {
+    "id": "V075",
+    "name": "Sacrifice",
+    "sold": [],
+    "asks": []
+  },
+  "V076": {
+    "id": "V076",
+    "name": "Snake Venom",
+    "sold": [],
+    "asks": []
+  },
+  "V077": {
+    "id": "V077",
+    "name": "Typhoon",
+    "sold": [],
+    "asks": []
+  },
+  "V078": {
+    "id": "V078",
+    "name": "Connection",
+    "sold": [],
+    "asks": []
+  },
+  "V079": {
+    "id": "V079",
+    "name": "Cull",
+    "sold": [],
+    "asks": []
+  },
+  "V080": {
+    "id": "V080",
+    "name": "Feast",
+    "sold": [],
+    "asks": []
+  },
+  "V081": {
+    "id": "V081",
+    "name": "Fireball",
+    "sold": [],
+    "asks": []
+  },
+  "V082": {
+    "id": "V082",
+    "name": "Haunted House",
+    "sold": [],
+    "asks": []
+  },
+  "V083": {
+    "id": "V083",
+    "name": "Love Bomb",
+    "sold": [],
+    "asks": []
+  },
+  "V084": {
+    "id": "V084",
+    "name": "Love Shot",
+    "sold": [],
+    "asks": []
+  },
+  "V085": {
+    "id": "V085",
+    "name": "Pact",
+    "sold": [],
+    "asks": []
+  },
+  "V086": {
+    "id": "V086",
+    "name": "Vanish",
+    "sold": [],
+    "asks": []
+  },
+  "V087": {
+    "id": "V087",
+    "name": "Airdrop",
+    "sold": [],
+    "asks": []
+  },
+  "V088": {
+    "id": "V088",
+    "name": "Cauldron",
+    "sold": [],
+    "asks": []
+  },
+  "V089": {
+    "id": "V089",
+    "name": "Chum The Water",
+    "sold": [],
+    "asks": []
+  },
+  "V090": {
+    "id": "V090",
+    "name": "Garden",
+    "sold": [],
+    "asks": []
+  },
+  "V091": {
+    "id": "V091",
+    "name": "Judgement",
+    "sold": [],
+    "asks": []
+  },
+  "V092": {
+    "id": "V092",
+    "name": "Meditation",
+    "sold": [],
+    "asks": []
+  },
+  "V093": {
+    "id": "V093",
+    "name": "Reborn",
+    "sold": [],
+    "asks": []
+  },
+  "V094": {
+    "id": "V094",
+    "name": "Scheme",
+    "sold": [],
+    "asks": []
+  },
+  "V095": {
+    "id": "V095",
+    "name": "Spearfish",
+    "sold": [],
+    "asks": []
+  },
+  "V096": {
+    "id": "V096",
+    "name": "Takedown",
+    "sold": [],
+    "asks": []
+  },
+  "V097": {
+    "id": "V097",
+    "name": "Swipe",
+    "sold": [],
+    "asks": []
+  },
+  "V098": {
+    "id": "V098",
+    "name": "Avenge",
+    "sold": [],
+    "asks": []
+  },
+  "V099": {
+    "id": "V099",
+    "name": "Booty Raid",
+    "sold": [],
+    "asks": []
+  },
+  "V100": {
+    "id": "V100",
+    "name": "Siphon",
+    "sold": [],
+    "asks": []
+  },
+  "V101": {
+    "id": "V101",
+    "name": "Black Hole",
+    "sold": [],
+    "asks": []
+  },
+  "V102": {
+    "id": "V102",
+    "name": "Ambush",
+    "sold": [],
+    "asks": []
+  },
+  "V103": {
+    "id": "V103",
+    "name": "Blast",
+    "sold": [],
+    "asks": []
+  },
+  "V104": {
+    "id": "V104",
+    "name": "Counterspell",
+    "sold": [],
+    "asks": []
+  },
+  "V105": {
+    "id": "V105",
+    "name": "Divine Shield",
+    "sold": [],
+    "asks": []
+  },
+  "V106": {
+    "id": "V106",
+    "name": "Frost Lock",
+    "sold": [],
+    "asks": []
+  },
+  "V107": {
+    "id": "V107",
+    "name": "Landmine",
+    "sold": [],
+    "asks": []
+  },
+  "V108": {
+    "id": "V108",
+    "name": "Pitfall",
+    "sold": [],
+    "asks": []
+  },
+  "V109": {
+    "id": "V109",
+    "name": "Intel",
+    "sold": [],
+    "asks": []
+  },
+  "V110": {
+    "id": "V110",
+    "name": "Spring Trap",
+    "sold": [],
+    "asks": []
+  },
+  "V111": {
+    "id": "V111",
+    "name": "Tidal Wave",
+    "sold": [],
+    "asks": []
+  }
+}

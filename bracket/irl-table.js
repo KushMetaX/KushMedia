@@ -3,6 +3,7 @@
  * turn-counted crystals (T1 = 1, cap 10, leftover lost), used-mana pips,
  * second-player Coin (+1 once), gold Legends playmat overlay,
  * 60s shot clock, Companion lane peeks, hand lock, deck lock, watcher.
+ * Referee alerts live in irl-ref.js and must not touch the lane scanner.
  */
 (function (global) {
   const START_LIFE = 40;
@@ -52,13 +53,14 @@
   }
 
   function searchKindOf(value) {
-    if (value === 'gy' || value === 'hand' || value === 'deck') return value;
+    if (value === 'gy' || value === 'hand' || value === 'deck' || value === 'banish') return value;
     return '';
   }
 
   function searchLabel(kind) {
     if (kind === 'gy') return 'GY';
     if (kind === 'hand') return 'hand';
+    if (kind === 'banish') return 'Banish';
     return 'deck';
   }
 
@@ -780,7 +782,7 @@
       <div class="hud-meters">
         <div>
           <p class="hud-kicker">Health</p>
-          <p class="hud-life${dead ? ' dead' : low ? ' low' : ''}">${seatHud.life}</p>
+          <p class="hud-life${dead ? ' dead' : low ? ' low' : ''}" data-hero="${meta.seat || ''}">${seatHud.life}</p>
           ${lifeBtns}
         </div>
         <div>
@@ -794,6 +796,9 @@
         </div>
       </div>
       ${coinBtn}
+      ${mine && meta.canPass ? `<div class="irl-ref-btns">
+        <button type="button" class="btn ghost" data-attack="1">${meta.attackMode ? 'Cancel attack' : 'Declare attack'}</button>
+      </div>` : ''}
       ${turnBtn}
     </div>`;
   }
@@ -821,6 +826,12 @@
     function canSit(n) {
       if (n !== 1 && n !== 2) return false;
       return entryMatchesUser(n === 1 ? player1 : player2, opts.viewer);
+    }
+
+    function seedPlayName(n) {
+      const entry = n === 1 ? player1 : n === 2 ? player2 : null;
+      if (!entry) return '';
+      return String(entry.playName || (entry.registeredDeck && entry.registeredDeck.playName) || '').trim();
     }
 
     function resolveSeat() {
@@ -867,7 +878,7 @@
       root.innerHTML = `<div class="irl-page">
         <p class="irl-crumb">${opts.backHref ? `<a href="${esc(opts.backHref)}">${esc(opts.eventName || 'Bracket')}</a>` : `<span>${esc(opts.eventName || 'Doginal Dogs Legends')}</span>`}<span> / </span><span>Verified table</span></p>
         <h1>${esc(player1 && player1.handle ? player1.handle : 'TBD')} <span class="muted">vs</span> ${esc(player2 && player2.handle ? player2.handle : 'TBD')}</h1>
-        <p class="muted">Lock your 40-card list, then point the rear camera at the mat. Creature and spell/trap boxes match official art and the printed name against that list — Skip vs Spark vs Plague is easy in a 40, not in all 111. Extra, Deck, Banish, and GY stay unnamed. Each turn is 60 seconds.</p>
+        <p class="muted">After you sit, submit your DDL TCG in-game name to lock a saved Play list — or paste / pick a Companion 40. Then point the rear camera at the mat. Creature and spell/trap boxes match official art and the printed name against that list — Skip vs Spark vs Plague is easy in a 40, not in all 111. Extra, Deck, Banish, and GY stay unnamed. Each turn is 60 seconds.</p>
         <div class="irl-card">
           <p class="muted">${esc(gate)}</p>
           ${signedIn ? '' : `<p class="irl-seat-grid"><a class="btn" href="${esc(discordHref)}">Sign in with Discord to sit</a></p>`}
@@ -924,8 +935,13 @@
       let watchTimer = 0;
       let lastWatch = { 1: '', 2: '' };
       const detectHold = { 1: {}, 2: {} };
+      const attack = { mode: '', attackers: [], target: null };
+      const refLog = [];
+      const logHeld = new Set();
       let pickerLane = null;
       let catalogReady = false;
+      let playNameDraft = seedPlayName(seat);
+      let pasteErr = '';
       let joined = false;
       let peers = [];
       const P2PRoom = global.DdlP2PRoom;
@@ -1128,6 +1144,139 @@
         }, 900);
       }
 
+      function lifeOf(n) {
+        if (n === seat) return Number(localHud.life) || 0;
+        const hud = remoteHud[n];
+        return Number(hud && hud.life) || START_LIFE;
+      }
+
+      function appendRefLog(list) {
+        const current = new Set();
+        (list || []).forEach((n) => {
+          if (!n || !n.text) return;
+          const key = `${n.kind}|${n.text}`;
+          current.add(key);
+          if (logHeld.has(key)) return;
+          logHeld.add(key);
+          refLog.push({
+            kind: n.kind,
+            level: n.level || '',
+            seat: n.seat || 0,
+            text: n.text,
+            at: Date.now(),
+          });
+        });
+        [...logHeld].forEach((key) => {
+          if (!current.has(key)) logHeld.delete(key);
+        });
+        if (refLog.length > 80) refLog.splice(0, refLog.length - 80);
+        renderRefLog();
+      }
+
+      function renderRefLog() {
+        const list = root.querySelector('[data-ref-log-list]');
+        if (!list) return;
+        list.innerHTML = refLog.slice(-40).map((n) => {
+          const cls = n.level === 'illegal' ? 'is-bad' : (n.level === 'ok' ? 'is-ok' : '');
+          return `<li class="${cls}">${esc(n.text)}</li>`;
+        }).join('');
+        const wrap = root.querySelector('[data-ref-log]');
+        if (wrap) wrap.hidden = refLog.length === 0;
+      }
+
+      function setPhaseNote(text) {
+        const el = root.querySelector('[data-phase]');
+        if (!el) return;
+        el.hidden = !text;
+        el.textContent = text || '';
+      }
+
+      function resetAttack() {
+        attack.mode = '';
+        attack.attackers = [];
+        attack.target = null;
+      }
+
+      function attackHint() {
+        if (attack.mode === 'poison') return 'Snake Venom: tap a Pirate you control';
+        if (attack.mode === 'attacker') return 'Tap your creature, then an enemy body or their life';
+        if (attack.mode === 'target') return 'Tap an enemy creature or their life total';
+        return '';
+      }
+
+      function applyAttackVerdict(verdict) {
+        const notes = (verdict && verdict.notes) || [];
+        appendRefLog(notes);
+        const alertEl = root.querySelector('[data-alerts]');
+        if (alertEl && notes.length) {
+          alertEl.hidden = false;
+          alertEl.textContent = notes.map((n) => n.text).join(' · ');
+          alertEl.classList.toggle('is-ok', notes.every((n) => n.level === 'ok'));
+        }
+        const ok = Boolean(verdict && verdict.ok);
+        toast(root, notes[0] ? notes[0].text : (ok ? 'Attack is legal' : 'Illegal attack'), ok);
+      }
+
+      function judgeCurrentAttack() {
+        const Ref = global.DdlIrlRef;
+        const Cat = global.DdlIrlCatalog;
+        if (!Ref || !attack.attackers.length || !attack.target) return;
+        const verdict = Ref.judgeAttack({
+          seatN: seat,
+          boardSeat: board[seat],
+          enemyBoard: board[seat === 1 ? 2 : 1],
+          clock,
+          attackers: attack.attackers,
+          target: attack.target,
+          catalog: Cat,
+        });
+        applyAttackVerdict(verdict);
+      }
+
+      function onAttackLane(seatN, key) {
+        const Ref = global.DdlIrlRef;
+        const Cat = global.DdlIrlCatalog;
+        if (!Ref) return;
+        if (attack.mode === 'poison') {
+          if (seatN !== seat) return;
+          const card = Cat && Cat.byId(laneSlotOf(board[seat], key).id);
+          if (!card || card.type !== 'Creature') return;
+          const pirate = String(card.class || '') === 'Pirate' || (card.classes || []).indexOf('Pirate') >= 0 || card.all_class;
+          if (!pirate) {
+            toast(root, 'Poison needs a Pirate you control', false);
+            return;
+          }
+          Ref.grantPoison(seat, key);
+          appendRefLog([{ kind: 'venom', level: 'ok', seat, text: `${card.name} has Poison until end of turn.` }]);
+          toast(root, `${card.name} has Poison this turn`, true);
+          resetAttack();
+          renderChrome();
+          return;
+        }
+        if (seatN === seat && String(key).indexOf('creature-') === 0) {
+          if (attack.mode === 'target' && attack.target && attack.attackers.indexOf(key) < 0) {
+            attack.attackers.push(key);
+            judgeCurrentAttack();
+            return;
+          }
+          attack.attackers = [key];
+          attack.mode = 'target';
+          toast(root, 'Now tap the enemy creature or their life', true);
+          renderChrome();
+          return;
+        }
+        if (attack.mode === 'target' && seatN !== seat && String(key).indexOf('creature-') === 0) {
+          attack.target = { kind: 'creature', seat: seatN, key };
+          judgeCurrentAttack();
+        }
+      }
+
+      function onHeroTarget(n) {
+        if (attack.mode !== 'target' || n === seat) return;
+        attack.target = { kind: 'hero', seat: n, key: '' };
+        judgeCurrentAttack();
+      }
+
       function passTurn(reason) {
         if (seat !== 1 && seat !== 2) return;
         if (!clock.started) return;
@@ -1135,12 +1284,27 @@
           if (clock.searching) return;
           if (remainingMs(clock) > 250) return;
         } else if (clock.active !== seat) return;
+        const ending = clock.active;
         const next = clock.active === 1 ? 2 : 1;
+        const Ref = global.DdlIrlRef;
+        const Cat = global.DdlIrlCatalog;
+        const phase = [];
+        if (Ref && Cat) {
+          phase.push(...(Ref.phaseNotes('end', ending, board[ending], Cat) || []));
+          phase.push(...(Ref.phaseNotes('start', next, board[next], Cat) || []));
+        }
         clock.active = next;
         clock.turns[next] = (clock.turns[next] || 0) + 1;
         clock.used = { 1: 0, 2: 0 };
         clock.coinArmed = false;
+        resetAttack();
         armTurn(clock);
+        if (phase.length) {
+          appendRefLog(phase);
+          setPhaseNote(phase.map((n) => n.text).join(' · '));
+        } else {
+          setPhaseNote('');
+        }
         pushClock();
       }
 
@@ -1161,6 +1325,16 @@
       function endSearch() {
         if (seat !== 1 && seat !== 2) return;
         if (clock.searching !== seat) return;
+        const Ref = global.DdlIrlRef;
+        if (Ref && typeof Ref.canResume === 'function') {
+          const st = Ref.seatMem ? Ref.seatMem(seat) : null;
+          const pileSeat = (st && st.expectOn) || seat;
+          const check = Ref.canResume(pileSeat, clock.searchKind);
+          if (check && check.ok === false) {
+            toast(root, `Put the ${Ref.pileLabel(check.missing)} back before resuming.`, false);
+            return;
+          }
+        }
         const left = Math.max(0, Number(clock.searchLeftMs) || 0);
         clock.searching = 0;
         clock.searchKind = '';
@@ -1284,6 +1458,8 @@
           el.classList.toggle('is-pile', Boolean(pile));
           el.classList.toggle('is-filled', Boolean(!pile && (slot.id || slot.occupied)));
           el.classList.toggle('is-alert', key === 'extra' && slot.occupied);
+          el.classList.toggle('is-searching', Boolean(clock.searching === seatN && (clock.searchKind === key || (clock.searchKind === 'gy' && key === 'banish'))));
+          el.classList.toggle('is-attack', Boolean(attack.mode && key.indexOf('creature-') === 0 && (attack.attackers.indexOf(key) >= 0 || (attack.mode === 'target' && seatN !== seat))));
           el.disabled = Boolean(pile);
           if (card) {
             el.setAttribute('data-peek', card.id);
@@ -1305,6 +1481,10 @@
             ev.preventDefault();
             ev.stopPropagation();
             if (pile) return;
+            if (attack.mode) {
+              onAttackLane(seatN, key);
+              return;
+            }
             if (card && Cat) {
               Cat.showPeek(card.id, el, 'pin');
               return;
@@ -1350,6 +1530,12 @@
         const Cat = global.DdlIrlCatalog;
         const semi = Boolean(opts.semiIrl);
         const mine = seat === 1 || seat === 2;
+        const quota = Cat && typeof Cat.sanitizeClassQuota === 'function'
+          ? Cat.sanitizeClassQuota(opts.deckClassQuota)
+          : null;
+        const quotaLabel = quota && Cat && typeof Cat.classQuotaLabel === 'function'
+          ? Cat.classQuotaLabel(quota)
+          : '';
         function packHtml(n) {
           const pack = decks[n];
           const name = handleName(n);
@@ -1357,44 +1543,132 @@
           const status = pack.ok ? 'Locked 40' : `Locked · ${esc((pack.errors && pack.errors[0]) || 'check list')}`;
           return `<p><strong>${esc(name)}</strong> · ${esc(pack.name)} · ${esc(status)}</p>`;
         }
-        const customs = Cat ? Cat.customDecks() : [];
+        const customs = Cat ? Cat.customDecks().slice() : [];
+        const registered = mine && ((seat === 1 ? opts.player1 : opts.player2) || {}).registeredDeck;
+        if (registered && registered.counts) {
+          customs.unshift({
+            id: 'registered-tourney',
+            name: `${registered.name || 'Registered deck'} (tournament lock)`,
+            hero: '',
+            heroes: [],
+            cards: registered.counts,
+          });
+        }
         const customOpts = customs.map((d) => `<option value="${esc(d.id)}">${esc(d.name)} (${esc((d.heroes || []).join('/'))})</option>`).join('');
         mountEl.hidden = false;
-        const key = `d|${semi ? 1 : 0}|${mine ? seat : 0}|${decks[1] ? decks[1].total : 0}|${decks[2] ? decks[2].total : 0}|${catalogReady ? 1 : 0}|${customs.length}`;
+        const key = `d|${semi ? 1 : 0}|${mine ? seat : 0}|${decks[1] ? decks[1].total : 0}|${decks[2] ? decks[2].total : 0}|${catalogReady ? 1 : 0}|${customs.length}|${pasteErr ? 'err' : '0'}|${quotaLabel || '0'}`;
         if (mountEl.dataset.key === key) return;
         mountEl.dataset.key = key;
         mountEl.innerHTML = `<p class="hud-kicker">${semi ? 'Semi-IRL · verified lists' : 'Deck lock'}</p>
           <p class="muted">${semi
-            ? 'Lock your 40-card Companion list. Auto-ID matches official art and printed names on that list only (Skip / Spark / Plague / Houdini, not all 111).'
-            : 'Lock your 40-card Companion list first. Auto-ID matches art and names from that list — not the whole 111-card pool.'}</p>
+            ? 'Paste the list you exported from ddltcg.com/play, or pick a Companion list. Auto-ID matches official art and printed names on that list only (Skip / Spark / Plague / Houdini, not all 111).'
+            : 'Paste your ddltcg.com/play export to lock a 40 (or pick a Companion list). Auto-ID matches art and names from that list — not the whole 111-card pool.'}</p>
+          ${quotaLabel ? `<p class="deck-quota-note" role="status"><strong>You need ${esc(quotaLabel)} in this deck.</strong>${quota.class === 'Neutral' ? ' Neutral cards count toward this mix.' : ' Mini, Midi, and Mega count as the hero class. Neutral does not.'}</p>` : ''}
           ${packHtml(1)}${packHtml(2)}
           ${mine ? `<div class="irl-deck-lock">
-            ${customOpts ? `<label>My decks<select data-custom-deck><option value="">Pick a saved list</option>${customOpts}</select></label>` : '<p class="muted">No Companion My decks on this browser. Paste a list, or build one on ddltcg.kushmetax.com.</p>'}
-            <label>Paste list<textarea data-deck-paste rows="3" placeholder="V001 x3&#10;V017 x2"></textarea></label>
-            <button type="button" class="btn" data-deck-lock>Lock my list</button>
+            <label>DDL TCG in-game name <span class="muted">(optional)</span>
+              <input data-play-name maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Hero name on Play" value="${esc(playNameDraft)}">
+            </label>
+            ${customOpts ? `<label>My decks<select data-custom-deck><option value="">Pick a saved list</option>${customOpts}</select></label>` : '<p class="muted">No Companion My decks on this browser. Paste your Play export below.</p>'}
+            <label>Paste your Play export<textarea data-deck-paste rows="4" spellcheck="false" placeholder="# DDL TCG&#10;# name: My Deck&#10;3× Blade&#10;# serials: V015,V015,V015"></textarea></label>
+            ${pasteErr ? `<p class="err">${esc(pasteErr)}</p>` : ''}
+            <div class="row wrap">
+              <button type="button" class="btn" data-deck-lock>Lock my list</button>
+              <button type="button" class="btn ghost" data-export-list>Export selected</button>
+            </div>
           </div>` : ''}`;
+        const nameEl = mountEl.querySelector('[data-play-name]');
+        if (nameEl) {
+          nameEl.oninput = () => {
+            playNameDraft = String(nameEl.value || '').trim();
+          };
+        }
+        function selectedList() {
+          const liveCat = global.DdlIrlCatalog;
+          const pasted = mountEl.querySelector('[data-deck-paste]');
+          if (liveCat && typeof liveCat.parsePlayList === 'function' && pasted && String(pasted.value || '').trim()) {
+            const parsed = liveCat.parsePlayList(pasted.value);
+            if (parsed.count) {
+              return {
+                counts: parsed.counts,
+                meta: {
+                  name: parsed.name || 'Pasted list',
+                  hero: '',
+                  heroes: liveCat.heroesFromCounts ? liveCat.heroesFromCounts(parsed.counts) : [],
+                },
+                unknown: parsed.unknown || [],
+              };
+            }
+          }
+          const sel = mountEl.querySelector('[data-custom-deck]');
+          const picked = sel && sel.value;
+          if (picked) {
+            const custom = customs.find((d) => d.id === picked);
+            if (custom) {
+              return {
+                counts: custom.cards,
+                meta: { name: custom.name, hero: custom.hero, heroes: custom.heroes },
+              };
+            }
+          }
+          if (mine && decks[seat] && decks[seat].counts) {
+            return {
+              counts: decks[seat].counts,
+              meta: { name: decks[seat].name, heroes: decks[seat].heroes, slot: decks[seat].slot },
+            };
+          }
+          return null;
+        }
         const lockBtn = mountEl.querySelector('[data-deck-lock]');
         if (lockBtn) {
-          lockBtn.onclick = () => {
-            if (!Cat) return toast(root, 'Companion catalog is still loading', false);
-            const sel = mountEl.querySelector('[data-custom-deck]');
-            const pasted = mountEl.querySelector('[data-deck-paste]');
-            let counts = Cat.parseDeckText(pasted && pasted.value);
-            let meta = { name: 'Pasted list', heroes: [] };
-            const picked = sel && sel.value;
-            if (picked) {
-              const custom = customs.find((d) => d.id === picked);
-              if (custom) {
-                counts = custom.cards;
-                meta = { name: custom.name, hero: custom.hero, heroes: custom.heroes };
-              }
+          lockBtn.onclick = async () => {
+            const liveCat = global.DdlIrlCatalog;
+            if (!liveCat) return toast(root, 'Companion catalog failed to load. Refresh the page.', false);
+            try {
+              if (typeof liveCat.load === 'function') await liveCat.load();
+            } catch (_err) {
+              return toast(root, 'Companion catalog failed to load. Refresh the page.', false);
             }
-            const checked = Cat.validateDeck(counts, meta.heroes);
-            if (!checked.ok) {
-              toast(root, checked.errors[0] || 'List is not a legal 40', false);
+            const picked = selectedList();
+            if (!picked) return toast(root, 'Paste your Play export or pick a saved deck', false);
+            if (picked.unknown && picked.unknown.length) {
+              pasteErr = `Could not read: ${picked.unknown.slice(0, 4).join(', ')}`;
+              mountEl.dataset.key = '';
+              renderDecksPanel();
+              return toast(root, pasteErr, false);
             }
-            lockMyDeck(counts, meta);
+            pasteErr = '';
+            const checked = liveCat.validateDeck(picked.counts, picked.meta.heroes);
+            if (quota && typeof liveCat.evaluateClassQuota === 'function') {
+              const mix = liveCat.evaluateClassQuota(picked.counts, quota);
+              if (!mix.ok) return toast(root, mix.message || 'This list misses the class mix', false);
+            }
+            if (!checked.ok) toast(root, checked.errors[0] || 'List is not a legal 40', false);
+            lockMyDeck(picked.counts, picked.meta);
             if (checked.ok) toast(root, 'List locked for this table', true);
+          };
+        }
+        const exportBtn = mountEl.querySelector('[data-export-list]');
+        if (exportBtn) {
+          exportBtn.onclick = async () => {
+            const liveCat = global.DdlIrlCatalog;
+            const picked = selectedList();
+            if (!picked) return toast(root, 'Paste your Play export or pick a saved deck', false);
+            if (!liveCat || typeof liveCat.exportDeckText !== 'function') {
+              return toast(root, 'Companion catalog failed to load. Refresh the page.', false);
+            }
+            try {
+              if (typeof liveCat.load === 'function') await liveCat.load();
+            } catch (_err) {
+              return toast(root, 'Companion catalog failed to load. Refresh the page.', false);
+            }
+            const text = liveCat.exportDeckText({
+              name: picked.meta.name,
+              playName: playNameDraft,
+              counts: picked.counts,
+              heroes: picked.meta.heroes,
+            });
+            await liveCat.copyText(text, exportBtn);
           };
         }
       }
@@ -1473,9 +1747,12 @@
         const offCam = clock.started && !clock.searching && handStatus[active] === 'ready' && hands[active] === 0;
         const note = root.querySelector('[data-shot-note]');
         if (note && !clock.searching) {
-          note.textContent = offCam
-            ? `${handleName(active)} · hands off cam`
-            : '60s shot clock · auto-pass at 0:00';
+          const atk = attackHint();
+          note.textContent = atk
+            ? atk
+            : (offCam
+              ? `${handleName(active)} · hands off cam`
+              : '60s shot clock · auto-pass at 0:00');
         }
         if (!clock.searching && remainingMs(clock) <= 0) passTurn('timeout');
       }
@@ -1605,7 +1882,55 @@
           } else if (sig !== lastWatch[seatN]) {
             lastWatch[seatN] = sig;
           }
-          notes.push(...Watch.alertsFromScan(seatN, hits, board[seatN], clock, decks[seatN] && decks[seatN].counts, Cat.byId));
+          const Ref = global.DdlIrlRef;
+          if (Ref) {
+            try {
+              const peek = global.DdlIrlHands && DdlIrlHands.peek ? DdlIrlHands.peek(video) : null;
+              const pileEls = [...cam.querySelectorAll('[data-lane]')].filter((el) => {
+                const key = el.getAttribute('data-lane');
+                return key === 'deck' || key === 'gy' || key === 'extra' || key === 'banish' || key === 'hand';
+              });
+              const enemySeat = seatN === 1 ? 2 : 1;
+              const verdict = Ref.observe({
+                seatN,
+                hits,
+                boardSeat: board[seatN],
+                enemyBoard: board[enemySeat],
+                clock,
+                lockedCounts: counts,
+                catalog: Cat,
+                video,
+                pileEls,
+                landmarks: peek && peek.landmarks,
+                life: { 1: lifeOf(1), 2: lifeOf(2) },
+                available: availableOf(clock, seatN),
+                used: clock.used[seatN] || 0,
+                wentSecond: seatN === secondOf(clock),
+                coinArmed: Boolean(clock.coinArmed && clock.active === seatN),
+                coinSpent: Boolean(clock.coinSpent),
+                offCam: Boolean(clock.started && !clock.searching && clock.active === seatN && handStatus[seatN] === 'ready' && hands[seatN] === 0),
+              });
+              notes.push(...(verdict.notes || []));
+              if (verdict.searchKind && seat === seatN && !clock.searching) {
+                beginSearch(verdict.searchKind);
+              }
+              if (verdict.spendMana != null && seat === seatN && (clock.used[seat] || 0) !== verdict.spendMana) {
+                setUsed(verdict.spendMana, true);
+              }
+              if (verdict.coinHint && seat === seatN) {
+                toast(root, 'This play is 1 over. Spend the Coin (+1).', true);
+              }
+              if (verdict.pickPoison && seat === seatN) {
+                attack.mode = 'poison';
+                attack.attackers = [];
+                attack.target = null;
+              }
+            } catch (_err) {
+              notes.push(...Watch.alertsFromScan(seatN, hits, board[seatN], clock, decks[seatN] && decks[seatN].counts, Cat.byId));
+            }
+          } else {
+            notes.push(...Watch.alertsFromScan(seatN, hits, board[seatN], clock, decks[seatN] && decks[seatN].counts, Cat.byId));
+          }
         });
         const alertEl = root.querySelector('[data-alerts]');
         if (alertEl) {
@@ -1618,6 +1943,8 @@
           });
           alertEl.hidden = unique.length === 0;
           alertEl.textContent = unique.map((n) => n.text).join(' · ');
+          alertEl.classList.toggle('is-ok', unique.length > 0 && unique.every((n) => n.level === 'ok'));
+          appendRefLog(unique);
         }
         const watchNote = root.querySelector('[data-watch-note]');
         if (watchNote) {
@@ -1646,12 +1973,12 @@
         pushClock();
       }
 
-      function setUsed(n) {
+      function setUsed(n, fromRef) {
         if (seat !== 1 && seat !== 2) return;
         if (!clock.started || clock.active !== seat) return;
         const avail = availableOf(clock, seat);
         let next = clamp(Number(n) || 0, 0, avail);
-        if ((clock.used[seat] || 0) === next && next !== 0) next -= 1;
+        if (!fromRef && (clock.used[seat] || 0) === next && next !== 0) next -= 1;
         clock.used[seat] = clamp(next, 0, avail);
         pushClock();
       }
@@ -1799,8 +2126,13 @@
           <span class="muted mono" data-rtt hidden></span>
         </div>
         <div class="irl-clock-mount" data-clock></div>
+        <p class="irl-phase" data-phase hidden></p>
         <p class="irl-alert" data-alerts hidden></p>
         <p class="muted" data-watch-note></p>
+        <details class="irl-ref-log" data-ref-log hidden>
+          <summary>Referee log</summary>
+          <ol data-ref-log-list></ol>
+        </details>
         <div class="irl-card irl-decks" data-decks></div>
         <p class="irl-stall" data-stall hidden>Direct link failed on this network. Stay on the page and retry the camera.</p>
         <div class="irl-actions" data-actions></div>
@@ -2087,7 +2419,10 @@
           if (wait) wait.textContent = panel.waiting;
           const hudMount = wrap.querySelector('[data-hud]');
           const hint = handHintFor(panel.n, Boolean(panel.stream), panel.hud.camLive);
-          const meta = hudMeta(clock, panel.n, panel.mine);
+          const meta = Object.assign(hudMeta(clock, panel.n, panel.mine), {
+            seat: panel.n,
+            attackMode: Boolean(panel.mine && attack.mode),
+          });
           hudMount.innerHTML = hudHtml(panel.hud, panel.mine, hint, meta);
           if (panel.mine) {
             hudMount.querySelectorAll('[data-life]').forEach((btn) => {
@@ -2100,6 +2435,23 @@
             if (turn) turn.onclick = () => passTurn();
             const coin = hudMount.querySelector('[data-coin]');
             if (coin) coin.onclick = () => spendCoin();
+            const atk = hudMount.querySelector('[data-attack]');
+            if (atk) {
+              atk.onclick = () => {
+                if (attack.mode) resetAttack();
+                else {
+                  attack.mode = 'attacker';
+                  toast(root, attackHint(), true);
+                }
+                renderChrome();
+              };
+            }
+          } else {
+            const hero = hudMount.querySelector('[data-hero]');
+            if (hero) {
+              hero.classList.toggle('is-target', attack.mode === 'target');
+              hero.onclick = () => onHeroTarget(panel.n);
+            }
           }
         }
         paintSide('top', top);
@@ -2159,7 +2511,7 @@
             if (lock.dataset.key !== lockKey) {
               lock.dataset.key = lockKey;
               lock.innerHTML = `<p class="muted">Only the host can lock this series. Sit, play, and keep health and mana in sync — the host types the games won when the paper match is over.</p>
-                ${typeof opts.onHostGate === 'function' ? '<button type="button" class="btn" data-host-lock>Host sign in to lock</button>' : ''}`;
+                ${typeof opts.onHostGate === 'function' ? '<button type="button" class="btn" data-host-lock>Admin or host can lock</button>' : ''}`;
               const gate = lock.querySelector('[data-host-lock]');
               if (gate) {
                 gate.onclick = async () => {

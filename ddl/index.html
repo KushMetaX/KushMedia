@@ -25,7 +25,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=peek5">
+  <link rel="stylesheet" href="styles.css?v=peek6">
+  <link rel="stylesheet" href="checklist.css?v=cl4">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -41,6 +42,7 @@
     </div>
     <nav class="tabs" id="tabs" aria-label="Companion sections">
       <button type="button" data-tab="cards" class="active">Cards</button>
+      <button type="button" data-tab="checklist">Checklist</button>
       <button type="button" data-tab="mechanics">How to play</button>
       <button type="button" data-tab="decks">Decks</button>
       <button type="button" data-tab="builder">My decks</button>
@@ -102,6 +104,46 @@
       <div id="card-grid" class="grid"></div>
     </section>
 
+    <section id="view-checklist" class="view">
+      <header class="view-intro">
+        <h2>Rise of the Pack checklist</h2>
+        <p>Scan your cards, or set how many copies you own with − and +. Chase cards use Base for a non-full-art copy and Full Art for the chase print. Download the PDF checklist, type 1x / 2x / 3x over each dash, save, and import that same file. Graded slabs stay on this device.</p>
+      </header>
+      <div class="cl-summary" id="cl-summary"></div>
+      <div class="btn-row cl-actions">
+        <button type="button" id="cl-scan">Scan cards</button>
+        <button type="button" class="ghost" id="cl-copy">Copy missing list</button>
+        <button type="button" class="ghost" id="cl-export">PDF checklist</button>
+        <label class="btn ghost cl-file">Import PDF<input type="file" id="cl-import" accept="application/pdf,.pdf" hidden></label>
+        <button type="button" class="ghost" id="cl-clear">Clear</button>
+      </div>
+      <div class="toolbar">
+        <label class="field grow">
+          <span>Search</span>
+          <input id="cl-q" type="search" placeholder="Toot, V059, or 59" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Rarity</span>
+          <select id="cl-tier"></select>
+        </label>
+        <label class="field">
+          <span>Class</span>
+          <select id="cl-class"></select>
+        </label>
+        <label class="field">
+          <span>Show</span>
+          <select id="cl-show">
+            <option value="">Every card</option>
+            <option value="missing">Still missing</option>
+            <option value="owned">Have at least one</option>
+            <option value="spares">Have spares</option>
+          </select>
+        </label>
+      </div>
+      <p class="meta" id="cl-meta"></p>
+      <ol class="cl-rows" id="cl-rows"></ol>
+    </section>
+
     <section id="view-mechanics" class="view"></section>
 
     <section id="view-decks" class="view">
@@ -137,7 +179,7 @@
     <section id="view-builder" class="view">
       <header class="view-intro">
         <h2>Build and rank your own 40</h2>
-        <p>Paste a list, pick cards, or generate a 40. Strength uses the same scoring as the featured decks — trap density, answers, engines, and finishers. Saved in this browser only.</p>
+        <p>Import a Play list, pick cards, or generate a 40. Strength uses the same scoring as the featured decks — trap density, answers, engines, and finishers. Saved in this browser only.</p>
       </header>
       <div class="builder-tabs" role="tablist" aria-label="Builder mode">
         <button type="button" class="kind-btn active" data-builder="edit">Input a list</button>
@@ -166,19 +208,13 @@
               </label>
             </div>
             <div id="custom-rank"></div>
+            <p class="io-msg" id="custom-io-msg" hidden></p>
             <div class="btn-row">
               <button type="button" class="btn" id="custom-save">Save list</button>
-              <button type="button" data-copy="custom-list">Copy decklist</button>
-              <button type="button" class="ghost" data-copy="custom-serials">Copy serials</button>
-              <button type="button" class="ghost" id="custom-delete">Delete</button>
-            </div>
-            <label class="field grow">
-              <span>Paste a list</span>
-              <textarea id="custom-paste" rows="3" placeholder="3x V004 Gary&#10;2 Ambush&#10;V106"></textarea>
-            </label>
-            <div class="btn-row">
-              <button type="button" class="btn" id="custom-parse">Add pasted cards</button>
+              <button type="button" class="ghost" id="custom-import" title="Paste a list into your builder">Import</button>
+              <button type="button" class="ghost" id="custom-export" title="Copy your list">Export</button>
               <button type="button" class="ghost" id="custom-clear">Clear list</button>
+              <button type="button" class="ghost" id="custom-delete">Delete</button>
             </div>
             <div class="builder-grid">
               <div>
@@ -228,6 +264,57 @@
     <div class="modal-card" id="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div>
   </div>
 
+  <div class="io-overlay" id="custom-io" hidden aria-hidden="true">
+    <div class="io-panel" role="dialog" aria-modal="true" aria-labelledby="custom-io-title">
+      <h2 id="custom-io-title">Import your list</h2>
+      <p class="io-copy" id="custom-io-copy">Paste a list you exported, <b>3× Card Name</b> lines, or V001 serials. This only fills <b>your</b> builder.</p>
+      <textarea id="custom-io-text" class="io-text" rows="12" spellcheck="false" autocomplete="off" placeholder="# DDL TCG&#10;3× Blade&#10;2× Snake Venom&#10;# serials: V015,V015,V015,V076,V076"></textarea>
+      <p class="io-status" id="custom-io-status" hidden></p>
+      <div class="io-actions">
+        <button type="button" class="btn ghost" id="custom-io-cancel">Cancel</button>
+        <button type="button" class="btn" id="custom-io-apply">Import into builder</button>
+      </div>
+    </div>
+  </div>
+
+  <dialog class="cl-scan" id="cl-scan-dialog" aria-labelledby="cl-scan-title">
+    <div class="cl-scan-head">
+      <h2 id="cl-scan-title">Scan cards</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close scanner">×</button>
+    </div>
+    <div class="cl-stage" id="cl-stage">
+      <video id="cl-video" playsinline muted autoplay></video>
+      <img id="cl-photo-preview" alt="Your photo">
+      <div class="cl-guide" id="cl-guide" aria-hidden="true"></div>
+    </div>
+    <p class="cl-status" id="cl-status" aria-live="polite"></p>
+    <div id="cl-result"></div>
+    <div class="cl-scan-controls">
+      <button type="button" class="btn ghost" id="cl-live">Live camera</button>
+      <label class="btn ghost cl-file">Use a photo<input type="file" id="cl-photo" accept="image/*" hidden></label>
+      <button type="button" class="btn ghost" id="cl-torch" aria-pressed="false" hidden>Light</button>
+      <label class="field" hidden>
+        <span>Camera</span>
+        <select id="cl-camera"></select>
+      </label>
+      <label class="field">
+        <span>When a card is read</span>
+        <select id="cl-auto">
+          <option value="ask">Ask which print</option>
+          <option value="base">Add Base right away</option>
+          <option value="holo">Add Holo right away</option>
+        </select>
+      </label>
+    </div>
+    <label class="field grow cl-manual">
+      <span>Or add by name or number</span>
+      <input type="search" id="cl-manual" placeholder="Toot, V059, or 59" autocomplete="off">
+    </label>
+    <div id="cl-manual-hits" class="cl-manual-hits"></div>
+    <h3 class="cl-log-h">Added this session</h3>
+    <ol id="cl-log" class="cl-log"></ol>
+  </dialog>
+
   <footer>
     <p>Public data from the official <a href="https://ddltcg.com/gallery">gallery</a> and <a href="https://ddltcg.com/play">Play client</a>. Fan tool — not affiliated with Doginal Dogs.</p>
     <p id="scraped-at"></p>
@@ -237,6 +324,9 @@
   <script src="data/builds.js"></script>
   <script src="data/classes.js"></script>
   <script src="manual.js?v=peek4"></script>
-  <script src="app.js?v=peek6"></script>
+  <script src="app.js?v=peek10"></script>
+  <script src="shared/ddl-checklist.js?v=cl1"></script>
+  <script src="shared/ddl-checklist-pdf.js?v=cl1"></script>
+  <script src="checklist.js?v=cl14"></script>
 </body>
 </html>

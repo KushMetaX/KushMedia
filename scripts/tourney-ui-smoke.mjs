@@ -77,6 +77,16 @@ function requestOnce(method, urlPath, body, headers) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function adminPassword() {
+	if (process.env.DD_ADMIN_PASSWORD) return process.env.DD_ADMIN_PASSWORD;
+	try {
+		return fs.readFileSync(path.join(repoRoot, 'public', 'server', 'data', '.dd-admin-password'), 'utf8')
+			.split(/\r?\n/)[0].trim();
+	} catch (_err) {
+		return '';
+	}
+}
+
 /** Waits for the app shell to paint something matching `probe`. */
 async function waitFor(win, probe, label) {
 	for (let i = 0; i < 80; i++) {
@@ -134,7 +144,9 @@ async function openApp() {
 async function main() {
 	// Seed an arena with one paid and one unpaid entry.
 	const slug = `uismoke-${Date.now().toString(36)}`;
-	const api = (method, p, body, headers) => request(method, `/tourney-api${p}`, body, headers);
+	// Creating an arena needs a signed-in host; admin stands in for one here.
+	const adminHeader = { 'x-tourney-admin': adminPassword() };
+	const api = (method, p, body, headers) => request(method, `/tourney-api${p}`, body, { ...adminHeader, ...(headers || {}) });
 	await api('POST', '/arenas', {
 		hostPassword: HOST_PW,
 		name: 'UI Smoke Cup',
@@ -257,8 +269,7 @@ async function main() {
 
 	check('no console errors during the whole run', consoleErrors.length === 0, consoleErrors.join(' | '));
 
-	const pw = fs.readFileSync(path.join(repoRoot, 'public', 'server', 'data', '.dd-admin-password'), 'utf8').split(/\r?\n/)[0].trim();
-	await api('POST', '/control/remove-arena', { adminPassword: pw, slug });
+	await api('POST', '/control/remove-arena', { adminPassword: adminPassword(), slug });
 
 	console.log(`\n${failures ? `${failures} check(s) failed` : 'all checks passed'}`);
 	process.exit(failures ? 1 : 0);

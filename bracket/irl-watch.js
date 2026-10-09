@@ -925,8 +925,41 @@
     if (!isPlayLane(laneKey)) return null;
     const cands = laneCandidates(preferIds, laneKey);
     if (!cands.length) return null;
-    loadPrints();
+    const ranked = rankCandidates(arts, full, names, cands);
+    if (!ranked.length) return null;
     const tight = Boolean(preferIds && preferIds.length);
+    const top = ranked[0];
+    const second = ranked[1];
+    const gap = second ? top.score - second.score : 1;
+    const accept = tight
+      ? (
+        (top.art >= 0.26 && gap >= 0.045)
+        || (top.nameS >= 0.38 && top.art >= 0.18 && gap >= 0.04)
+      )
+      : (
+        (top.art >= 0.36 && gap >= 0.07)
+        || (top.nameS >= 0.45 && top.art >= 0.24 && gap >= 0.06)
+      );
+    if (!accept) return null;
+    return hitFrom(top);
+  }
+
+  function hitFrom(top) {
+    const conf = Math.max(0, Math.min(1, (top.score - 0.12) / 0.55));
+    return {
+      id: top.id,
+      conf,
+      score: top.score,
+      name: top.name,
+      art: Math.max(0, top.art),
+      why: top.art >= (top.nameS || 0) ? 'art' : 'name',
+      nameOk: top.nameS >= 0.28,
+      artOk: top.art >= 0.26,
+    };
+  }
+
+  function rankCandidates(arts, full, names, cands) {
+    loadPrints();
     const ranked = [];
     cands.forEach((card) => {
       const id = String(card.id).toUpperCase();
@@ -959,31 +992,686 @@
       }
     });
     ranked.sort((a, b) => b.score - a.score);
-    if (!ranked.length) return null;
+    return ranked;
+  }
+
+  /** Area-averaged read of `box`: luma grid (tw×th), 4×3 RGB grid and 8-bin hue histogram, like the print builder's resize. */
+  function sampleArea(src, box, tw, th) {
+    const sw = src.w;
+    const sh = src.h;
+    const data = src.data;
+    const bx0 = box.x0 * sw;
+    const by0 = box.y0 * sh;
+    const bw = Math.max(1, (box.x1 - box.x0) * sw);
+    const bh = Math.max(1, (box.y1 - box.y0) * sh);
+    const gray = new Float32Array(tw * th);
+    const cnt = new Float32Array(tw * th);
+    const color = new Float32Array(36);
+    const ccnt = new Float32Array(12);
+    const hue = new Float32Array(8);
+    const xa = Math.max(0, Math.floor(bx0));
+    const xb = Math.min(sw, Math.ceil(bx0 + bw));
+    const ya = Math.max(0, Math.floor(by0));
+    const yb = Math.min(sh, Math.ceil(by0 + bh));
+    for (let y = ya; y < yb; y += 1) {
+      const fy = (y + 0.5 - by0) / bh;
+      if (fy < 0 || fy >= 1) continue;
+      const gy = Math.floor(fy * th);
+      const cy = Math.floor(fy * 3);
+      for (let x = xa; x < xb; x += 1) {
+        const fx = (x + 0.5 - bx0) / bw;
+        if (fx < 0 || fx >= 1) continue;
+        const gx = Math.floor(fx * tw);
+        const cx = Math.floor(fx * 4);
+        const i = (y * sw + x) * 4;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        gray[gy * tw + gx] += r * 0.3 + g * 0.59 + b * 0.11;
+        cnt[gy * tw + gx] += 1;
+        const ci = cy * 4 + cx;
+        color[ci * 3] += r;
+        color[ci * 3 + 1] += g;
+        color[ci * 3 + 2] += b;
+        ccnt[ci] += 1;
+        const mx = Math.max(r, g, b);
+        const mn = Math.min(r, g, b);
+        if (mx < 24 || mx - mn < 14) continue;
+        const df = mx - mn;
+        let h;
+        if (mx === r) h = ((g - b) / df) % 6;
+        else if (mx === g) h = (b - r) / df + 2;
+        else h = (r - g) / df + 4;
+        if (h < 0) h += 6;
+        hue[Math.min(7, Math.floor((h / 6) * 8))] += 1;
+      }
+    }
+    let filled = 0;
+    let sum = 0;
+    for (let k = 0; k < gray.length; k += 1) {
+      if (cnt[k]) {
+        gray[k] /= cnt[k];
+        sum += gray[k];
+        filled += 1;
+      }
+    }
+    const fill = filled ? sum / filled : 0;
+    for (let k = 0; k < gray.length; k += 1) if (!cnt[k]) gray[k] = fill;
+    for (let k = 0; k < 12; k += 1) {
+      const n = ccnt[k] || 1;
+      color[k * 3] /= n;
+      color[k * 3 + 1] /= n;
+      color[k * 3 + 2] /= n;
+    }
+    let hs = 0;
+    for (let k = 0; k < 8; k += 1) hs += hue[k];
+    if (hs) for (let k = 0; k < 8; k += 1) hue[k] /= hs;
+    return { gray, color, hue };
+  }
+
+  /** Spread of a luma grid; a blank wall, a finger over the lens or a blurred smear has almost none. */
+  function contrastOf(gray) {
+    let m = 0;
+    for (let i = 0; i < gray.length; i += 1) m += gray[i];
+    m /= gray.length || 1;
+    let v = 0;
+    for (let i = 0; i < gray.length; i += 1) v += (gray[i] - m) * (gray[i] - m);
+    return Math.sqrt(v / (gray.length || 1));
+  }
+
+  // Tuned on renders over photos, blank walls, hands and look-alike cards: no hits without a set card.
+  // The printed name must read as the same card as the art (minName / minNameGap).
+  const HANDHELD = {
+    minContrast: 12,
+    minArt: 0.65,
+    minFull: 0.5,
+    minColor: 0.6,
+    minHue: 0.8,
+    minScore: 0.74,
+    minGap: 0.07,
+    minName: 0.65,
+    minNameGap: 0.04,
+  };
+  const GUIDE_MARGIN = 0.07;
+
+  function unitVec(a) {
+    const n = a.length;
+    let m = 0;
+    for (let i = 0; i < n; i += 1) m += a[i];
+    m /= n || 1;
+    const out = new Float32Array(n);
+    let ss = 0;
+    for (let i = 0; i < n; i += 1) {
+      out[i] = a[i] - m;
+      ss += out[i] * out[i];
+    }
+    if (ss < 1e-6) return null;
+    const k = 1 / Math.sqrt(ss);
+    for (let i = 0; i < n; i += 1) out[i] *= k;
+    return out;
+  }
+
+  function dot(a, b) {
+    let s = 0;
+    for (let i = 0; i < a.length; i += 1) s += a[i] * b[i];
+    return s;
+  }
+
+  let normed = null;
+  function normedPrints() {
+    if (normed && normed.length === prints.size) return normed;
+    normed = [];
+    prints.forEach((p) => {
+      const art = unitVec(p.art);
+      const full = unitVec(p.full || p.art);
+      if (art && full) normed.push({ id: p.id, print: p, art, full });
+    });
+    return normed;
+  }
+
+  function subBox(p, b) {
+    const w = p.x1 - p.x0;
+    const h = p.y1 - p.y0;
+    return { x0: p.x0 + b.x0 * w, y0: p.y0 + b.y0 * h, x1: p.x0 + b.x1 * w, y1: p.y0 + b.y1 * h };
+  }
+
+  function grabRegion(video, rect, dw, dh) {
+    const c = grabRegion._c || (grabRegion._c = document.createElement('canvas'));
+    if (c.width !== dw) c.width = dw;
+    if (c.height !== dh) c.height = dh;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    try {
+      ctx.drawImage(video, rect.x, rect.y, rect.w, rect.h, 0, 0, dw, dh);
+      return { data: ctx.getImageData(0, 0, dw, dh).data, w: dw, h: dh };
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  /** grabRegion that tolerates `rect` running off the frame: the missing part is neutral gray. */
+  function grabPadded(video, rect, size, dw, dh) {
+    const x0 = Math.max(0, rect.x);
+    const y0 = Math.max(0, rect.y);
+    const x1 = Math.min(size.vw, rect.x + rect.w);
+    const y1 = Math.min(size.vh, rect.y + rect.h);
+    if (x1 - x0 < 2 || y1 - y0 < 2) return null;
+    if (x0 === rect.x && y0 === rect.y && x1 === rect.x + rect.w && y1 === rect.y + rect.h) {
+      return grabRegion(video, rect, dw, dh);
+    }
+    const c = grabRegion._c || (grabRegion._c = document.createElement('canvas'));
+    if (c.width !== dw) c.width = dw;
+    if (c.height !== dh) c.height = dh;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const kx = dw / rect.w;
+    const ky = dh / rect.h;
+    try {
+      ctx.fillStyle = '#808080';
+      ctx.fillRect(0, 0, dw, dh);
+      ctx.drawImage(video, x0, y0, x1 - x0, y1 - y0, (x0 - rect.x) * kx, (y0 - rect.y) * ky, (x1 - x0) * kx, (y1 - y0) * ky);
+      return { data: ctx.getImageData(0, 0, dw, dh).data, w: dw, h: dh };
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  // Slack (in name-grid cells) around the printed name so a card a few percent off still reads.
+  const NAME_SLACK_X = 14;
+  const NAME_SLACK_Y = 7;
+  const NAME_LIKELY = 5;
+  const NAME_RIVALS = 4;
+  let nameCfg = null;
+  const namePrints = new Map();
+
+  function loadNamePrints() {
+    if (nameCfg) return nameCfg;
+    const pack = global.DDL_NAME_PRINTS;
+    if (!pack || !pack.cards || typeof atob !== 'function') return null;
+    const w = Number(pack.w);
+    const h = Number(pack.h);
+    const dark = new Set((pack.dark || []).map((id) => String(id).toUpperCase()));
+    const names = pack.names || {};
+    Object.keys(pack.cards).forEach((id) => {
+      const bin = atob(pack.cards[id]);
+      if (bin.length !== w * h) return;
+      const a = new Float32Array(w * h);
+      for (let i = 0; i < a.length; i += 1) a[i] = bin.charCodeAt(i);
+      const vec = unitVec(a);
+      const half = w / 2;
+      const left = new Float32Array(half * h);
+      const right = new Float32Array(half * h);
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < half; x += 1) {
+          left[y * half + x] = a[y * w + x];
+          right[y * half + x] = a[y * w + half + x];
+        }
+      }
+      // Core letter columns, not the empty margin. A wide span is a full-art mask, not a letter count.
+      let span0 = w;
+      let span1 = -1;
+      for (let x = 0; x < w; x += 1) {
+        let col = 0;
+        for (let y = 0; y < h; y += 1) col += a[y * w + x];
+        if (col / h > 40) {
+          if (x < span0) span0 = x;
+          if (x > span1) span1 = x;
+        }
+      }
+      const span = span1 >= span0 ? span1 - span0 + 1 : 0;
+      const letters = span > 8 && span < w * 0.7;
+      const end0 = letters ? span0 + Math.floor(span * 0.45) : 0;
+      const end1 = letters ? span1 + 1 : 0;
+      let endVec = null;
+      if (letters && end1 - end0 >= 4) {
+        const cols = end1 - end0;
+        const tail = new Float32Array(cols * h);
+        for (let y = 0; y < h; y += 1) {
+          for (let x = 0; x < cols; x += 1) tail[y * cols + x] = a[y * w + end0 + x];
+        }
+        endVec = unitVec(tail);
+      }
+      const key = String(id).toUpperCase();
+      if (vec) {
+        namePrints.set(key, {
+          vec,
+          left: unitVec(left),
+          right: unitVec(right),
+          endVec,
+          end0,
+          end1,
+          span: letters ? span : 0,
+          dark: dark.has(key),
+          text: String(names[id] || ''),
+        });
+      }
+    });
+    if (!namePrints.size) return null;
+    nameCfg = { w, h, box: pack.box };
+    return nameCfg;
+  }
+
+  /** Whiteness (framed cards) and darkness (full arts) maps of the band, stretched like the prints. */
+  function nameMaps(src) {
+    const mw = src.w;
+    const mh = src.h;
+    const data = src.data;
+    const n = mw * mh;
+    const lo = new Float32Array(n);
+    const hi = new Float32Array(n);
+    const hLo = new Uint32Array(256);
+    const hHi = new Uint32Array(256);
+    for (let i = 0, p = 0; p < n; i += 4, p += 1) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      lo[p] = Math.min(r, g, b);
+      hi[p] = Math.max(r, g, b);
+      hLo[lo[p]] += 1;
+      hHi[hi[p]] += 1;
+    }
+    const pct = (hist, frac, fromTop) => {
+      let seen = 0;
+      for (let k = 0; k < 256; k += 1) {
+        const v = fromTop ? 255 - k : k;
+        seen += hist[v];
+        if (seen >= n * frac) return v;
+      }
+      return fromTop ? 0 : 255;
+    };
+    const white = Math.max(pct(hLo, 0.02, true), 60);
+    const black = Math.min(pct(hHi, 0.02, false), white - 40);
+    const range = white - black;
+    const wLo = black + 0.55 * range;
+    const wSpan = 0.35 * range;
+    const dHi = black + 0.38 * range;
+    const dSpan = 0.3 * range;
+    for (let p = 0; p < n; p += 1) {
+      lo[p] = Math.max(0, Math.min(1, (lo[p] - wLo) / wSpan));
+      hi[p] = Math.max(0, Math.min(1, (dHi - hi[p]) / dSpan));
+    }
+    return { white: boxBlur3(lo, mw, mh), dark: boxBlur3(hi, mw, mh), mw, mh };
+  }
+
+  function boxBlur3(src, mw, mh) {
+    const tmp = new Float32Array(mw * mh);
+    const out = new Float32Array(mw * mh);
+    for (let y = 0; y < mh; y += 1) {
+      const row = y * mw;
+      for (let x = 0; x < mw; x += 1) {
+        tmp[row + x] = src[row + Math.max(0, x - 1)] + src[row + x] + src[row + Math.min(mw - 1, x + 1)];
+      }
+    }
+    for (let y = 0; y < mh; y += 1) {
+      const ya = Math.max(0, y - 1) * mw;
+      const yb = y * mw;
+      const yc = Math.min(mh - 1, y + 1) * mw;
+      for (let x = 0; x < mw; x += 1) out[yb + x] = tmp[ya + x] + tmp[yb + x] + tmp[yc + x];
+    }
+    return out;
+  }
+
+  /**
+   * Read the printed name of a card lying at `card` (media pixels). Each likely card's name is
+   * fitted to the band on its own (shift, tilt as a shear across the band, scale); every other
+   * name is then checked against the band as fitted for the leader.
+   */
+  function readName(video, card, size, likelyIds) {
+    const cfg = loadNamePrints();
+    if (!cfg) return null;
+    const { w, h, box } = cfg;
+    const SX = NAME_SLACK_X;
+    const SY = NAME_SLACK_Y;
+    const UP = 3;
+    const cellW = ((box.x1 - box.x0) * card.w) / w;
+    const cellH = ((box.y1 - box.y0) * card.h) / h;
+    const gw = w + SX * 2;
+    const gh = h + SY * 2;
+    const rect = {
+      x: card.x + box.x0 * card.w - SX * cellW,
+      y: card.y + box.y0 * card.h - SY * cellH,
+      w: gw * cellW,
+      h: gh * cellH,
+    };
+    const coreX = card.x + box.x0 * card.w;
+    const coreY = card.y + box.y0 * card.h;
+    if (coreX < 0 || coreY < 0 || coreX + w * cellW > size.vw || coreY + h * cellH > size.vh) return null;
+    const likely = likelyIds.slice(0, NAME_LIKELY).filter((id) => namePrints.has(id));
+    if (!likely.length) return null;
+    const src = grabPadded(video, rect, size, gw * UP, gh * UP);
+    if (!src) return null;
+    const maps = nameMaps(src);
+    const { mw, mh } = maps;
+    const half = w / 2;
+    const win = new Float32Array(w * h);
+    const halfWin = new Float32Array(half * h);
+    const colX = new Int32Array(w);
+    const colDy = new Float32Array(w);
+    // Band sampled under transform t, columns [x0, x1) of the name grid.
+    const sample = (map, t, x0, x1, out) => {
+      const cols = x1 - x0;
+      for (let x = x0; x < x1; x += 1) {
+        colX[x] = Math.max(0, Math.min(mw - 1, Math.round((SX + t.dx + w / 2 + (x + 0.5 - w / 2) * t.s) * UP - 0.5)));
+        colDy[x] = (t.sh * (x + 0.5 - w / 2)) / w;
+      }
+      for (let y = 0; y < h; y += 1) {
+        const base = SY + t.dy + h / 2 + (y + 0.5 - h / 2) * t.s;
+        for (let x = x0; x < x1; x += 1) {
+          const py = Math.max(0, Math.min(mh - 1, Math.round((base + colDy[x]) * UP - 0.5)));
+          out[y * cols + x - x0] = map[py * mw + colX[x]];
+        }
+      }
+      return unitVec(out);
+    };
+    const whole = (map, t) => sample(map, t, 0, w, win);
+    // Each half of the name is placed on its own; their offsets give tilt and scale.
+    const fitHalf = (map, tmpl, x0) => {
+      let best = null;
+      const tryAt = (dx, dy) => {
+        const vec = sample(map, { dx, dy, s: 1, sh: 0 }, x0, x0 + half, halfWin);
+        if (!vec) return;
+        const score = dot(vec, tmpl);
+        if (!best || score > best.score) best = { dx, dy, score };
+      };
+      for (let dy = -SY; dy <= SY; dy += 1) {
+        for (let dx = -SX; dx <= SX; dx += 2) tryAt(dx, dy);
+      }
+      if (!best) return null;
+      const c = best;
+      tryAt(c.dx - 1, c.dy);
+      tryAt(c.dx + 1, c.dy);
+      return best;
+    };
+    const fitName = (print, from) => {
+      const map = print.dark ? maps.dark : maps.white;
+      let best = null;
+      const tryFit = (t) => {
+        const vec = whole(map, t);
+        if (!vec) return;
+        const score = dot(vec, print.vec);
+        if (!best || score > best.score) best = { t, score };
+      };
+      if (from) {
+        tryFit(from);
+      } else {
+        const L = print.left ? fitHalf(map, print.left, 0) : null;
+        const R = print.right ? fitHalf(map, print.right, half) : null;
+        if (L && R) {
+          const s = Math.max(0.92, Math.min(1.08, 1 + (R.dx - L.dx) / half));
+          tryFit({ dx: (L.dx + R.dx) / 2, dy: (L.dy + R.dy) / 2, s, sh: 2 * (R.dy - L.dy) });
+        }
+        if (L) tryFit({ dx: L.dx, dy: L.dy, s: 1, sh: 0 });
+        if (R) tryFit({ dx: R.dx, dy: R.dy, s: 1, sh: 0 });
+      }
+      if (!best) return null;
+      for (let pass = 0; pass < 2; pass += 1) {
+        const step = pass ? 1 / 3 : 2 / 3;
+        const c = best.t;
+        [-1, 1].forEach((d) => {
+          tryFit({ dx: c.dx + d * step, dy: c.dy, s: c.s, sh: c.sh });
+          tryFit({ dx: c.dx, dy: c.dy + d * step, s: c.s, sh: c.sh });
+          tryFit({ dx: c.dx, dy: c.dy, s: c.s, sh: c.sh + d * step * 3 });
+          tryFit({ dx: c.dx, dy: c.dy, s: c.s + d * step * 0.04, sh: c.sh });
+        });
+      }
+      return best;
+    };
+    const endBuf = new Float32Array(w * h);
+    // How many template columns of this fit actually hold ink. Shared by every name on the same fit.
+    const liveWidth = (map, t) => {
+      if (t.liveW != null) return t.liveW;
+      let start = w;
+      let end = -1;
+      for (let x = 0; x < w; x += 1) {
+        const px = Math.max(0, Math.min(mw - 1, Math.round((SX + t.dx + w / 2 + (x + 0.5 - w / 2) * t.s) * UP - 0.5)));
+        const shear = (t.sh * (x + 0.5 - w / 2)) / w;
+        let col = 0;
+        for (let y = 0; y < h; y += 1) {
+          const base = SY + t.dy + h / 2 + (y + 0.5 - h / 2) * t.s;
+          const py = Math.max(0, Math.min(mh - 1, Math.round((base + shear) * UP - 0.5)));
+          col += map[py * mw + px];
+        }
+        if (col / h > 0.22) {
+          if (x < start) start = x;
+          if (x > end) end = x;
+        }
+      }
+      t.liveW = end < start ? 0 : end - start + 1;
+      return t.liveW;
+    };
+    // A shared opening (CHICO / CHERRY) cannot win on the first letters alone.
+    // The last half of the ink and the letter width both have to agree.
+    const nameScore = (print, t, map, wholeScore) => {
+      if (!print.span || !print.endVec) return wholeScore;
+      const tail = sample(map, t, print.end0, print.end1, endBuf.subarray(0, (print.end1 - print.end0) * h));
+      const end = tail ? dot(tail, print.endVec) : -1;
+      let score = end + 0.12 < wholeScore ? Math.min(wholeScore, end) : (0.4 * wholeScore + 0.6 * end);
+      const liveW = liveWidth(map, t);
+      if (liveW > 4) {
+        const err = Math.abs(Math.log(liveW / print.span));
+        score -= Math.max(0, err - 0.08) * 0.9;
+      }
+      return score;
+    };
+    const scores = new Map();
+    let lead = null;
+    likely.forEach((id) => {
+      const print = namePrints.get(id);
+      const f = fitName(print);
+      if (!f) return;
+      const score = nameScore(print, f.t, print.dark ? maps.dark : maps.white, f.score);
+      scores.set(id, score);
+      if (!lead || score > lead.score) lead = { id, t: f.t, score };
+    });
+    if (!lead) return null;
+    const whiteVec = whole(maps.white, lead.t);
+    const darkVec = whole(maps.dark, lead.t);
+    const rivals = [];
+    namePrints.forEach((print, id) => {
+      if (scores.has(id)) return;
+      const vec = print.dark ? darkVec : whiteVec;
+      if (vec) rivals.push({ id, score: dot(vec, print.vec) });
+    });
+    // Look-alike names (PUMPY / DUMPY, CHICO / CHERRY) get the ending-and-length check.
+    // Everyone else keeps the cheap score so a bigger set stays one pass.
+    rivals.sort((a, b) => b.score - a.score);
+    rivals.forEach((r, i) => {
+      const print = namePrints.get(r.id);
+      if (i >= NAME_RIVALS) {
+        scores.set(r.id, r.score);
+        return;
+      }
+      const f = fitName(print, lead.t);
+      const map = print.dark ? maps.dark : maps.white;
+      scores.set(r.id, f ? nameScore(print, f.t, map, f.score) : r.score);
+    });
+    const ranked = [...scores].map(([id, score]) => ({ id, score })).sort((a, b) => b.score - a.score);
     const top = ranked[0];
-    const second = ranked[1];
-    const gap = second ? top.score - second.score : 1;
-    const accept = tight
-      ? (
-        (top.art >= 0.26 && gap >= 0.045)
-        || (top.nameS >= 0.38 && top.art >= 0.18 && gap >= 0.04)
-      )
-      : (
-        (top.art >= 0.36 && gap >= 0.07)
-        || (top.nameS >= 0.45 && top.art >= 0.24 && gap >= 0.06)
-      );
-    if (!accept) return null;
-    const conf = Math.max(0, Math.min(1, (top.score - 0.12) / 0.55));
     return {
       id: top.id,
-      conf,
+      text: namePrints.get(top.id).text,
       score: top.score,
-      name: top.name,
-      art: Math.max(0, top.art),
-      why: top.art >= (top.nameS || 0) ? 'art' : 'name',
-      nameOk: top.nameS >= 0.28,
-      artOk: top.art >= 0.26,
+      gap: top.score - (ranked[1] ? ranked[1].score : 0),
     };
+  }
+
+  function handheldScore(row) {
+    return 0.4 * row.art + 0.35 * row.full + 0.15 * Math.max(0, row.color) + 0.1 * Math.max(0, row.hue);
+  }
+
+  /** Best print for one card placement: cheap art+full pass over every print, full check on the leaders. */
+  function rankPlacement(src, place, np, deep) {
+    const artS = sampleArea(src, subBox(place, artBox), artW, artH);
+    const fullS = sampleArea(src, subBox(place, fullBox), fullW, fullH);
+    const contrast = contrastOf(fullS.gray);
+    if (contrast < HANDHELD.minContrast) return null;
+    const aN = unitVec(artS.gray);
+    const fN = unitVec(fullS.gray);
+    if (!aN || !fN) return null;
+    const rows = np.map((row) => {
+      const art = dot(aN, row.art);
+      const full = dot(fN, row.full);
+      return { id: row.id, print: row.print, art, full, pre: 0.55 * art + 0.45 * full };
+    });
+    rows.sort((a, b) => b.pre - a.pre);
+    if (!deep) return { pre: rows[0].pre, rows };
+    const likely = rows.slice(0, 12).map((row) => row.id);
+    const top = rows.slice(0, 6);
+    top.forEach((row) => {
+      row.color = ncc(artS.color, row.print.color);
+      row.hue = hueCos(artS.hue, row.print.hue);
+      row.score = handheldScore(row);
+    });
+    top.sort((a, b) => b.score - a.score);
+    return { pre: rows[0].pre, rows: top, all: rows, likely };
+  }
+
+  /**
+   * A clear picture is enough: one print well ahead of the other 110.
+   * Coloured light can wreck hue, so a strong grayscale match does not wait on colour.
+   * The name only breaks a close call. A confident different name cannot override a clear picture.
+   */
+  function decideHandheld(top, second, name) {
+    if (!top) return { ok: false, decisive: false };
+    const artGap = second ? top.art - second.art : 1;
+    const clear = top.art >= 0.62 && top.full >= 0.42 && artGap >= 0.05;
+    const picture = top.art >= 0.52 && top.full >= 0.36 && artGap >= 0.04;
+    const nameAgrees = name && name.id === top.id && name.score >= 0.55 && name.gap >= 0.03;
+    const nameConflicts = name && name.id !== top.id && name.score >= 0.68 && name.gap >= 0.05;
+    if (clear) return { ok: true, decisive: true };
+    if (nameAgrees && top.art >= 0.38 && top.full >= 0.28) return { ok: true, decisive: true };
+    if (picture && !nameConflicts) return { ok: true, decisive: artGap >= 0.05 };
+    return { ok: false, decisive: false };
+  }
+
+  /**
+   * Handheld scan: read the card inside `rect` (video pixels) against every print.
+   * Tries a small grid of card sizes/offsets inside the guide so a card held slightly off-centre still lines up.
+   * Returns the accepted hit (or null) plus the top few guesses so the UI can offer a pick.
+   * `card` is only true when the frame has enough detail to hold a card at all.
+   */
+  function scanFrame(video, rect) {
+    loadPrints();
+    const size = mediaSize(video);
+    if (!size || !prints.size) return { hit: null, ranked: [], card: false };
+    const outer = rect || { x: 0, y: 0, w: size.vw, h: size.vh };
+    const box = clipRect(outer, size.vw, size.vh);
+    const raw = box && grabSlot(video, box);
+    if (!raw || !looksLikeCard(raw)) return { hit: null, ranked: [], card: false };
+    const ext = clipRect({
+      x: outer.x - outer.w * GUIDE_MARGIN,
+      y: outer.y - outer.h * GUIDE_MARGIN,
+      w: outer.w * (1 + GUIDE_MARGIN * 2),
+      h: outer.h * (1 + GUIDE_MARGIN * 2),
+    }, size.vw, size.vh);
+    const src = ext && grabRegion(video, ext, 144, 200);
+    if (!src) return { hit: null, ranked: [], card: false };
+    const fx = (vx) => (vx - ext.x) / ext.w;
+    const fy = (vy) => (vy - ext.y) / ext.h;
+    const np = normedPrints();
+    const placeAt = (s, dx, dy) => {
+      const cx = outer.x + outer.w * (0.5 + dx);
+      const cy = outer.y + outer.h * (0.5 + dy);
+      const w = outer.w * s;
+      const h = outer.h * s;
+      return { x0: fx(cx - w / 2), y0: fy(cy - h / 2), x1: fx(cx + w / 2), y1: fy(cy + h / 2) };
+    };
+    const onFrame = (place) => place.x0 >= -0.08 && place.y0 >= -0.08 && place.x1 <= 1.08 && place.y1 <= 1.08;
+    // The name may pick between two close pictures. It cannot override a picture that is clearly ahead.
+    const choose = (ranked, name) => {
+      let top = ranked.rows[0];
+      let second = ranked.rows[1];
+      const pool = ranked.all || ranked.rows;
+      if (name && name.id !== top.id && name.score >= 0.6 && name.gap >= 0.04) {
+        const alt = pool.find((row) => row.id === name.id);
+        if (alt && top.art - alt.art <= 0.05) {
+          second = top;
+          top = alt;
+        }
+      }
+      return { top, second };
+    };
+    const emit = (ranked, name) => {
+      const picked = choose(ranked, name);
+      const top = picked.top;
+      const second = picked.second;
+      const decision = decideHandheld(top, second, name);
+      const rows = [top].concat((ranked.rows || []).filter((row) => row.id !== top.id));
+      return {
+        hit: decision.ok ? {
+          id: top.id,
+          conf: Math.max(0, Math.min(1, (Math.max(top.score || 0, top.art) - 0.35) / 0.45)),
+          score: top.score || top.pre || top.art,
+          art: top.art,
+          full: top.full,
+          color: top.color,
+          nameText: name ? name.text : '',
+          nameScore: name ? name.score : 0,
+          artOk: true,
+          decisive: decision.decisive,
+        } : null,
+        ranked: rows.slice(0, 4).map((row) => ({ id: row.id, score: row.score || row.pre || row.art })),
+        name,
+        card: true,
+        top: {
+          id: top.id,
+          art: top.art,
+          full: top.full,
+          color: top.color || 0,
+          hue: top.hue || 0,
+          score: Math.max(top.score || 0, top.art, top.pre || 0),
+          gap: second ? Math.max(top.art - second.art, (top.score || 0) - (second.score || 0)) : 1,
+          nameId: name ? name.id : null,
+          nameScore: name ? name.score : -1,
+          nameGap: name ? name.gap : 0,
+        },
+      };
+    };
+    // Cheap pass over every size the card might fill. Deep check and the name run once, on the best.
+    let best = null;
+    const note = (place, rough) => {
+      if (!rough || !(rough.pre > (best ? best.pre : -1))) return;
+      best = { place, pre: rough.pre };
+    };
+    [1, 0.9, 0.8, 0.7].forEach((s) => {
+      const place = placeAt(s, 0, 0);
+      if (onFrame(place)) note(place, rankPlacement(src, place, np, false));
+    });
+    const tight = tightCard(raw);
+    if (tight.x1 - tight.x0 < 0.95 || tight.y1 - tight.y0 < 0.95) {
+      const place = {
+        x0: fx(box.x + tight.x0 * box.w),
+        y0: fy(box.y + tight.y0 * box.h),
+        x1: fx(box.x + tight.x1 * box.w),
+        y1: fy(box.y + tight.y1 * box.h),
+      };
+      if (onFrame(place)) note(place, rankPlacement(src, place, np, false));
+    }
+    if (best) {
+      const lw = best.place.x1 - best.place.x0;
+      const lh = best.place.y1 - best.place.y0;
+      const lcx = (best.place.x0 + best.place.x1) / 2;
+      const lcy = (best.place.y0 + best.place.y1) / 2;
+      [[0.05, 0], [-0.05, 0], [0, 0.05], [0, -0.05]].forEach(([dx, dy]) => {
+        const place = {
+          x0: lcx + dx * lw - lw / 2,
+          y0: lcy + dy * lh - lh / 2,
+          x1: lcx + dx * lw + lw / 2,
+          y1: lcy + dy * lh + lh / 2,
+        };
+        if (onFrame(place)) note(place, rankPlacement(src, place, np, false));
+      });
+    }
+    if (!best) return { hit: null, ranked: [], card: true };
+    const ranked = rankPlacement(src, best.place, np, true);
+    if (!ranked || !ranked.rows.length) return { hit: null, ranked: [], card: true };
+    const quick = decideHandheld(ranked.rows[0], ranked.rows[1], null);
+    if (quick.decisive && ranked.rows[0].art >= 0.7) return emit(ranked, null);
+    const name = readName(video, {
+      x: ext.x + best.place.x0 * ext.w,
+      y: ext.y + best.place.y0 * ext.h,
+      w: (best.place.x1 - best.place.x0) * ext.w,
+      h: (best.place.y1 - best.place.y0) * ext.h,
+    }, size, ranked.likely);
+    return emit(ranked, name);
   }
 
   function scan(video, slotEls, preferIds) {
@@ -1165,8 +1853,133 @@
     return prints.size;
   }
 
+  /** Bounding box of whatever stands out from a photo's border colour (a card on a table). */
+  function findCardRect(canvas) {
+    const k = Math.min(1, 240 / Math.max(canvas.width, canvas.height));
+    const w = Math.max(16, Math.round(canvas.width * k));
+    const h = Math.max(16, Math.round(canvas.height * k));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(canvas, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
+    const ring = [[], [], []];
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        if (x > 2 && x < w - 3 && y > 2 && y < h - 3) continue;
+        const i = (y * w + x) * 4;
+        ring[0].push(d[i]);
+        ring[1].push(d[i + 1]);
+        ring[2].push(d[i + 2]);
+      }
+    }
+    const bg = ring.map((arr) => arr.sort((a, b) => a - b)[arr.length >> 1]);
+    const rows = new Uint16Array(h);
+    const cols = new Uint16Array(w);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const i = (y * w + x) * 4;
+        const dist = Math.abs(d[i] - bg[0]) + Math.abs(d[i + 1] - bg[1]) + Math.abs(d[i + 2] - bg[2]);
+        if (dist > 60) {
+          rows[y] += 1;
+          cols[x] += 1;
+        }
+      }
+    }
+    // Dark bands on the card face (text box, borders) can dip under the threshold; bridge short gaps.
+    const run = (arr, len, min) => {
+      const maxGap = Math.round(len * 0.1);
+      let best = null;
+      let start = -1;
+      let lastOn = -1;
+      for (let i = 0; i <= len; i += 1) {
+        const on = i < len && arr[i] >= min;
+        if (on) {
+          if (start < 0) start = i;
+          lastOn = i;
+        } else if (start >= 0 && (i === len || i - lastOn > maxGap)) {
+          if (!best || lastOn + 1 - start > best[1] - best[0]) best = [start, lastOn + 1];
+          start = -1;
+        }
+      }
+      return best;
+    };
+    const ys = run(rows, h, w * 0.12);
+    const xs = run(cols, w, h * 0.12);
+    if (!ys || !xs) return null;
+    const bw = xs[1] - xs[0];
+    const bh = ys[1] - ys[0];
+    if (bw < w * 0.15 || bh < h * 0.15) return null;
+    const aspect = bw / bh;
+    if (aspect < 0.45 || aspect > 1.05) return null;
+    const pad = 0.02;
+    return {
+      x: Math.max(0, (xs[0] - bw * pad) / k),
+      y: Math.max(0, (ys[0] - bh * pad) / k),
+      w: Math.min(canvas.width, (bw * (1 + pad * 2)) / k),
+      h: Math.min(canvas.height, (bh * (1 + pad * 2)) / k),
+    };
+  }
+
+  /** Card-shaped windows across a photo, a few sizes, overlapping so any card sits near one of them. */
+  function photoWindows(canvas) {
+    const aspect = 63 / 88;
+    const W = canvas.width;
+    const H = canvas.height;
+    const out = [];
+    [0.95, 0.8, 0.65, 0.5].forEach((s) => {
+      let h = H * s;
+      let w = h * aspect;
+      if (w > W * 0.95) {
+        w = W * 0.95;
+        h = w / aspect;
+      }
+      const sx = Math.max(8, w / 5);
+      const sy = Math.max(8, h / 5);
+      for (let y = 0; y + h <= H + 1; y += sy) {
+        for (let x = 0; x + w <= W + 1; x += sx) out.push({ x, y, w, h });
+      }
+    });
+    return out;
+  }
+
+  /** One-placement read of a window: how well its best print lines up, for picking windows worth a full scan. */
+  function quickWindowScore(canvas, rect) {
+    const box = clipRect(rect, canvas.width, canvas.height);
+    const src = box && grabRegion(canvas, box, 144, 200);
+    if (!src) return -1;
+    const r = rankPlacement(src, { x0: 0, y0: 0, x1: 1, y1: 1 }, normedPrints(), false);
+    return r ? r.pre : -1;
+  }
+
+  /**
+   * Read one card from a still photo (canvas). Tries the detected card outline first, then the
+   * few photo windows that line up best with any print; each still has to pass the full scanFrame check.
+   */
+  function scanStill(canvas) {
+    loadPrints();
+    const found = findCardRect(canvas);
+    if (found) {
+      const out = scanFrame(canvas, found);
+      if (out.hit) return out;
+    }
+    const windows = photoWindows(canvas)
+      .map((rect) => ({ rect, s: quickWindowScore(canvas, rect) }))
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 6);
+    let best = null;
+    windows.forEach(({ rect }) => {
+      const out = scanFrame(canvas, rect);
+      if (out.hit && (!best || out.hit.score > best.hit.score)) best = out;
+    });
+    return best;
+  }
+
   global.DdlIrlWatch = {
     scan,
+    scanFrame,
+    scanStill,
     loadPrints,
     printCount,
     alertsFromScan,

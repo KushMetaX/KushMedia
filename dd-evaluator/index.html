@@ -2297,6 +2297,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="ddl-tcg.css?v=ddl-eval-10">
 </head>
 <body>
 
@@ -2338,9 +2339,13 @@
                 <span class="eval-hero-tip-chip-cta">Leave a Tip →</span>
               </button>
             </div>
-            <p class="eval-overline eval-hero-brand">DOGINAL DOGS</p>
+            <div class="ddl-mode-switch" role="tablist" aria-label="Choose evaluator">
+              <button type="button" class="ddl-mode-btn active" data-eval-mode="dd" role="tab" aria-selected="true">Doginal Dogs</button>
+              <button type="button" class="ddl-mode-btn" data-eval-mode="ddl" role="tab" aria-selected="false">DDL TCG</button>
+            </div>
+            <p class="eval-overline eval-hero-brand" id="evalHeroBrand">DOGINAL DOGS</p>
             <h1 class="eval-title" id="evalMainTitle">Price Evaluator</h1>
-            <p class="eval-subtitle">Trait-weighted valuation powered by live market data</p>
+            <p class="eval-subtitle" id="evalHeroSubtitle">Trait-weighted valuation powered by live market data</p>
           </div>
           <div class="eval-hero-divider" aria-hidden="true" style="display:none"></div>
           <div class="eval-auth-bar" id="evalAuthBar" style="display:none">
@@ -2356,6 +2361,157 @@
             </div>
           </div>
         </div>
+
+        <section class="ddl-eval" id="ddlEval" hidden aria-label="DDL TCG price evaluator">
+          <div class="eval-glass-panel eval-block-card ddl-panel ddl-profile" id="ddlProfile" aria-live="polite"></div>
+
+          <div class="eval-glass-panel eval-block-card ddl-panel" id="ddlCommunity">
+            <div class="ddl-collection-head">
+              <div>
+                <p class="eval-mp-kicker">Collectors</p>
+                <p class="ddl-muted">Public checklists, the prints they still need, and the cards people are looking for.</p>
+              </div>
+              <div class="ddl-collection-actions">
+                <button type="button" class="eval-mp-btn" id="ddlBoardRefresh">Refresh</button>
+              </div>
+            </div>
+            <div class="ddl-board-tabs" role="tablist" aria-label="Collector lists">
+              <button type="button" role="tab" data-board="collections" aria-selected="true">Public collections</button>
+              <button type="button" role="tab" data-board="searching" aria-selected="false">Looking for</button>
+            </div>
+            <input type="search" id="ddlBoardSearch" class="eval-input ddl-search" placeholder="Search collectors or cards" autocomplete="off" aria-label="Search the collector lists">
+            <div class="ddl-board" id="ddlBoard"><p class="ddl-muted">Loading collector lists…</p></div>
+          </div>
+
+          <div class="eval-glass-panel eval-block-card ddl-panel" id="ddlMarket">
+            <p class="eval-mp-kicker">Market</p>
+            <div class="ddl-market-grid" id="ddlMarketGrid"><p class="ddl-muted">Loading Doginal Dogs shop prices…</p></div>
+            <p class="ddl-muted ddl-market-meta" id="ddlMarketMeta"></p>
+          </div>
+
+          <div class="eval-glass-panel eval-block-card ddl-panel" id="ddlCollection">
+            <div class="ddl-collection-head">
+              <div>
+                <p class="eval-mp-kicker">My collection</p>
+                <p class="ddl-collection-value" id="ddlCollectionValue">$0</p>
+                <p class="ddl-muted" id="ddlCollectionSub">Set how many copies you own with − and +. Chase cards use Base for a non-full-art copy. Download the PDF, type 1x / 2x / 3x over each dash, save, and import that file.</p>
+              </div>
+              <div class="ddl-collection-actions">
+                <button type="button" class="eval-mp-btn eval-mp-btn-primary" id="ddlScanBtn">Scan cards</button>
+                <button type="button" class="eval-mp-btn" id="ddlExportBtn">PDF checklist</button>
+                <label class="eval-mp-btn ddl-import-label">Import PDF<input type="file" id="ddlImportInput" accept="application/pdf,.pdf" hidden></label>
+                <button type="button" class="eval-mp-btn" id="ddlClearBtn">Clear</button>
+              </div>
+            </div>
+            <div class="ddl-totals" id="ddlTotals"></div>
+            <div class="ddl-group-bar">
+              <label class="ddl-group-label" for="ddlGroup">Group
+                <select id="ddlGroup" aria-label="Group the collection">
+                  <option value="class">Class</option>
+                  <option value="finish">Full art, holo, base</option>
+                  <option value="rarity">Common/Rare and chase</option>
+                  <option value="type">Creatures, spells, traps</option>
+                </select>
+              </label>
+            </div>
+            <ul class="ddl-group-list" id="ddlGroupList" aria-label="How many you still need"></ul>
+          </div>
+
+          <div class="eval-glass-panel eval-block-card ddl-panel">
+            <div class="ddl-toolbar">
+              <input type="search" id="ddlSearch" class="eval-input ddl-search" placeholder="Search card or #" autocomplete="off" aria-label="Search cards">
+              <select id="ddlTier" aria-label="Rarity">
+                <option value="">All rarities</option>
+                <option value="CR">Common/Rare</option>
+                <option value="UR">Ultra Rare</option>
+                <option value="GIGA">Giga Rare</option>
+              </select>
+              <select id="ddlClass" aria-label="Class">
+                <option value="">All classes</option>
+                <option>Crown</option><option>Bow</option><option>Wizard</option>
+                <option>Zombie</option><option>Pirate</option><option>Neutral</option><option>All</option>
+              </select>
+              <select id="ddlOwned" aria-label="Owned filter">
+                <option value="">All cards</option>
+                <option value="owned">Owned</option>
+                <option value="missing">Missing</option>
+                <option value="want">Looking for</option>
+              </select>
+              <select id="ddlSort" aria-label="Sort">
+                <option value="no">Set #</option>
+                <option value="value">Highest value</option>
+                <option value="name">Name</option>
+              </select>
+            </div>
+            <div class="ddl-table-wrap">
+              <table class="ddl-table">
+                <thead>
+                  <tr><th>#</th><th>Card</th><th>Base</th><th>Holo</th><th>Full art</th><th>Art dog</th></tr>
+                </thead>
+                <tbody id="ddlRows"></tbody>
+              </table>
+            </div>
+            <p class="ddl-muted ddl-footnote">Booster box and pack use the Doginal Dogs shop listing whose title matches, unless sold comps are newer. Card prices use sold comps, then a matching shop listing, then other asks at <span id="ddlAskPct">85%</span>, then a pack-math estimate from the booster box. Pack odds are unpublished. Fan tool, not affiliated with Doginal Dogs.</p>
+          </div>
+
+          <dialog class="ddl-dialog" id="ddlCardDialog" aria-labelledby="ddlCardTitle">
+            <div class="ddl-dialog-inner" id="ddlCardBody"></div>
+          </dialog>
+
+          <dialog class="ddl-dialog ddl-scan-dialog" id="ddlScanDialog" aria-labelledby="ddlScanTitle">
+            <div class="ddl-dialog-inner">
+              <div class="ddl-dialog-head">
+                <h3 id="ddlScanTitle">Scan cards</h3>
+                <button type="button" class="ddl-close" data-close aria-label="Close">×</button>
+              </div>
+              <div class="ddl-scan-stage" id="ddlScanStage">
+                <video id="ddlScanVideo" playsinline muted autoplay></video>
+                <img id="ddlScanPhoto" alt="Your photo">
+                <div class="ddl-scan-guide" id="ddlScanGuide" aria-hidden="true"></div>
+              </div>
+              <p class="ddl-muted ddl-scan-status" id="ddlScanStatus" aria-live="polite">Hold one card flat inside the frame.</p>
+              <div class="ddl-scan-result" id="ddlScanResult"></div>
+              <div class="ddl-scan-controls">
+                <button type="button" class="eval-mp-btn" id="ddlScanLive">Live camera</button>
+                <label class="eval-mp-btn ddl-import-label">Use a photo<input type="file" id="ddlScanFile" accept="image/*" hidden></label>
+                <button type="button" class="eval-mp-btn" id="ddlScanTorch" aria-pressed="false" hidden>Light</button>
+                <select id="ddlScanCamera" aria-label="Camera" hidden></select>
+                <select id="ddlScanAuto" aria-label="When a card is read">
+                  <option value="ask">Ask which print</option>
+                  <option value="base">Add Base right away</option>
+                  <option value="holo">Add Holo right away</option>
+                </select>
+              </div>
+              <input type="search" id="ddlScanManual" class="eval-input ddl-scan-manual" placeholder="Or add by name or number: Toot, 59…" autocomplete="off" aria-label="Add a card by name or number">
+              <div class="ddl-scan-manual-hits" id="ddlScanManualHits"></div>
+              <ul class="ddl-scan-log" id="ddlScanLog"></ul>
+            </div>
+          </dialog>
+
+          <dialog class="ddl-dialog ddl-profile-dialog" id="ddlProfileDialog" aria-labelledby="ddlProfileTitle">
+            <form class="ddl-dialog-inner" id="ddlProfileForm" method="dialog">
+              <div class="ddl-dialog-head">
+                <h3 id="ddlProfileTitle">Collector profile</h3>
+                <button type="button" class="ddl-close" data-close aria-label="Close">×</button>
+              </div>
+              <label class="ddl-field"><span>Display name</span><input name="displayName" maxlength="32" required></label>
+              <label class="ddl-field"><span>Profile link</span><span class="ddl-slug-row"><em id="ddlSlugPrefix"></em><input name="slug" maxlength="24" pattern="[a-z0-9][a-z0-9_\-]{2,23}" required></span></label>
+              <label class="ddl-field"><span>Bio</span><textarea name="bio" maxlength="200" rows="3" placeholder="Chasing the Gigas. Trades open."></textarea></label>
+              <label class="ddl-field"><span>Favorite card</span><select name="favoriteCard" id="ddlFavSelect"></select></label>
+              <label class="ddl-toggle"><input type="checkbox" name="isPublic"> <span>Public profile: list your checklist with other collectors, including a Missing view and the cards you are looking for</span></label>
+              <label class="ddl-toggle"><input type="checkbox" name="showValue"> <span>Show my collection value on the public profile</span></label>
+              <p class="ddl-muted ddl-form-msg" id="ddlProfileMsg" role="status"></p>
+              <div class="ddl-form-actions">
+                <button type="button" class="eval-mp-btn" data-close>Cancel</button>
+                <button type="submit" class="eval-mp-btn eval-mp-btn-primary">Save profile</button>
+              </div>
+            </form>
+          </dialog>
+
+          <dialog class="ddl-dialog" id="ddlCollectorDialog" aria-labelledby="ddlCollectorTitle">
+            <div class="ddl-dialog-inner" id="ddlCollectorBody"></div>
+          </dialog>
+        </section>
 
         <div class="eval-dex-spotlight eval-glass-panel eval-block-card eval-lift-hover" style="display:none">
           <div class="eval-dex-spotlight-inner">
@@ -2703,6 +2859,9 @@
   <!-- Anon URL + key injected by Express from env (GET config.js). Never put service_role here. -->
   <script src="config.js"></script>
   <script src="dogidex-supabase.js"></script>
+  <script src="ddl-checklist.js?v=ddl-eval-4"></script>
+  <script src="ddl-checklist-pdf.js?v=cl1"></script>
+  <script src="ddl-tcg.js?v=ddl-eval-14"></script>
   <script>
     (function () {
       try {

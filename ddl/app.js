@@ -10,8 +10,8 @@ function pricesTabOpen() {
 }
 function tabIds() {
   return pricesTabOpen()
-    ? ["cards", "mechanics", "decks", "builder", "prices"]
-    : ["cards", "mechanics", "decks", "builder"];
+    ? ["cards", "checklist", "mechanics", "decks", "builder", "prices"]
+    : ["cards", "checklist", "mechanics", "decks", "builder"];
 }
 const CLASSES = ["Crown", "Bow", "Wizard", "Zombie", "Pirate", "Neutral", "All"];
 const CLASS_COLOR = {
@@ -205,7 +205,8 @@ $("modal").addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if ($("modal") && !$("modal").hidden) closeModal();
+    if ($("custom-io") && !$("custom-io").hidden) closeListIo();
+    else if ($("modal") && !$("modal").hidden) closeModal();
     else hideCardPeek();
     return;
   }
@@ -805,17 +806,40 @@ function expandBuild(build) {
   return { rows, counts, curve };
 }
 
-function deckText(title, hero, rows) {
-  const heroes = Array.isArray(hero) ? hero.filter(Boolean).join(" + ") : hero;
-  const lines = [`DDL TCG — ${title}`, `Class: ${heroes}`, `40 cards · max 3 copies`, ""];
-  for (const type of ["Creature", "Spell", "Trap"]) {
-    const group = rows.filter((r) => r.type === type).sort((a, b) => a.mana - b.mana || a.name.localeCompare(b.name));
-    if (!group.length) continue;
-    lines.push(`## ${type}s (${group.reduce((s, r) => s + r.qty, 0)})`);
-    for (const r of group) lines.push(`${r.qty} ${r.name} (${r.id})`);
-    lines.push("");
-  }
-  return lines.join("\n");
+const UNPLAYABLE_SERIALS = { V029: 1 };
+
+/** Same text ddltcg.com/play writes, so a list round-trips into Play Import. */
+function playListText(title, rows) {
+  const serials = [];
+  (rows || []).forEach((r) => {
+    const n = Math.max(0, Math.min(3, Number(r && r.qty) || 0));
+    for (let i = 0; i < n; i++) {
+      const id = String((r && r.id) || "").toUpperCase();
+      if (/^V\d{3}$/.test(id) && !UNPLAYABLE_SERIALS[id]) serials.push(id);
+    }
+  });
+  const by = {};
+  serials.forEach((id) => { by[id] = (by[id] || 0) + 1; });
+  const name = String(title || "Custom").trim() || "Custom";
+  const lines = ["# DDL TCG", `# name: ${name}`, `# count: ${serials.length}/40`, ""];
+  Object.keys(by)
+    .sort((a, b) => {
+      const na = (cardById(a) && cardById(a).name) || a;
+      const nb = (cardById(b) && cardById(b).name) || b;
+      return String(na).localeCompare(String(nb));
+    })
+    .forEach((id) => {
+      const card = cardById(id);
+      lines.push(`${by[id]}× ${(card && card.name) || id}`);
+    });
+  lines.push("");
+  const serialsLine = Object.keys(by).sort().flatMap((id) => Array(by[id]).fill(id));
+  lines.push(`# serials: ${serialsLine.join(",")}`);
+  return `${lines.join("\n")}\n`;
+}
+
+function deckText(title, _hero, rows) {
+  return playListText(title, rows);
 }
 
 function serialText(rows) {
@@ -1230,38 +1254,263 @@ function loadCookedIntoDraft(list, heroes, title) {
   renderCustom();
 }
 
-function parseDeckText(text) {
+function cardByName(label) {
+  const key = String(label || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!key) return null;
+  return D.cards.find((c) => (
+    !UNPLAYABLE_SERIALS[String(c.id).toUpperCase()]
+    && String(c.name).trim().toLowerCase().replace(/\s+/g, " ") === key
+  )) || null;
+}
+
+function parsePlayList(raw) {
   const unknown = [];
-  let added = 0;
-  for (const line of String(text || "").split(/\n|;/)) {
-    const raw = line.trim();
-    if (!raw || /^#|^DDL|^Class:|^40 cards|^##/i.test(raw)) continue;
-    let qty = 1;
-    let rest = raw;
-    const m = raw.match(/^(\d+)\s*[x×]\s*(.+)$/i) || raw.match(/^(\d+)\s+(.+)$/);
-    if (m) {
-      qty = Math.min(3, Number(m[1]) || 1);
-      rest = m[2].trim();
-    } else {
-      const tail = raw.match(/^(.+?)\s*[x×]\s*(\d+)$/i);
-      if (tail) {
-        rest = tail[1].trim();
-        qty = Math.min(3, Number(tail[2]) || 1);
-      }
-    }
-    const idm = rest.match(/V\d{3}/i);
-    let card = idm ? cardById(idm[0].toUpperCase()) : null;
-    if (!card) {
-      const name = rest.replace(/\s*\(V\d{3}.*\)$/i, "").trim();
-      card = D.cards.find((c) => c.name.toLowerCase() === name.toLowerCase());
-    }
-    if (!card) unknown.push(raw);
-    else {
-      draft.cards[card.id] = Math.min(3, (draft.cards[card.id] || 0) + qty);
-      added += 1;
+  const dropped = [];
+  let deckName = "";
+  let serials = [];
+  const text = String(raw || "");
+  const stripped = text.trim();
+  if (stripped.charAt(0) === "[") {
+    try {
+      const arr = JSON.parse(stripped);
+      if (Array.isArray(arr)) serials = arr.map((x) => String(x || "").trim().toUpperCase()).filter(Boolean);
+    } catch {
+      serials = [];
     }
   }
-  return { added, unknown };
+  if (!serials.length) {
+    const fromLine = [];
+    const fromBody = [];
+    text.split(/\r?\n/).forEach((line) => {
+      const s = String(line || "").trim();
+      if (!s) return;
+      const low = s.toLowerCase();
+      if (low.indexOf("# name:") === 0) {
+        deckName = s.split(":").slice(1).join(":").trim();
+        return;
+      }
+      if (low.indexOf("# serials:") === 0) {
+        const found = s.match(/\bV\d{3}\b/ig) || [];
+        found.forEach((tok) => fromLine.push(tok.toUpperCase()));
+        return;
+      }
+      if (s.charAt(0) === "#") return;
+      const tokens = s.match(/\bV\d{3}\b/ig) || [];
+      const restLetters = s.replace(/V\d{3}/ig, "").replace(/[^A-Za-z]/g, "");
+      if (tokens.length && restLetters.length < 3) {
+        tokens.forEach((tok) => fromBody.push(tok.toUpperCase()));
+        return;
+      }
+      let count = 1;
+      let label = s;
+      let m = s.match(/^\s*(\d+)\s*[x×]\s+(.+?)\s*$/i);
+      if (m) {
+        count = parseInt(m[1], 10) || 1;
+        label = m[2];
+      } else {
+        m = s.match(/^\s*(.+?)\s*[x×]\s*(\d+)\s*$/i);
+        if (m) {
+          label = m[1];
+          count = parseInt(m[2], 10) || 1;
+        } else {
+          m = s.match(/^\s*(\d+)\s+(.+?)\s*$/);
+          if (m) {
+            count = parseInt(m[1], 10) || 1;
+            label = m[2];
+          }
+        }
+      }
+      label = String(label || "").replace(/\s+/g, " ").replace(/\s*\(V\d{3}\)\s*$/i, "").trim();
+      const named = cardByName(label) || (/^V\d{3}$/i.test(label) ? cardById(label) : null);
+      if (!named) {
+        unknown.push(label || s);
+        return;
+      }
+      const n = Math.max(1, Math.min(3, count | 0));
+      for (let i = 0; i < n; i++) fromBody.push(named.id);
+    });
+    serials = fromLine.length ? fromLine : fromBody;
+    if (fromLine.length) unknown.length = 0;
+  }
+  const out = [];
+  const seen = {};
+  serials.forEach((s) => {
+    const key = String(s || "").trim().toUpperCase();
+    if (!/^V\d{3}$/.test(key)) return;
+    if (UNPLAYABLE_SERIALS[key]) {
+      dropped.push(key);
+      return;
+    }
+    if (!cardById(key)) {
+      unknown.push(key);
+      return;
+    }
+    const n = seen[key] | 0;
+    if (n >= 3) return;
+    seen[key] = n + 1;
+    out.push(key);
+  });
+  const counts = {};
+  out.forEach((id) => { counts[id] = (counts[id] || 0) + 1; });
+  return { ok: out.length > 0, serials: out, name: deckName, unknown, dropped, count: out.length, counts };
+}
+
+function heroesFromCounts(counts) {
+  const tally = {};
+  Object.keys(counts || {}).forEach((id) => {
+    const qty = Math.max(0, Number(counts[id]) || 0);
+    if (!qty) return;
+    const card = cardById(id);
+    if (!card || card.all_class) return;
+    const cls = String(card.class || "");
+    if (!cls || cls === "Neutral" || cls === "All") return;
+    tally[cls] = (tally[cls] || 0) + qty;
+  });
+  return Object.entries(tally)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map((row) => row[0]);
+}
+
+function setIoMsg(text, bad) {
+  const el = $("custom-io-msg");
+  if (!el) return;
+  if (!text) {
+    el.hidden = true;
+    el.textContent = "";
+    el.classList.remove("is-bad");
+    return;
+  }
+  el.hidden = false;
+  el.textContent = text;
+  el.classList.toggle("is-bad", !!bad);
+}
+
+function closeListIo() {
+  const ov = $("custom-io");
+  if (!ov) return;
+  ov.hidden = true;
+  ov.setAttribute("aria-hidden", "true");
+}
+
+function openListIo(mode, presetText) {
+  const ov = $("custom-io");
+  if (!ov) return;
+  const title = $("custom-io-title");
+  const copy = $("custom-io-copy");
+  const ta = $("custom-io-text");
+  const apply = $("custom-io-apply");
+  const st = $("custom-io-status");
+  const exportMode = mode === "export";
+  if (title) title.textContent = exportMode ? "Your list" : "Import your list";
+  if (copy) {
+    copy.innerHTML = exportMode
+      ? "This is <b>your</b> list. Copy it, then paste it into Play or send it however you like."
+      : "Paste a list you exported, <b>3× Card Name</b> lines, or V001 serials. This only fills <b>your</b> builder.";
+  }
+  if (ta) {
+    ta.value = presetText || "";
+    ta.readOnly = !!exportMode;
+  }
+  if (apply) {
+    apply.hidden = !!exportMode;
+    apply.textContent = "Import into builder";
+  }
+  if (st) {
+    st.hidden = true;
+    st.textContent = "";
+    st.classList.remove("is-bad");
+  }
+  ov.hidden = false;
+  ov.removeAttribute("aria-hidden");
+  try {
+    if (ta) {
+      ta.focus();
+      if (exportMode) ta.select();
+    }
+  } catch { /* ignore */ }
+}
+
+async function exportCustomList() {
+  const rows = draftRows();
+  const n = rows.reduce((s, r) => s + r.qty, 0);
+  if (!n) {
+    setIoMsg("Add cards before exporting.", true);
+    return;
+  }
+  const text = playListText(draft.name || $("custom-name")?.value || "Custom", rows);
+  let copied = false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    }
+  } catch {
+    copied = false;
+  }
+  if (!copied) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      copied = document.execCommand("copy");
+      ta.remove();
+    } catch {
+      copied = false;
+    }
+  }
+  if (copied) {
+    setIoMsg("Copied your " + n + "-card list.");
+    const exportBtn = $("custom-export");
+    if (exportBtn) {
+      const prev = exportBtn.textContent;
+      exportBtn.textContent = "Copied";
+      setTimeout(() => { exportBtn.textContent = prev; }, 1400);
+    }
+  } else {
+    openListIo("export", text);
+    setIoMsg("Copy failed — select the list and copy it.", true);
+  }
+}
+
+function applyImportedList() {
+  const ta = $("custom-io-text");
+  const raw = (ta && ta.value) || "";
+  const parsed = parsePlayList(raw);
+  const st = $("custom-io-status");
+  if (!parsed.ok) {
+    const msg = parsed.unknown.length
+      ? ("Could not read: " + parsed.unknown.slice(0, 4).join(", "))
+      : "No cards found in that list.";
+    if (st) {
+      st.hidden = false;
+      st.textContent = msg;
+      st.classList.add("is-bad");
+    }
+    return;
+  }
+  draft.cards = { ...parsed.counts };
+  if (parsed.name) {
+    const cur = ($("custom-name")?.value || "").trim();
+    if (!cur || /^Untitled$/i.test(cur) || /^Generated /i.test(cur) || cur === "Custom draft") {
+      draft.name = parsed.name.slice(0, 48);
+      if ($("custom-name")) $("custom-name").value = draft.name;
+    }
+  }
+  const heroes = heroesFromCounts(parsed.counts);
+  if (heroes[0] && $("custom-class")) {
+    $("custom-class").value = heroes[0];
+    if ($("custom-class-2")) $("custom-class-2").value = heroes[1] && heroes[1] !== heroes[0] ? heroes[1] : "";
+  }
+  closeListIo();
+  renderCustom();
+  const bits = ["Imported " + parsed.count + " into your list"];
+  if (parsed.dropped.length) bits.push("dropped unplayable");
+  if (parsed.count !== 40) bits.push(parsed.count + "/40");
+  setIoMsg(bits.join(" · ") + (parsed.count === 40 ? "" : " — add or remove to hit 40"), parsed.count !== 40);
 }
 
 function classSheetHtml(heroes) {
@@ -1339,7 +1588,7 @@ function renderCustom() {
           </span>
           <span class="chip ${CLASS_COLOR[r.class] || ""}">${legalFor(r, heroes) ? r.class : "Illegal · " + r.class}</span>
         </div>`).join("")}`).join("")
-    : `<p class="empty">Paste a list or tap cards on the left. Aim for 40, with 4–7 traps unless you are building a dedicated race or a trap wall.</p>`;
+    : `<p class="empty">Import a list or tap cards on the left. Aim for 40, with 4–7 traps unless you are building a dedicated race or a trap wall.</p>`;
 
   const term = ($("custom-q")?.value || "").trim().toLowerCase();
   const pool = D.cards.filter((c) => {
@@ -1406,7 +1655,7 @@ function initCustomBuilder() {
     activeCustomId = "";
     draft = { id: "", name: "", hero: $("custom-class").value || "Pirate", heroes: [$("custom-class").value || "Pirate"], cards: {} };
     $("custom-name").value = "";
-    $("custom-paste").value = "";
+    setIoMsg("");
     renderCustom();
   });
   $("custom-save").addEventListener("click", persistDraft);
@@ -1428,13 +1677,21 @@ function initCustomBuilder() {
   });
   $("custom-clear").addEventListener("click", () => {
     draft.cards = {};
+    setIoMsg("");
     renderCustom();
   });
-  $("custom-parse").addEventListener("click", () => {
-    const { unknown } = parseDeckText($("custom-paste").value);
-    renderCustom();
-    if (unknown.length) window.alert("Could not match: " + unknown.slice(0, 8).join(", "));
+  $("custom-import").addEventListener("click", () => {
+    setIoMsg("");
+    openListIo("import");
   });
+  $("custom-export").addEventListener("click", () => { exportCustomList(); });
+  $("custom-io-cancel").addEventListener("click", closeListIo);
+  $("custom-io-apply").addEventListener("click", applyImportedList);
+  const ioRoot = $("custom-io");
+  if (ioRoot && !ioRoot.dataset.bound) {
+    ioRoot.dataset.bound = "1";
+    ioRoot.addEventListener("click", (ev) => { if (ev.target === ioRoot) closeListIo(); });
+  }
   ["custom-class", "custom-class-2"].forEach((id) => $(id).addEventListener("change", renderCustom));
   $("custom-name").addEventListener("input", () => { draft.name = $("custom-name").value; });
   $("custom-q").addEventListener("input", renderCustom);
@@ -1458,13 +1715,6 @@ function initCustomBuilder() {
     const id = step.dataset.qty;
     setDraftQty(id, (draft.cards[id] || 0) + Number(step.dataset.d));
   });
-  document.querySelector("#view-builder")?.addEventListener("click", (e) => {
-    const copy = e.target.closest("[data-copy]");
-    if (!copy) return;
-    const rows = draftRows();
-    if (copy.dataset.copy === "custom-list") copyText(deckText(draft.name || "Custom 40", draftHeroes(), rows), copy);
-    if (copy.dataset.copy === "custom-serials") copyText(serialText(rows), copy);
-  });
   document.querySelectorAll("[data-builder]").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll("[data-builder]").forEach((b) => b.classList.toggle("active", b === btn));
@@ -1476,9 +1726,9 @@ function initCustomBuilder() {
 }
 
 /* ---------- Prices ---------- */
-function estimatedUsd(card) {
+function estimatedUsd(card, boxUsd) {
   const shop = D.shop;
-  const box = shop.box_usd;
+  const box = boxUsd || shop.box_usd;
   const cardsPerBox = shop.packs_per_box * shop.cards_per_pack;
   const bulk = box / cardsPerBox;
   if (card.scarcity != null && card.rarity_pct) {
@@ -1492,12 +1742,29 @@ function estimatedUsd(card) {
   return bulk * fallback * (1 + (card.mana || 0) / 25) * (card.keyword === "Taunt" ? 1.1 : 1);
 }
 
-function renderPrices() {
+function livePrintUsd(card, live) {
+  const row = live && Array.isArray(live.cards) ? live.cards.find((c) => c.id === card.id) : null;
+  if (!row || !row.prints) return null;
+  const vals = Object.values(row.prints).map((p) => Number(p.usd)).filter((n) => n > 0);
+  if (!vals.length) return null;
+  const best = Math.max(...vals);
+  const print = Object.entries(row.prints).find(([, p]) => Number(p.usd) === best);
+  return { usd: best, source: print ? print[1].source : null };
+}
+
+function paintPrices(live) {
   const shop = D.shop;
-  const pack = shop.box_usd / shop.packs_per_box;
-  const perCard = shop.box_usd / (shop.packs_per_box * shop.cards_per_pack);
+  const boxUsd = live && live.box && live.box.usd ? Number(live.box.usd) : shop.box_usd;
+  const pack = live && live.pack && live.pack.usd ? Number(live.pack.usd) : boxUsd / shop.packs_per_box;
+  const boxFromShop = live && live.box && live.box.source === "shop";
+  const packFromShop = live && live.pack && live.pack.source === "shop";
+  const perCard = boxUsd / (shop.packs_per_box * shop.cards_per_pack);
   const priced = D.cards
-    .map((c) => ({ ...c, usd: estimatedUsd(c) }))
+    .map((c) => {
+      const hit = livePrintUsd(c, live);
+      const listed = hit && hit.source && hit.source !== "model" && hit.source !== "derived";
+      return { ...c, usd: listed ? hit.usd : estimatedUsd(c, boxUsd), source: listed ? hit.source : "model" };
+    })
     .sort((a, b) => b.usd - a.usd);
 
   const byRarity = {};
@@ -1510,12 +1777,12 @@ function renderPrices() {
   $("view-prices").innerHTML = `
     <header class="view-intro">
       <h2>What a box is worth</h2>
-      <p>There is no public singles market yet. These numbers are estimates from pack math, not asking prices.</p>
+      <p>${boxFromShop || packFromShop ? "Booster box and pack prices are the current Doginal Dogs shop listings, matched by product title. Singles stay estimates until a listing title matches that card." : "There is no public singles market yet. These numbers are estimates from pack math, not asking prices."}</p>
     </header>
     <article class="price-box">
       <h3>${shop.product}</h3>
-      <p>Official shop: <a href="${shop.url}">$${shop.box_usd}</a> · ${shop.packs_per_box} packs · ${shop.cards_per_pack} cards each · <b>${shop.status.replace("_", " ")}</b> · ships ${shop.ships}.</p>
-      <p>About $${pack.toFixed(2)} per pack, or $${perCard.toFixed(2)} if you treat every card as equal. ${shop.note}</p>
+      <p>Official shop: <a href="${live && live.box && live.box.url ? live.box.url : shop.url}">$${boxUsd.toFixed(2)}</a>${boxFromShop ? " · matched shop listing" : ""} · ${shop.packs_per_box} packs · ${shop.cards_per_pack} cards each · <b>${shop.status.replace("_", " ")}</b> · ships ${shop.ships}.</p>
+      <p>Pack <b>$${pack.toFixed(2)}</b>${packFromShop ? ` · <a href="${live.pack.url || shop.url}">Doginal Dogs shop</a>` : ""}, or $${perCard.toFixed(2)} if you treat every card in a box as equal. ${shop.note}</p>
     </article>
     <details class="fold">
       <summary>
@@ -1548,6 +1815,14 @@ function renderPrices() {
       </table>
     </article>
   `;
+}
+
+function renderPrices() {
+  paintPrices(null);
+  fetch("/api/ddl-market/cards", { headers: { accept: "application/json" } })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((live) => { if (live && live.box) paintPrices(live); })
+    .catch(() => {});
 }
 
 /* ---------- Tabs ---------- */
