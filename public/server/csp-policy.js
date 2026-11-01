@@ -22,7 +22,7 @@ function contentSecurityPolicy() {
 		`connect-src 'self' https://script.google.com https://script.googleusercontent.com https://challenges.cloudflare.com https://market.doginaldogs.com https://${DOGIDEX_SUPABASE_HOST} wss://${DOGIDEX_SUPABASE_HOST} https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com`,
 		"media-src 'self' blob:",
 		"worker-src 'self' blob:",
-		"frame-src 'self' https://kick.com https://*.kick.com",
+		"frame-src 'self'",
 		"frame-ancestors 'none'",
 		"form-action 'self' https://script.google.com",
 		"object-src 'none'",
