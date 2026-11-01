@@ -9,10 +9,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>KushMetaX — About</title>
   <meta name="description" content="Founder of KennelDAO. Multidisciplinary creative specializing in video editing, graphic design, UX/UI, and Web3.">
-  <link rel="icon" href="assets/Kush.png" type="image/png">
-  <link rel="apple-touch-icon" href="assets/Kush.png">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/favicon-180.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="brand.css">
+  <link rel="stylesheet" href="brand.css?v=20261015b">
   <script>
     // If arriving from portal animation, skip hero entrance animations
     if (window.location.hash === '#from-portal') {
@@ -28,7 +29,7 @@
     <video class="bg-video" muted playsinline></video>
     <div class="bg-video-overlay"></div>
   </div>
-  <button class="video-mute-btn" id="muteBtn" aria-label="Unmute background video">
+  <button class="video-mute-btn" id="muteBtn" type="button" aria-pressed="false" aria-label="Unmute background video. Sound is off.">
     <!-- Muted icon -->
     <svg class="icon-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -41,13 +42,14 @@
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
       <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
     </svg>
+    <span class="mute-label">Sound off</span>
   </button>
 
   <!-- ===== HEADER ===== -->
   <header class="site-header">
     <div class="header-inner">
       <a href="index.html" class="header-logo">
-        <img src="assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+        <img src="assets/favicon-180.png" alt="KushMetaX" class="header-logo-img">
         <span class="header-logo-text">KushMetaX</span>
       </a>
       <button class="hamburger" aria-label="Open menu" aria-expanded="false">
@@ -59,12 +61,9 @@
   <!-- ===== NAV OVERLAY ===== -->
   <nav class="nav-overlay" aria-label="Main navigation">
     <ul class="nav-list">
+      <li><a href="dd-evaluator/#ddl-tcg" class="nav-link">DDL TCG Evaluator</a></li>
       <li><a href="index.html" class="nav-link">Home</a></li>
-      <li><a href="about.html" class="nav-link">About</a></li>
-      <li><a href="gallery.html" class="nav-link">Gallery</a></li>
-      <li><a href="services.html" class="nav-link">Services</a></li>
-      <li><a href="dd-evaluator/" class="nav-link">DD Evaluator</a></li>
-      <li><a href="ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
+      <li><a href="oracle-madness/" class="nav-link">Oracle Madness</a></li>
       <li><a href="voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="contact.html" class="nav-link">Connect</a></li>
     </ul> 
@@ -74,11 +73,11 @@
   <!-- ===== HERO ===== -->
   <section class="hero">
     <div class="hero-content">
-      <img src="assets/Kush.png" alt="KushMetaX" class="hero-pfp">
+      <img src="assets/kush-dog.png" alt="Kush pixel dog" class="hero-pfp">
       <p class="hero-handle">@KushMetaX</p>
       <h1 class="hero-title">Craftsmanship<br>Meets <span class="accent">Web3</span></h1>
       <p class="hero-tagline">Founder of KennelDAO — multidisciplinary creative, daily X Space host, and builder at the intersection of digital art and real-world craft.</p>
-      <a href="gallery.html" class="hero-cta">View Gallery →</a>
+      <a href="dd-evaluator/" class="hero-cta">Open DD Evaluator →</a>
       <div class="scroll-indicator" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10l5 5 5-5"/></svg>
       </div>
@@ -106,83 +105,10 @@
         </div>
         <div class="about-visual">
             <div class="about-visual-grid">
-              <img src="assets/Kush.png" alt="KushMetaX dog avatar" class="about-visual-img">
+              <img src="assets/kush-dog.png" alt="Kush pixel dog" class="about-visual-img">
               <img src="assets/me.jpg" alt="KushMetaX portrait" class="about-visual-img">
             </div>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== DOGINAL DOGS LORE QUIZ ===== -->
-  <section class="quiz-section" id="quiz" style="display:none;">
-    <div class="container">
-      <p class="quiz-round-label">Round 1</p>
-      <h2 class="quiz-heading">Doginal Dogs Lore Quiz</h2>
-      <p class="quiz-intro">Test your knowledge of the Doginal Dogs project! <strong>10 questions</strong>, multiple choice, getting progressively harder. <strong>Rules:</strong> Choose one answer per question. Results and explanations appear after you submit.</p>
-
-      <div id="quizContainer">
-        <!-- Questions are rendered by JavaScript -->
-      </div>
-
-      <div class="quiz-progress" id="quizProgress">
-        <div class="quiz-progress-track">
-          <div class="quiz-progress-fill" id="quizProgressFill" style="width:10%"></div>
-        </div>
-        <p class="quiz-progress-label" id="quizProgressLabel">1 of 10</p>
-      </div>
-
-      <div class="quiz-nav" id="quizNav">
-        <button class="quiz-btn" id="quizPrev" disabled>← Previous</button>
-        <button class="quiz-btn" id="quizNext">Next →</button>
-        <button class="quiz-btn quiz-btn-submit" id="quizSubmit">Submit Quiz</button>
-      </div>
-
-      <div class="quiz-results" id="quizResults">
-        <div class="quiz-score-card">
-          <p class="quiz-score-number" id="quizScoreNum"></p>
-          <p class="quiz-score-label">correct out of 10</p>
-          <h3 class="quiz-tier-title" id="quizTierTitle"></h3>
-          <p class="quiz-tier-desc" id="quizTierDesc"></p>
-        </div>
-        <div class="quiz-review" id="quizReview"></div>
-        <button class="quiz-btn-retry" id="quizRetry">Retake Quiz</button>
-        <a href="#quiz2" class="quiz-btn-levelup" id="quizLevelUp" style="display:none;">Continue to Round 2 — Elite Shibe Edition →</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== ROUND 2 — ELITE SHIBE EDITION ===== -->
-  <section class="quiz-section" id="quiz2" style="display:none;">
-    <div class="container">
-      <p class="quiz-round-label">Round 2</p>
-      <h2 class="quiz-heading">Elite Shibe Edition</h2>
-      <p class="quiz-intro">You survived Round 1 — now prove you're a true on-chain historian. <strong>10 deeper questions</strong> across Advanced, Expert, and Master tiers. <strong>Rules:</strong> One answer per question. Results and explanations after you submit.</p>
-
-      <div id="quiz2Container"></div>
-
-      <div class="quiz-progress" id="quiz2Progress">
-        <div class="quiz-progress-track">
-          <div class="quiz-progress-fill" id="quiz2ProgressFill" style="width:10%"></div>
-        </div>
-        <p class="quiz-progress-label" id="quiz2ProgressLabel">1 of 10</p>
-      </div>
-
-      <div class="quiz-nav" id="quiz2Nav">
-        <button class="quiz-btn" id="quiz2Prev" disabled>← Previous</button>
-        <button class="quiz-btn" id="quiz2Next">Next →</button>
-        <button class="quiz-btn quiz-btn-submit" id="quiz2Submit">Submit Quiz</button>
-      </div>
-
-      <div class="quiz-results" id="quiz2Results">
-        <div class="quiz-score-card">
-          <p class="quiz-score-number" id="quiz2ScoreNum"></p>
-          <p class="quiz-score-label">correct out of 10</p>
-          <h3 class="quiz-tier-title" id="quiz2TierTitle"></h3>
-          <p class="quiz-tier-desc" id="quiz2TierDesc"></p>
-        </div>
-        <div class="quiz-review" id="quiz2Review"></div>
-        <button class="quiz-btn-retry" id="quiz2Retry">Retake Round 2</button>
       </div>
     </div>
   </section>
@@ -218,7 +144,7 @@
     </div>
   </footer>
 
-  <script src="brand.js"></script>
+  <script src="brand.js?v=20261015b"></script>
   <script>
   // Background video cycling — add/remove filenames in the array
   (function(){
@@ -232,7 +158,9 @@
     if (!el || !videos.length) return;
     var i = 0;
     function load(idx) {
+      var keepMuted = el.muted;
       el.src = videos[idx];
+      el.muted = keepMuted;
       el.play().catch(function(){});
     }
     el.addEventListener('ended', function() {
@@ -250,515 +178,13 @@
       btn.addEventListener('click', function() {
         el.muted = !el.muted;
         btn.classList.toggle('is-unmuted', !el.muted);
-        btn.setAttribute('aria-label', el.muted ? 'Unmute background video' : 'Mute background video');
+        btn.setAttribute('aria-pressed', el.muted ? 'false' : 'true');
+        btn.setAttribute('aria-label', el.muted ? 'Unmute background video. Sound is off.' : 'Mute background video. Sound is on.');
+        var muteLabel = btn.querySelector('.mute-label');
+        if (muteLabel) muteLabel.textContent = el.muted ? 'Sound off' : 'Sound on';
       });
     }
   })();
   </script>
-  <script>
-  // ---- Doginal Dogs Lore Quiz (10 Questions) ----
-  (function(){
-    var questions = [
-      {
-        tier: 'easy',
-        text: 'How many Doginal Dogs are in the official collection?',
-        options: ['5,000', '10,000', '20,000', '1,000'],
-        correct: 1,
-        explanation: 'The official collection size is exactly 10,000 hand-curated pixel dogs.'
-      },
-      {
-        tier: 'easy',
-        text: 'On which blockchain are the Doginal Dogs inscribed as permanent digital collectibles?',
-        options: ['Bitcoin', 'Ethereum', 'Dogecoin', 'Solana'],
-        correct: 2,
-        explanation: 'All Doginal Dogs are inscribed directly on the Dogecoin blockchain for true on-chain permanence.'
-      },
-      {
-        tier: 'easy',
-        text: 'What is the artistic style of every Doginal Dog?',
-        options: ['3D rendered models', 'Hand-drawn oil paintings', 'Pixel art', 'Photorealistic photography'],
-        correct: 2,
-        explanation: 'They feature bold, nostalgic pixel style with vivid colors and lasting design.'
-      },
-      {
-        tier: 'easy',
-        text: 'How were the 10,000 dogs in the collection created?',
-        options: ['Randomly generated by code', 'AI-generated', 'Hand-curated (each one individually designed)', 'Community-submitted and voted on'],
-        correct: 2,
-        explanation: 'Every single dog was individually designed (not generative or random).'
-      },
-      {
-        tier: 'medium',
-        text: 'What inspired the very first pixel-art Doginal Dog?',
-        options: ['The original Shiba Inu meme from Dogecoin', 'A famous CryptoPunks-style character', "Barkmeta\u2019s beloved Doberman named Atlas", 'A stray dog photographed on the streets'],
-        correct: 2,
-        explanation: "The entire project traces back to one pixel-art piece Barkmeta made of his own dog, Atlas. Community demand turned it into the full 10k collection."
-      },
-      {
-        tier: 'medium',
-        text: 'Who are the two primary co-founders of Doginal Dogs?',
-        options: ['Elon Musk and Vitalik Buterin', 'Barkmeta (Christian Barker) and Shibo (David Chaboki)', 'Shield and Joe Rogan', 'A VC firm and a marketing agency'],
-        correct: 1,
-        explanation: 'They co-founded it (Shield later joined as CFO).'
-      },
-      {
-        tier: 'medium',
-        text: 'What made the original launch of Doginal Dogs unique compared to most NFT projects?',
-        options: ['It had a massive VC-backed presale with celebrity endorsements', 'It was a completely free mint with no founder allocation or roadmap', 'It was auctioned on Ethereum with high entry fees', 'It required a whitelist and paid mint'],
-        correct: 1,
-        explanation: 'Zero cost to mint, no reserved supply, pure community distribution.'
-      },
-      {
-        tier: 'hard',
-        text: 'What is the exact launch date of the free mint for the Doginal Dogs collection?',
-        options: ['January 11, 2024', 'September 18, 2025', 'March 28, 2026', 'December 21, 2023'],
-        correct: 0,
-        explanation: 'Confirmed launch date of the free mint on Dogecoin was January 11, 2024.'
-      },
-      {
-        tier: 'hard',
-        text: 'What does the term Doginal specifically refer to in the context of this project?',
-        options: ['A new type of Dogecoin meme coin', "Dogecoin\u2019s version of Bitcoin Ordinals (inscriptions on individual \u201cShibes\u201d/smallest units of DOGE)", 'A physical dog-themed merchandise line', 'An AI chatbot trained on Dogecoin lore'],
-        correct: 1,
-        explanation: 'Doginals = inscriptions on the Dogecoin blockchain (the "Dogecoin Ordinals" equivalent).'
-      },
-      {
-        tier: 'hard',
-        text: 'Which of these best captures the core community-first philosophy and outcome of the Doginal Dogs project?',
-        options: [
-          'Founders reserved 50% of the supply for themselves and VCs',
-          'It started as a single piece of pixel art of Atlas, grew purely from community demand, with every single one of the 10,000 dogs distributed to the community\u2014no presale, no funding, no founder allocation\u2014and evolved into a full platform with events, merch, tools, and Starter Dogs for free entry',
-          'It was designed as a short-term hype project that rug-pulled after the mint',
-          'It was built exclusively for high-net-worth collectors with expensive entry barriers'
-        ],
-        correct: 1,
-        explanation: 'Organic, community-driven growth from one dog\u2019s pixel art into a massive, fully community-owned cultural movement with no extraction mechanics.'
-      }
-    ];
-
-    var tiers = [
-      { min: 9, title: 'Doginal Legend', desc: 'You know the lore inside and out. True on-chain historian.' },
-      { min: 6, title: 'True Shibe Holder', desc: 'Solid knowledge \u2014 you\u2019ve been paying attention.' },
-      { min: 3, title: 'New to the Pack', desc: 'Welcome! Grab a free Starter Dog and keep learning.' },
-      { min: 0, title: 'Time to Mint Your Knowledge', desc: 'Head to doginaldogs.com and start your journey on-chain.' }
-    ];
-
-    var current = 0;
-    var answers = new Array(questions.length);
-    var submitted = false;
-
-    var container   = document.getElementById('quizContainer');
-    var progressFill  = document.getElementById('quizProgressFill');
-    var progressLabel = document.getElementById('quizProgressLabel');
-    var prevBtn     = document.getElementById('quizPrev');
-    var nextBtn     = document.getElementById('quizNext');
-    var submitBtn   = document.getElementById('quizSubmit');
-    var resultsDiv  = document.getElementById('quizResults');
-    var scoreNum    = document.getElementById('quizScoreNum');
-    var tierTitle   = document.getElementById('quizTierTitle');
-    var tierDesc    = document.getElementById('quizTierDesc');
-    var reviewDiv   = document.getElementById('quizReview');
-    var retryBtn    = document.getElementById('quizRetry');
-    var navDiv      = document.getElementById('quizNav');
-    var progressDiv = document.getElementById('quizProgress');
-
-    function buildQuestions() {
-      container.innerHTML = '';
-      questions.forEach(function(q, i) {
-        var div = document.createElement('div');
-        div.className = 'quiz-question' + (i === 0 ? ' active' : '');
-        div.setAttribute('data-index', i);
-        var tierClass = q.tier;
-        div.innerHTML =
-          '<div class="quiz-q-meta">' +
-            '<span class="quiz-q-number">Question ' + (i + 1) + ' of 10</span>' +
-            '<span class="quiz-q-tier ' + tierClass + '">' + q.tier.charAt(0).toUpperCase() + q.tier.slice(1) + '</span>' +
-          '</div>' +
-          '<h3 class="quiz-q-text">' + q.text + '</h3>' +
-          '<div class="quiz-options">' +
-            q.options.map(function(opt, j) {
-              return '<button class="quiz-option" data-index="' + j + '">' +
-                String.fromCharCode(65 + j) + ') ' + opt + '</button>';
-            }).join('') +
-          '</div>';
-        container.appendChild(div);
-      });
-      bindOptions();
-    }
-
-    function bindOptions() {
-      container.querySelectorAll('.quiz-option').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          if (submitted) return;
-          var qDiv = btn.closest('.quiz-question');
-          var qIdx = parseInt(qDiv.getAttribute('data-index'));
-          var aIdx = parseInt(btn.getAttribute('data-index'));
-          answers[qIdx] = aIdx;
-          qDiv.querySelectorAll('.quiz-option').forEach(function(b) {
-            b.classList.toggle('selected', parseInt(b.getAttribute('data-index')) === aIdx);
-          });
-          updateNav();
-        });
-      });
-    }
-
-    function showQuestion(idx) {
-      container.querySelectorAll('.quiz-question').forEach(function(q, i) {
-        q.classList.toggle('active', i === idx);
-      });
-      current = idx;
-      progressFill.style.width = ((idx + 1) / questions.length * 100) + '%';
-      progressLabel.textContent = (idx + 1) + ' of ' + questions.length;
-      updateNav();
-    }
-
-    function updateNav() {
-      prevBtn.disabled = current === 0;
-      if (current === questions.length - 1) {
-        nextBtn.style.display = 'none';
-        submitBtn.classList.add('visible');
-      } else {
-        nextBtn.style.display = '';
-        submitBtn.classList.remove('visible');
-      }
-    }
-
-    function submitQuiz() {
-      submitted = true;
-      var score = 0;
-      questions.forEach(function(q, i) {
-        if (answers[i] === q.correct) score++;
-      });
-
-      // Show score
-      scoreNum.textContent = score + '/10';
-      var tier = tiers.find(function(t) { return score >= t.min; });
-      tierTitle.textContent = tier.title;
-      tierDesc.textContent = tier.desc;
-
-      // Build review
-      reviewDiv.innerHTML = '';
-      questions.forEach(function(q, i) {
-        var isCorrect = answers[i] === q.correct;
-        var item = document.createElement('div');
-        item.className = 'quiz-review-item ' + (isCorrect ? 'is-correct' : 'is-wrong');
-        var yourAnswer = answers[i] !== undefined
-          ? (String.fromCharCode(65 + answers[i]) + ') ' + q.options[answers[i]])
-          : 'No answer';
-        var correctAnswer = String.fromCharCode(65 + q.correct) + ') ' + q.options[q.correct];
-        item.innerHTML =
-          '<p class="quiz-review-q">' + (i + 1) + '. ' + q.text + '</p>' +
-          (isCorrect
-            ? '<p class="quiz-review-answer correct">\u2713 ' + correctAnswer + '</p>'
-            : '<p class="quiz-review-answer wrong">\u2717 Your answer: ' + yourAnswer + '</p>' +
-              '<p class="quiz-review-answer correct">\u2713 Correct: ' + correctAnswer + '</p>') +
-          '<p class="quiz-review-explanation">' + q.explanation + '</p>';
-        reviewDiv.appendChild(item);
-      });
-
-      // Lock all options and show correct/wrong state
-      container.querySelectorAll('.quiz-question').forEach(function(qDiv, i) {
-        qDiv.querySelectorAll('.quiz-option').forEach(function(btn) {
-          btn.disabled = true;
-          var bIdx = parseInt(btn.getAttribute('data-index'));
-          if (bIdx === questions[i].correct) btn.classList.add('correct');
-          else if (bIdx === answers[i]) btn.classList.add('wrong');
-        });
-      });
-
-      navDiv.style.display = 'none';
-      progressDiv.style.display = 'none';
-      resultsDiv.classList.add('visible');
-
-      // Show all questions at once in review mode
-      container.querySelectorAll('.quiz-question').forEach(function(q) {
-        q.classList.add('active');
-        q.style.marginBottom = '16px';
-      });
-    }
-
-    function retry() {
-      submitted = false;
-      answers = new Array(questions.length);
-      resultsDiv.classList.remove('visible');
-      navDiv.style.display = '';
-      progressDiv.style.display = '';
-      buildQuestions();
-      showQuestion(0);
-    }
-
-    prevBtn.addEventListener('click', function() {
-      if (current > 0) showQuestion(current - 1);
-    });
-
-    nextBtn.addEventListener('click', function() {
-      if (current < questions.length - 1) showQuestion(current + 1);
-    });
-
-    submitBtn.addEventListener('click', submitQuiz);
-    retryBtn.addEventListener('click', retry);
-
-    buildQuestions();
-    showQuestion(0);
-  })();
-  </script>
-
-  <!-- ---- Round 2: Elite Shibe Edition Quiz ---- -->
-  <script>
-  (function(){
-    var questions = [
-      {
-        tier: 'advanced',
-        text: 'What was the original inscription number range for the Doginal Dogs mint on Dogecoin?',
-        options: ['Inscription #1 – #10,000', 'The exact range varies — they were inscribed in batches across several thousand shiboshi-level satoshis', 'They were all minted as a single batch on one block', 'Doginal Dogs were never individually inscribed'],
-        correct: 1,
-        explanation: 'The Doginal Dogs were inscribed starting from the earliest Doginal inscription slots, occupying a historically significant range on the Dogecoin blockchain.'
-      },
-      {
-        tier: 'advanced',
-        text: 'What role does Shield play in the Doginal Dogs project?',
-        options: ['He is the lead artist', 'He serves as the CFO overseeing financials and operations', 'He runs the community Discord server', 'He designed the marketplace smart contracts'],
-        correct: 1,
-        explanation: 'Shield joined the founding team as CFO, managing the financial and operational side of Doginal Dogs.'
-      },
-      {
-        tier: 'advanced',
-        text: 'What are Starter Dogs in the Doginal Dogs ecosystem?',
-        options: ['Rare 1-of-1 dogs given to early adopters', 'Free-to-claim dogs aimed at onboarding new members without cost barriers', 'A separate NFT collection on Ethereum', 'AI-generated dogs sold at a premium'],
-        correct: 1,
-        explanation: 'Starter Dogs are a free entry point designed to bring new people into the Doginal Dogs community with zero financial barrier.'
-      },
-      {
-        tier: 'expert',
-        text: 'How does the Doginal Dogs marketplace handle royalties differently from most NFT marketplaces?',
-        options: ['It charges a flat 10% royalty on every sale', 'Royalties are optional and set by the seller — the marketplace was built to respect community-first economics', 'There are no fees of any kind', 'Royalties are sent directly to the Dogecoin Foundation'],
-        correct: 1,
-        explanation: 'The Doginal Dogs marketplace was designed with community-first economics, giving sellers control rather than enforcing mandatory extraction.'
-      },
-      {
-        tier: 'expert',
-        text: 'What is the significance of the 10k hand-curated distinction for Doginal Dogs?',
-        options: ['It means each dog was mass-produced using a trait randomizer', 'Each of the 10,000 dogs was individually designed by Barkmeta — no algorithm or generative tool was used', 'It refers to 10,000 community votes on which dogs to include', 'It means only 10,000 wallets could participate in the mint'],
-        correct: 1,
-        explanation: 'Unlike generative PFP projects, every single Doginal Dog was hand-drawn by Barkmeta individually, making each one a unique piece of art.'
-      },
-      {
-        tier: 'expert',
-        text: 'What was the community\'s reaction that turned Barkmeta\'s single Atlas pixel art into a 10,000-piece collection?',
-        options: ['A VC firm offered funding to expand it', 'Organic community demand — people loved the Atlas piece so much they asked for more, and Barkmeta responded by creating the full collection', 'A celebrity endorsement went viral', 'An airdrop from another project required it'],
-        correct: 1,
-        explanation: 'There was no top-down plan. The community simply loved the Atlas art and demanded more — Barkmeta listened and built the entire 10k collection in response.'
-      },
-      {
-        tier: 'master',
-        text: 'What makes Doginal inscriptions fundamentally different from Ethereum-based NFTs in terms of data storage?',
-        options: ['They are stored on IPFS with a pointer on-chain', 'The image data is inscribed directly on the Dogecoin blockchain itself — fully on-chain, not a pointer to external storage', 'They use the same ERC-721 standard as Ethereum', 'The data is stored on centralized servers with a blockchain receipt'],
-        correct: 1,
-        explanation: 'Doginals store the actual image data on-chain within the Dogecoin blockchain, unlike Ethereum NFTs which typically point to off-chain storage like IPFS.'
-      },
-      {
-        tier: 'master',
-        text: 'How does the Doginal Dogs project\'s no founder allocation policy compare to industry norms?',
-        options: ['Most NFT projects also give 0% to founders', 'It is extremely rare — the vast majority of NFT projects reserve 5-20% (or more) for founders, advisors, and treasury. Doginal Dogs gave 100% to the community.', 'Founder allocations don\'t exist in Web3', 'Doginal Dogs actually reserved 10% but donated it later'],
-        correct: 1,
-        explanation: 'Zero founder allocation is nearly unheard of in the NFT space. Most projects reserve significant portions for the team. Doginal Dogs distributed every single dog to the community.'
-      },
-      {
-        tier: 'master',
-        text: 'What is the technical term for the smallest unit of Dogecoin on which Doginals are inscribed?',
-        options: ['A Shibe', 'An elon', 'A koinu', 'A satoshi'],
-        correct: 0,
-        explanation: 'The smallest unit of Dogecoin is called a Shibe, similar to how Bitcoin\'s smallest unit is a satoshi. Doginals are inscribed on these individual Shibes on the Dogecoin blockchain.'
-      },
-      {
-        tier: 'master',
-        text: 'Which statement best captures the full arc and philosophy of Doginal Dogs from inception to its current state?',
-        options: [
-          'A well-funded startup that pivoted from gaming to NFTs on Dogecoin',
-          'An organic cultural movement that began with one hand-drawn pixel dog (Atlas), grew through pure community demand into a 10,000-piece hand-curated collection, launched as a free mint with zero founder allocation, built its own marketplace and tools, introduced Starter Dogs for free entry, and continues to evolve as a community-owned ecosystem on the Dogecoin blockchain',
-          'A for-profit company that licenses Dogecoin branding for merchandise sales',
-          'A derivative project that copied CryptoPunks onto the Dogecoin chain'
-        ],
-        correct: 1,
-        explanation: 'This captures the full story: from Atlas to 10k hand-curated dogs, free mint, no founder allocation, community-built infrastructure, Starter Dogs, and ongoing evolution as a community-first movement.'
-      }
-    ];
-
-    var tiers = [
-      { min: 9, title: 'On-Chain Immortal', desc: 'Absolute mastery. You are the lore.' },
-      { min: 7, title: 'Elite Pack Alpha', desc: 'Deep knowledge — you lead the pack.' },
-      { min: 4, title: 'Dedicated Deep Diver', desc: 'Solid effort — keep digging into the lore.' },
-      { min: 0, title: 'Ready for a Starter Dog', desc: 'No shame — grab a free Starter Dog and level up your knowledge.' }
-    ];
-
-    var current = 0;
-    var answers = new Array(questions.length);
-    var submitted = false;
-
-    var container     = document.getElementById('quiz2Container');
-    var progressFill  = document.getElementById('quiz2ProgressFill');
-    var progressLabel = document.getElementById('quiz2ProgressLabel');
-    var prevBtn       = document.getElementById('quiz2Prev');
-    var nextBtn       = document.getElementById('quiz2Next');
-    var submitBtn     = document.getElementById('quiz2Submit');
-    var resultsDiv    = document.getElementById('quiz2Results');
-    var scoreNum      = document.getElementById('quiz2ScoreNum');
-    var tierTitle     = document.getElementById('quiz2TierTitle');
-    var tierDesc      = document.getElementById('quiz2TierDesc');
-    var reviewDiv     = document.getElementById('quiz2Review');
-    var retryBtn      = document.getElementById('quiz2Retry');
-    var navDiv        = document.getElementById('quiz2Nav');
-    var progressDiv   = document.getElementById('quiz2Progress');
-
-    function buildQuestions() {
-      container.innerHTML = '';
-      questions.forEach(function(q, i) {
-        var div = document.createElement('div');
-        div.className = 'quiz-question' + (i === 0 ? ' active' : '');
-        div.setAttribute('data-index', i);
-        div.innerHTML =
-          '<div class="quiz-q-meta">' +
-            '<span class="quiz-q-number">Question ' + (i + 1) + ' of 10</span>' +
-            '<span class="quiz-q-tier ' + q.tier + '">' + q.tier.charAt(0).toUpperCase() + q.tier.slice(1) + '</span>' +
-          '</div>' +
-          '<h3 class="quiz-q-text">' + q.text + '</h3>' +
-          '<div class="quiz-options">' +
-            q.options.map(function(opt, j) {
-              return '<button class="quiz-option" data-index="' + j + '">' +
-                String.fromCharCode(65 + j) + ') ' + opt + '</button>';
-            }).join('') +
-          '</div>';
-        container.appendChild(div);
-      });
-      bindOptions();
-    }
-
-    function bindOptions() {
-      container.querySelectorAll('.quiz-option').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          if (submitted) return;
-          var qDiv = btn.closest('.quiz-question');
-          var qIdx = parseInt(qDiv.getAttribute('data-index'));
-          var aIdx = parseInt(btn.getAttribute('data-index'));
-          answers[qIdx] = aIdx;
-          qDiv.querySelectorAll('.quiz-option').forEach(function(b) {
-            b.classList.toggle('selected', parseInt(b.getAttribute('data-index')) === aIdx);
-          });
-          updateNav();
-        });
-      });
-    }
-
-    function showQuestion(idx) {
-      container.querySelectorAll('.quiz-question').forEach(function(q, i) {
-        q.classList.toggle('active', i === idx);
-      });
-      current = idx;
-      progressFill.style.width = ((idx + 1) / questions.length * 100) + '%';
-      progressLabel.textContent = (idx + 1) + ' of ' + questions.length;
-      updateNav();
-    }
-
-    function updateNav() {
-      prevBtn.disabled = current === 0;
-      if (current === questions.length - 1) {
-        nextBtn.style.display = 'none';
-        submitBtn.classList.add('visible');
-      } else {
-        nextBtn.style.display = '';
-        submitBtn.classList.remove('visible');
-      }
-    }
-
-    function submitQuiz() {
-      submitted = true;
-      var score = 0;
-      questions.forEach(function(q, i) {
-        if (answers[i] === q.correct) score++;
-      });
-
-      scoreNum.textContent = score + '/10';
-      var tier = tiers.find(function(t) { return score >= t.min; });
-      tierTitle.textContent = tier.title;
-      tierDesc.textContent = tier.desc;
-
-      reviewDiv.innerHTML = '';
-      questions.forEach(function(q, i) {
-        var isCorrect = answers[i] === q.correct;
-        var item = document.createElement('div');
-        item.className = 'quiz-review-item ' + (isCorrect ? 'is-correct' : 'is-wrong');
-        var yourAnswer = answers[i] !== undefined
-          ? (String.fromCharCode(65 + answers[i]) + ') ' + q.options[answers[i]])
-          : 'No answer';
-        var correctAnswer = String.fromCharCode(65 + q.correct) + ') ' + q.options[q.correct];
-        item.innerHTML =
-          '<p class="quiz-review-q">' + (i + 1) + '. ' + q.text + '</p>' +
-          (isCorrect
-            ? '<p class="quiz-review-answer correct">\u2713 ' + correctAnswer + '</p>'
-            : '<p class="quiz-review-answer wrong">\u2717 Your answer: ' + yourAnswer + '</p>' +
-              '<p class="quiz-review-answer correct">\u2713 Correct: ' + correctAnswer + '</p>') +
-          '<p class="quiz-review-explanation">' + q.explanation + '</p>';
-        reviewDiv.appendChild(item);
-      });
-
-      container.querySelectorAll('.quiz-question').forEach(function(qDiv, i) {
-        qDiv.querySelectorAll('.quiz-option').forEach(function(btn) {
-          btn.disabled = true;
-          var bIdx = parseInt(btn.getAttribute('data-index'));
-          if (bIdx === questions[i].correct) btn.classList.add('correct');
-          else if (bIdx === answers[i]) btn.classList.add('wrong');
-        });
-      });
-
-      navDiv.style.display = 'none';
-      progressDiv.style.display = 'none';
-      resultsDiv.classList.add('visible');
-
-      container.querySelectorAll('.quiz-question').forEach(function(q) {
-        q.classList.add('active');
-        q.style.marginBottom = '16px';
-      });
-    }
-
-    function retry() {
-      submitted = false;
-      answers = new Array(questions.length);
-      resultsDiv.classList.remove('visible');
-      navDiv.style.display = '';
-      progressDiv.style.display = '';
-      buildQuestions();
-      showQuestion(0);
-    }
-
-    prevBtn.addEventListener('click', function() {
-      if (current > 0) showQuestion(current - 1);
-    });
-
-    nextBtn.addEventListener('click', function() {
-      if (current < questions.length - 1) showQuestion(current + 1);
-    });
-
-    submitBtn.addEventListener('click', submitQuiz);
-    retryBtn.addEventListener('click', retry);
-
-    buildQuestions();
-    showQuestion(0);
-  })();
-  </script>
-
-  <!-- ---- Level-up wiring: show Round 2 button after Round 1 submit ---- -->
-  <script>
-  (function(){
-    var r1Submit = document.getElementById('quizSubmit');
-    var levelUpBtn = document.getElementById('quizLevelUp');
-    var r2Section = document.getElementById('quiz2');
-    if (r1Submit && levelUpBtn) {
-      r1Submit.addEventListener('click', function() {
-        levelUpBtn.style.display = '';
-        if (r2Section) r2Section.style.display = '';
-      });
-    }
-  })();
-  </script>
-</body>
+  </body>
 </html>

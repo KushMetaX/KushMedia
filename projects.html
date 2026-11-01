@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>KushMetaX — Projects</title>
   <meta name="description" content="Selected projects by KushMetaX — Web3 communities, creative portfolios, and e-commerce.">
-  <link rel="icon" href="assets/Kush.png" type="image/png">
-  <link rel="apple-touch-icon" href="assets/Kush.png">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/favicon-180.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="brand.css">
+  <link rel="stylesheet" href="brand.css?v=20261015b">
 </head>
 <body>
 
@@ -16,7 +17,7 @@
   <header class="site-header">
     <div class="header-inner">
       <a href="index.html" class="header-logo">
-        <img src="assets/Kush.png" alt="KushMetaX" class="header-logo-img">
+        <img src="assets/favicon-180.png" alt="KushMetaX" class="header-logo-img">
         <span class="header-logo-text">KushMetaX</span>
       </a>
       <button class="hamburger" aria-label="Open menu" aria-expanded="false">
@@ -28,12 +29,10 @@
   <!-- ===== NAV OVERLAY ===== -->
   <nav class="nav-overlay" aria-label="Main navigation">
     <ul class="nav-list">
+      <li><a href="dd-evaluator/#ddl-tcg" class="nav-link">DDL TCG Evaluator</a></li>
       <li><a href="index.html" class="nav-link">Home</a></li>
-      <li><a href="about.html" class="nav-link">About</a></li>
-      <li><a href="gallery.html" class="nav-link">Gallery</a></li>
-      <li><a href="services.html" class="nav-link">Services</a></li>
-      <li><a href="dd-evaluator/" class="nav-link">DD Evaluator</a></li>
-      <li><a href="ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
+      <li><a href="oracle-madness/" class="nav-link">Oracle Madness</a></li>
+      <li><a href="voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="contact.html" class="nav-link">Connect</a></li>
     </ul>
   </nav>
@@ -59,6 +58,23 @@
             <h3>DDL Tourney - Legends Bracket</h3>
             <p class="desc">Challonge-style pack tournaments for Doginal Dogs Legends. DOGE entry (swap on K9SWAP if you need it), paid roster, live brackets.</p>
             <span class="project-link">Open arena →</span>
+          </a>
+
+          <a class="project-card" href="oracle-madness/">
+            <div class="project-thumb" aria-hidden="true">
+              <svg width="100%" height="64" viewBox="0 0 320 64" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="gOM" x1="0" x2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity="0.32"/><stop offset="1" stop-color="#e6007a" stop-opacity="0.14"/></linearGradient></defs>
+                <rect width="320" height="64" rx="8" fill="#07080d"/>
+                <rect width="320" height="64" rx="8" fill="url(#gOM)"/>
+                <g fill="none" stroke-width="1.4">
+                  <path d="M14 44 L60 36 L104 40 L150 24 L196 30 L240 18 L306 22" stroke="#c4b5fd"/>
+                  <path d="M14 40 L60 42 L104 32 L150 34 L196 38 L240 30 L306 34" stroke="#f472b6" stroke-opacity="0.8"/>
+                </g>
+              </svg>
+            </div>
+            <h3>Oracle Madness — Pyth Hackathon</h3>
+            <p class="desc">A March Madness bracket where crypto assets race on live Pyth prices. Confidence intervals call overtime, verifiable randomness settles sudden death.</p>
+            <span class="project-link">Enter the bracket →</span>
           </a>
 
           <a class="project-card" href="voyager.html">
@@ -157,6 +173,6 @@
     </div>
   </footer>
 
-  <script src="brand.js"></script>
+  <script src="brand.js?v=20261015b"></script>
 </body>
 </html>

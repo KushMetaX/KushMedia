@@ -2315,8 +2315,9 @@
 
   <nav class="nav-overlay" aria-label="Main navigation">
     <ul class="nav-list">
+      <li><a href="../dd-evaluator/#ddl-tcg" class="nav-link">DDL TCG Evaluator</a></li>
       <li><a href="../index.html" class="nav-link">Home</a></li>
-      <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
+      <li><a href="../oracle-madness/" class="nav-link">Oracle Madness</a></li>
       <li><a href="../voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="../contact.html" class="nav-link">Connect</a></li>
     </ul>
@@ -2562,8 +2563,13 @@
             </div>
             <div>
               <label for="evalLoreText">Lore</label>
-              <textarea id="evalLoreText" maxlength="8000" placeholder="Share the story, background, or significance of this dog&hellip;" required></textarea>
+              <textarea id="evalLoreText" maxlength="4000" placeholder="Share the story, background, or significance of this dog&hellip;" required></textarea>
             </div>
+            <div style="position:absolute;left:-10000px;height:0;overflow:hidden;" aria-hidden="true">
+              <label for="evalLoreWebsite">Website</label>
+              <input type="text" id="evalLoreWebsite" name="website" tabindex="-1" autocomplete="off" value="">
+            </div>
+            <div id="evalLoreTurnstile"></div>
             <div class="eval-lore-request-actions">
               <button type="submit" class="eval-lore-request-btn" id="evalLoreSubmit">Submit for review</button>
               <span class="eval-lore-request-msg" id="evalLoreMsg" aria-live="polite"></span>
@@ -6109,6 +6115,35 @@
       loreMsg.className = 'eval-lore-request-msg' + (kind ? ' is-' + kind : '');
     }
 
+    function loreMountTurnstile() {
+      fetch(API_BASE + '/api/dd-evaluator/community/turnstile', { headers: { accept: 'application/json' } })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(data) {
+          var siteKey = data && data.siteKey ? String(data.siteKey) : '';
+          var slot = document.getElementById('evalLoreTurnstile');
+          if (!siteKey || !slot) {
+            loreSetMsg('Lore submissions are paused until spam protection is configured.', 'err');
+            return;
+          }
+          function renderWidget() {
+            if (!window.turnstile) return;
+            window.turnstile.render(slot, { sitekey: siteKey });
+          }
+          if (window.turnstile) {
+            renderWidget();
+            return;
+          }
+          var script = document.createElement('script');
+          script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+          script.async = true;
+          script.onload = renderWidget;
+          document.head.appendChild(script);
+        })
+        .catch(function() {
+          loreSetMsg('Lore submissions are waiting on the API. Pending server restore.', 'err');
+        });
+    }
+
     function loreDetectPasswordRequirement() {
       if (!lorePwRow) return;
       mpFetchJson(API_BASE + '/api/dd-evaluator/community/status')
@@ -6140,6 +6175,7 @@
 
     if (loreForm) {
       loreDetectPasswordRequirement();
+      loreMountTurnstile();
 
       // Prefill the dog number from the current inscription search when handy.
       if (loreDogInput && typeof input !== 'undefined') {
@@ -6169,12 +6205,29 @@
           loreSetMsg('Please enter your name or handle.', 'err');
           return;
         }
-        if (!lore) {
-          loreSetMsg('Please add some lore text.', 'err');
+        if (!lore || lore.length < 20) {
+          loreSetMsg('Lore needs at least 20 characters.', 'err');
           return;
         }
-        if (lore.length > 8000) {
-          loreSetMsg('Lore is too long (max 8000 characters).', 'err');
+        if (lore.length > 4000) {
+          loreSetMsg('Lore is too long (max 4000 characters).', 'err');
+          return;
+        }
+        if (submittedBy.length > 80) {
+          loreSetMsg('Name or handle must be 80 characters or fewer.', 'err');
+          return;
+        }
+        var honeypot = document.getElementById('evalLoreWebsite');
+        if (honeypot && String(honeypot.value || '').trim()) {
+          loreSetMsg('Submission could not be accepted.', 'err');
+          return;
+        }
+        var turnstileToken = '';
+        if (window.turnstile && document.getElementById('evalLoreTurnstile')) {
+          try { turnstileToken = window.turnstile.getResponse() || ''; } catch (_t) { turnstileToken = ''; }
+        }
+        if (!turnstileToken) {
+          loreSetMsg('Complete the spam check, or wait until spam protection is configured.', 'err');
           return;
         }
         if (lorePwRequired && !pw) {
@@ -6182,7 +6235,7 @@
           return;
         }
 
-        var body = { kind: 'lore_only', dogNumber: dogNumber, lore: lore, submittedBy: submittedBy.slice(0, 120) };
+        var body = { kind: 'lore_only', dogNumber: dogNumber, lore: lore, submittedBy: submittedBy.slice(0, 80), website: honeypot ? honeypot.value : '', turnstileToken: turnstileToken };
         if (pw) body.communityPassword = pw;
         var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
         if (pw) headers['x-dd-community-password'] = pw;

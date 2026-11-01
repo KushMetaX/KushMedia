@@ -155,21 +155,71 @@ function rateLimitTipIntents(req, res, next) {
   next();
 }
 
+function slidingAllow(map, key, max, windowMs) {
+  const now = Date.now();
+  const prev = map.get(key) || [];
+  const fresh = prev.filter((t) => now - t < windowMs);
+  if (fresh.length >= max) {
+    map.set(key, fresh);
+    const retryAfterSec = Math.max(1, Math.ceil((windowMs - (now - fresh[0])) / 1000));
+    return { ok: false, retryAfterSec };
+  }
+  fresh.push(now);
+  map.set(key, fresh);
+  return { ok: true };
+}
+
 function rateLimitCommunitySuggestions(req, res, next) {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const windowMs = 15 * 60 * 1000;
-  const max = 60;
-  const now = Date.now();
-  let bucket = communitySubmitBuckets.get(ip);
-  if (!bucket || now > bucket.resetAt) {
-    bucket = { count: 0, resetAt: now + windowMs };
-    communitySubmitBuckets.set(ip, bucket);
+  const ipHit = slidingAllow(communitySubmitBuckets, `ip:${ip}`, 5, 60 * 60 * 1000);
+  if (!ipHit.ok) {
+    res.set('Retry-After', String(ipHit.retryAfterSec));
+    return res.status(429).json({
+      error: 'Too many lore submissions from this network. Please wait and try again.',
+      retryAfterSec: ipHit.retryAfterSec,
+    });
   }
-  bucket.count += 1;
-  if (bucket.count > max) {
-    return res.status(429).json({ error: 'Too many submissions. Try again later.' });
+  const sid = req.signedCookies && req.signedCookies.km_sid;
+  if (sid) {
+    const acctHit = slidingAllow(communitySubmitBuckets, `acct:${sid}`, 8, 24 * 60 * 60 * 1000);
+    if (!acctHit.ok) {
+      res.set('Retry-After', String(acctHit.retryAfterSec));
+      return res.status(429).json({
+        error: 'Too many lore submissions for this account today. Please try again later.',
+        retryAfterSec: acctHit.retryAfterSec,
+      });
+    }
   }
   next();
+}
+
+async function verifyTurnstile(token, ip) {
+  const secret = String(process.env.TURNSTILE_SECRET_KEY || '').trim();
+  if (!secret) {
+    const err = new Error('Spam protection is not configured yet.');
+    err.statusCode = 503;
+    throw err;
+  }
+  if (!token) {
+    const err = new Error('Complete the spam check and try again.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const body = new URLSearchParams();
+  body.set('secret', secret);
+  body.set('response', token);
+  if (ip) body.set('remoteip', ip);
+  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!data || data.success !== true) {
+    const err = new Error('Spam check failed. Please try again.');
+    err.statusCode = 400;
+    throw err;
+  }
 }
 
 function readSuggestionsStore() {
@@ -438,11 +488,28 @@ function validateSuggestionPayload(kind, raw) {
     if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
       throw new Error('dogNumber must be 1–10000.');
     }
+    const submittedBy = String(raw.submittedBy || '').trim();
     if (!lore) {
       throw new Error('lore is required.');
     }
-    if (lore.length > 8000) {
-      throw new Error('lore is too long.');
+    if (lore.length < 20) {
+      throw new Error('lore must be at least 20 characters.');
+    }
+    if (lore.length > 4000) {
+      throw new Error('lore is too long (max 4000 characters).');
+    }
+    if (/[<>]/.test(lore) || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(lore)) {
+      throw new Error('lore cannot include HTML or control characters.');
+    }
+    const links = lore.match(/https?:\/\//gi);
+    if (links && links.length > 2) {
+      throw new Error('lore can include at most two links.');
+    }
+    if (submittedBy.length < 1 || submittedBy.length > 80) {
+      throw new Error('Name or handle must be 1–80 characters.');
+    }
+    if (/[<>]/.test(submittedBy) || /[\u0000-\u001F]/.test(submittedBy)) {
+      throw new Error('Name or handle has characters we cannot accept.');
     }
     if (loreMultiplier != null && !Number.isFinite(loreMultiplier)) {
       throw new Error('loreMultiplier must be a finite number.');
@@ -450,7 +517,7 @@ function validateSuggestionPayload(kind, raw) {
     if (loreMultiplier != null && (loreMultiplier > 100 || loreMultiplier < -0.99)) {
       throw new Error('loreMultiplier must be between -0.99 and 100.');
     }
-    return { dogNumber, lore, loreMultiplier };
+    return { dogNumber, lore, loreMultiplier, submittedBy };
   }
   throw new Error('Unknown suggestion kind.');
 }
@@ -507,9 +574,9 @@ async function mergeApprovedSuggestion(item) {
   } else if (kind === 'lore_only') {
     const ns = readCommunityNotesStore();
     const dn = String(payload.dogNumber);
-    let stored = payload.lore;
+    const stored = { lore: payload.lore, submittedBy: payload.submittedBy || null };
     if (payload.loreMultiplier != null && Number.isFinite(Number(payload.loreMultiplier))) {
-      stored = { lore: payload.lore, loreMultiplier: Number(payload.loreMultiplier) };
+      stored.loreMultiplier = Number(payload.loreMultiplier);
     }
     ns.notes = { ...(ns.notes || {}), [dn]: stored };
     writeCommunityNotesStore(ns);
@@ -1342,6 +1409,12 @@ router.get('/community/status', (req, res) => {
   res.json({ communityPasswordRequired: getCommunitySubmitPassword() != null });
 });
 
+router.get('/community/turnstile', (_req, res) => {
+  const siteKey = String(process.env.TURNSTILE_SITE_KEY || '').trim();
+  res.set('Cache-Control', 'no-store');
+  res.json({ siteKey });
+});
+
 router.get('/community/lore/:dogNumber', (req, res) => {
   const dogNumber = Number(req.params.dogNumber);
   if (!Number.isInteger(dogNumber) || dogNumber < 1 || dogNumber > 10000) {
@@ -1413,6 +1486,20 @@ router.post('/community/suggestions', rateLimitCommunitySuggestions, async (req,
 
   const bodyCopy = { ...rawBody };
   delete bodyCopy.communityPassword;
+  const honeypot = String(bodyCopy.website || bodyCopy.company_website || '').trim();
+  delete bodyCopy.website;
+  delete bodyCopy.company_website;
+  if (honeypot) {
+    return res.status(400).json({ error: 'Submission could not be accepted.' });
+  }
+  const turnstileToken = String(bodyCopy.turnstileToken || '').trim();
+  delete bodyCopy.turnstileToken;
+  try {
+    await verifyTurnstile(turnstileToken, req.ip);
+  } catch (err) {
+    const status = Number(err && err.statusCode) || 400;
+    return res.status(status).json({ error: (err && err.message) || 'Spam check failed.' });
+  }
 
   if (expectedComm) {
     if (!timingSafeEqualString(expectedComm, provided)) {

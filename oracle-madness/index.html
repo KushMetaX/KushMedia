@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Oracle Madness · Live market brackets refereed by Pyth</title>
+  <meta name="description" content="A March Madness bracket where the competitors are crypto assets. Pyth price feeds race them live, Pyth confidence intervals call overtime, Entropy settles sudden death." />
+  <link rel="canonical" href="https://kushmedia.xyz/oracle-madness/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="KushMetaX" />
+  <meta property="og:url" content="https://kushmedia.xyz/oracle-madness/" />
+  <meta property="og:title" content="Oracle Madness · Live market brackets refereed by Pyth" />
+  <meta property="og:description" content="DOGE vs BONK, live. Pyth price feeds race the assets, confidence intervals call overtime, randomness settles sudden death." />
+  <meta property="og:image" content="https://kushmedia.xyz/oracle-madness/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Oracle Madness: DOGE vs BONK live race chart with confidence bands" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Oracle Madness · Live market brackets refereed by Pyth" />
+  <meta name="twitter:description" content="Pyth price feeds race the assets, confidence intervals call overtime, randomness settles sudden death." />
+  <meta name="twitter:image" content="https://kushmedia.xyz/oracle-madness/og-image.png" />
+  <meta name="twitter:image:alt" content="Oracle Madness: DOGE vs BONK live race chart with confidence bands" />
+  <meta name="theme-color" content="#07080d" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Press+Start+2P&family=Silkscreen&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <a class="brand-mark" href="/" aria-label="KushMetaX home"><img src="/assets/favicon-32.png" alt="" width="32" height="32"></a>
+      <div>
+        <div class="brand-name">ORACLE <span>MADNESS</span></div>
+        <div class="brand-sub">KushMetaX · assets racing in a bracket</div>
+      </div>
+    </div>
+    <div class="badges">
+      <span id="dataBadge" class="badge badge-idle" title="Price data source">DATA: NOT STARTED</span>
+      <span id="entBadge" class="badge badge-sim" title="Randomness source">SIMULATED ENTROPY</span>
+      <span id="scoreBadge" class="badge badge-score" hidden>PICK'EM 0 PTS</span>
+      <button type="button" id="muteBtn" class="badge mute-btn" aria-pressed="false">🔊 Sound on</button>
+    </div>
+  </header>
+  <div id="ticker" class="ticker" hidden aria-label="Live Pyth prices"><div class="tk-track"></div></div>
+
+  <main id="main">
+    <!-- ============ SETUP ============ -->
+    <section id="setup" class="panel setup" aria-labelledby="setupTitle">
+      <div class="hero">
+        <p class="kicker">Pyth Community Hackathon · Round 2 prototype</p>
+        <h1 id="setupTitle">Assets go head to head.<br /><em>The oracle is the referee.</em></h1>
+        <p class="lede">Each match is a live race: whichever asset gains more (in %) during the match window advances.
+          If the gap is inside Pyth's <strong>confidence intervals</strong>, the referee calls <strong>OVERTIME</strong>.
+          Still too close? <strong>SUDDEN DEATH</strong> by verifiable randomness. Every result gets an <strong>instant replay</strong> with the prices as proof.</p>
+      </div>
+
+      <form id="setupForm" class="setup-form" novalidate>
+        <fieldset class="field">
+          <legend>1 · Choose a bracket</legend>
+          <div id="bracketChoices" class="choice-grid" role="radiogroup" aria-label="Bracket"></div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend>2 · Price data</legend>
+          <div class="row">
+            <label for="srcSelect">Source</label>
+            <select id="srcSelect" aria-describedby="srcHelp">
+              <option value="auto">Auto: live mix (Hermes where the key is entitled, else Solana on-chain)</option>
+              <option value="hermes">Pyth Hermes only (via proxy.php, needs API key)</option>
+              <option value="solana">Pyth Solana push feeds only (keyless, ~45–60 s updates)</option>
+              <option value="demo">Simulated demo data (not real prices)</option>
+            </select>
+          </div>
+          <p id="srcHelp" class="help">Checking which Pyth feeds are live…</p>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend>3 · Match rules</legend>
+          <div class="row-grid">
+            <label>Match window (s)<input id="winInput" type="number" min="2" max="600" value="30" inputmode="numeric" /></label>
+            <label>Overtime (s)<input id="otInput" type="number" min="1" max="300" value="15" inputmode="numeric" /></label>
+            <label>Referee sensitivity <output id="kOut" for="kInput">1.0×</output>
+              <input id="kInput" type="range" min="0" max="2" step="0.1" value="1" aria-describedby="kHelp" /></label>
+            <label>Prize pool (USD)<input id="prizeInput" type="number" min="0" step="1" value="100" inputmode="numeric" /></label>
+          </div>
+          <p id="kHelp" class="help">Sensitivity scales the confidence "shield". 0 = never overtime, 1 = Pyth confidence as published, 2 = twice as strict.</p>
+        </fieldset>
+
+        <div class="cta-row">
+          <button id="drawBtn" type="submit" class="btn btn-primary btn-xl">Draw seeds with Entropy ⟶</button>
+          <button id="turboBtn" type="button" class="btn btn-ghost">Quick demo (3 s matches, simulated)</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ============ SEEDING ============ -->
+    <section id="seeding" class="panel seeding" hidden aria-labelledby="seedTitle">
+      <h2 id="seedTitle" class="section-title">Seeding draw</h2>
+      <ol class="commit-steps">
+        <li id="stepCommit"><span class="step-k">Provider commitment</span><code id="seedCommit">…</code></li>
+        <li id="stepUser"><span class="step-k">Your browser's random number</span><code id="seedUser">…</code></li>
+        <li id="stepReveal"><span class="step-k">Provider reveal (hash-checks against commitment)</span><code id="seedReveal">…</code></li>
+        <li id="stepRandom"><span class="step-k">Final random number → shuffles the seeds</span><code id="seedRandom">…</code></li>
+      </ol>
+      <ol id="seedList" class="seed-list" aria-label="Seeds"></ol>
+    </section>
+
+    <!-- ============ ARENA ============ -->
+    <section id="arena" class="arena" hidden aria-labelledby="arenaTitle">
+      <div class="scorebug">
+        <span id="roundName" class="sb-round">Round of 16</span>
+        <h2 id="arenaTitle" class="sb-title">Match <span id="matchNo">1</span> of <span id="matchTotal">15</span></h2>
+        <span id="phase" class="sb-phase phase-live">LIVE</span>
+        <span id="clock" class="sb-clock" aria-label="Time remaining">00:30</span>
+      </div>
+      <div class="fighters">
+        <article id="fA" class="fighter" aria-live="off"></article>
+        <div class="versus">
+          <div class="vs">VS</div>
+          <div id="refCall" class="ref-call">Referee watching</div>
+        </div>
+        <article id="fB" class="fighter right" aria-live="off"></article>
+      </div>
+      <div id="raceBars" class="race-bars" aria-hidden="true"></div>
+      <div id="callBox" class="call-box" hidden>
+        <span class="call-q">Pick your winner</span>
+        <div class="call-btns"><button type="button" class="call-btn">A</button><button type="button" class="call-btn">B</button></div>
+        <span id="callStats" class="call-stats"></span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="race" role="img" aria-label="Live race chart of percentage change with confidence bands"></canvas>
+      </div>
+      <p id="chartNote" class="help" hidden></p>
+      <div class="ref-meter" aria-label="Referee meter">
+        <div class="rm-label">Gap <strong id="gapVal">0.000%</strong> vs confidence shield <strong id="bandVal">0.000%</strong></div>
+        <div class="rm-bar"><div id="rmBand" class="rm-band"></div><div id="rmGap" class="rm-gap"></div></div>
+      </div>
+      <div id="sdBox" class="sd-box" hidden aria-live="polite"></div>
+      <div id="champBox" class="champ-box" hidden></div>
+    </section>
+
+    <div class="grid">
+      <!-- ============ BRACKET ============ -->
+      <section id="bracketPanel" class="panel bracket-panel" hidden aria-labelledby="bracketTitle">
+        <div class="panel-head">
+          <h2 id="bracketTitle" class="section-title">Bracket</h2>
+          <span id="srcLine" class="src-line"></span>
+        </div>
+        <div id="pickBar" class="pick-bar" hidden>
+          <p class="pick-help"><strong>Fill your bracket.</strong> Click who you think wins each match. Points: <span id="ptsInfo"></span>.</p>
+          <div class="pick-controls">
+            <label class="name-label">Your name <input id="nameInput" type="text" maxlength="24" placeholder="Kush" autocomplete="nickname" /></label>
+            <span id="pickCount" class="pick-count">0 / 15 picks</span>
+            <button type="button" id="chalkBtn" class="btn btn-ghost btn-sm">Auto-fill (higher seed)</button>
+            <button type="button" id="randBtn" class="btn btn-ghost btn-sm">Random picks</button>
+            <button type="button" id="clearBtn" class="btn btn-ghost btn-sm">Clear</button>
+            <button type="button" id="lockBtn" class="btn btn-primary" disabled>Lock picks &amp; start</button>
+            <button type="button" id="watchBtn" class="btn btn-ghost">Skip, just watch</button>
+          </div>
+        </div>
+        <div class="bracket-scroll">
+          <div id="bracket" class="bracket"></div>
+        </div>
+      </section>
+
+      <aside class="side" id="side" hidden>
+        <section class="panel" aria-labelledby="pickTitle">
+          <h2 id="pickTitle" class="section-title sm">Pick'em</h2>
+          <div id="myPick" class="my-pick">No bracket locked.</div>
+          <h3 class="mini-title">Leaderboard (this device)</h3>
+          <ol id="leaderboard" class="leaderboard"></ol>
+        </section>
+        <section class="panel" aria-labelledby="prizeTitle">
+          <h2 id="prizeTitle" class="section-title sm">Prize pool</h2>
+          <div id="prize" class="prize">—</div>
+        </section>
+        <section class="panel" aria-labelledby="vaultTitle">
+          <h2 id="vaultTitle" class="section-title sm">Replay vault</h2>
+          <ol id="vault" class="vault"><li class="muted">Replays appear after each match.</li></ol>
+        </section>
+        <section class="panel" aria-labelledby="entTitle">
+          <h2 id="entTitle" class="section-title sm">Entropy log</h2>
+          <p class="help" id="entLabel">Simulated Entropy (testnet integration next)</p>
+          <ol id="entLog" class="ent-log"></ol>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <div id="banner" class="banner" aria-hidden="true"><span id="bannerText"></span><small id="bannerSub"></small></div>
+
+  <dialog id="replay" class="replay" aria-labelledby="replayTitle">
+    <div class="replay-inner">
+      <header class="replay-head">
+        <span class="replay-tag">INSTANT REPLAY</span>
+        <h2 id="replayTitle">Result</h2>
+        <button type="button" class="btn btn-ghost btn-sm" id="replayClose" aria-label="Close replay">✕</button>
+      </header>
+      <div id="replayBody"></div>
+      <div id="replayBars" class="race-bars sm" aria-hidden="true"></div>
+      <div class="replay-chart"><canvas id="replayCanvas" role="img" aria-label="Replay chart"></canvas></div>
+      <div class="replay-actions">
+        <button type="button" class="btn btn-ghost" id="replayPlay">▶ Play replay</button>
+        <button type="button" class="btn btn-ghost" id="replayVerify">Verify with Pyth Benchmarks</button>
+        <button type="button" class="btn btn-primary" id="replayNext">Next match ⟶</button>
+      </div>
+      <div id="replayProof" class="replay-proof" aria-live="polite"></div>
+    </div>
+  </dialog>
+
+  <div id="sr" class="sr-only" aria-live="polite"></div>
+  <div id="confetti" class="confetti" aria-hidden="true"></div>
+  <div id="screenFlash" class="screen-flash" aria-hidden="true"></div>
+  <div id="otTakeover" class="ot-takeover" hidden aria-hidden="true"><strong>OVERTIME</strong><small></small></div>
+  <div id="sdTakeover" class="sd-takeover" hidden aria-hidden="true">
+    <p class="sd-kicker">TOO CLOSE TO CALL</p>
+    <strong>SUDDEN DEATH</strong>
+    <p class="sd-sub"></p>
+    <div class="sd-wheel-wrap">
+      <div class="sd-pointer" aria-hidden="true"></div>
+      <div class="sd-wheel">
+        <span class="sd-a"></span>
+        <span class="sd-b"></span>
+      </div>
+    </div>
+  </div>
+  <div id="jackpot" class="jackpot" hidden aria-hidden="true"><span class="jp-tag">★ JACKPOT ★</span><span class="jp-name"></span><span class="jp-sub"></span></div>
+
+  <footer class="foot">
+    <p>Assets racing in a bracket, settled by Pyth confidence bands. The badge at the top shows whether prices are live or simulated.
+      Randomness in this build is <strong>simulated commit-reveal</strong>. Pick'em points are for fun only: no wagering, no real money.</p>
+    <p><a href="/">KushMetaX</a> · <a href="/dd-evaluator/#ddl-tcg">DDL TCG Evaluator</a> · <a href="/voyager.html">Voyager</a> · <a href="/contact.html">Connect</a> · <a href="/legal/privacy-policy.html">Privacy</a></p>
+  </footer>
+
+  <script type="module" src="js/app.js?v=20261022"></script>
+</body>
+</html>

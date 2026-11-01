@@ -1,13 +1,11 @@
 User-agent: *
 Allow: /
 
-Disallow: /admin
-Disallow: /admin.html
-Disallow: /__admin_gate
 Disallow: /server
-Disallow: /internal
 Disallow: /api
 Disallow: /public/server
+Disallow: /map
+Disallow: /bracket/
 
-# ADMIN_PATH is intentionally omitted so robots.txt does not advertise it.
-# That route sends X-Robots-Tag: noindex.
+# Admin stays behind the login gate. Those paths are not listed here.
+Sitemap: https://kushmedia.xyz/sitemap.xml
