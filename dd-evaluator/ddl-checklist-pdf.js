@@ -12,9 +12,9 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const PDF_LIB_SRC = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
-  const PDFJS_SRC = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js";
-  const PDFJS_WORKER = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
+  const PDF_LIB_SRC = "/dd-evaluator/vendor/pdf-lib.min.js";
+  const PDFJS_SRC = "/dd-evaluator/vendor/pdf.min.mjs";
+  const PDFJS_WORKER = "/dd-evaluator/vendor/pdf.worker.min.mjs";
   const FORMAT = "rotp-checklist-1";
   const ROW_H = 12.6;
   const DASH = "\u2014";
@@ -216,14 +216,17 @@
     return scope.PDFLib;
   }
 
+  let pdfjsLibPromise = null;
   async function ensurePdfJs() {
-    const scope = typeof globalThis !== "undefined" ? globalThis : window;
-    if (!scope.pdfjsLib) await loadScript(PDFJS_SRC);
-    const pdfjsLib = scope.pdfjsLib;
-    if (!pdfjsLib) throw new Error("Could not load the PDF tools. Check your connection and try again.");
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      const code = await (await fetch(PDFJS_WORKER)).text();
-      pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+    if (!pdfjsLibPromise) {
+      pdfjsLibPromise = import(PDFJS_SRC).then((pdfjsLib) => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+        return pdfjsLib;
+      });
+    }
+    const pdfjsLib = await pdfjsLibPromise;
+    if (!pdfjsLib || typeof pdfjsLib.getDocument !== "function") {
+      throw new Error("Could not load the PDF tools. Check your connection and try again.");
     }
     return pdfjsLib;
   }
@@ -598,7 +601,7 @@
 
   async function textItemsFromBytes(bytes) {
     const pdfjsLib = await ensurePdfJs();
-    const doc = await pdfjsLib.getDocument({ data: bytes, disableWorker: false }).promise;
+    const doc = await pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise;
     const pages = [];
     for (let i = 1; i <= doc.numPages; i += 1) {
       const page = await doc.getPage(i);

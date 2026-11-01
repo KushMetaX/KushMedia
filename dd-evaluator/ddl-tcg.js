@@ -346,11 +346,59 @@
 
   function sourceBadge(row) {
     if (!row) return '';
+    if (row.source === 'auction') {
+      const open = row.open !== false && (!row.endsAt || Date.parse(row.endsAt) > Date.now());
+      const bids = row.bids ? `${row.bids} bid${row.bids === 1 ? '' : 's'}` : 'eBay auction';
+      return open
+        ? `<span class="ddl-src ddl-src-auction" title="${bids}">Auction</span>`
+        : `<span class="ddl-src ddl-src-auction" title="Last bid kept after the auction closed">Final bid</span>`;
+    }
     if (row.source === 'sold') return `<span class="ddl-src ddl-src-sold" title="Median of ${row.sold} sold comp${row.sold === 1 ? '' : 's'}">Sold · ${row.sold}</span>`;
     if (row.source === 'shop') return '<span class="ddl-src ddl-src-shop" title="Matched to a Doginal Dogs shop listing by title">Shop</span>';
     if (row.source === 'asks') return `<span class="ddl-src ddl-src-asks" title="${row.asks} active listing${row.asks === 1 ? '' : 's'}, discounted">Asks · ${row.asks}</span>`;
     if (row.source === 'derived') return '<span class="ddl-src ddl-src-model" title="Raw price × grade multiplier">Grade est.</span>';
     return '<span class="ddl-src ddl-src-model" title="No comps yet — pack math from the booster box price">Estimate</span>';
+  }
+
+  function auctionLeft(iso) {
+    const ms = Date.parse(iso || '') - Date.now();
+    if (!Number.isFinite(ms)) return '';
+    if (ms <= 0) return 'Closed';
+    const totalMin = Math.floor(ms / 60000);
+    const d = Math.floor(totalMin / 1440);
+    const h = Math.floor((totalMin % 1440) / 60);
+    const m = totalMin % 60;
+    if (d) return `${d}d ${h}h left`;
+    if (h) return `${h}h ${m}m left`;
+    return `${m}m left`;
+  }
+
+  function auctionSpotlight() {
+    const auc = market && market.auctions;
+    if (!auc || !auc.items || !auc.items.length) return '';
+    const anyOpen = auc.items.some((it) => Date.parse(it.endsAt) > Date.now());
+    const liveNote = auc.live
+      ? 'Bids were pulled from eBay on the last check.'
+      : 'The server keeps the last bids it could read. eBay often blocks automatic checks, so the listing is the live number.';
+    const rows = auc.items.map((it) => {
+      const ship = ' · + shipping';
+      return `<li>
+        <button type="button" class="ddl-link" data-card="${esc(it.cardId)}">${esc(it.name)} <em>${esc(it.grade)}</em></button>
+        <span class="ddl-auc-meta">${it.bids || 0} bids · ${esc(auctionLeft(it.endsAt))}${esc(ship)}</span>
+        <b>${money(it.bidUsd)}</b>
+        <a class="ddl-auc-go" href="${esc(it.url)}" target="_blank" rel="noopener nofollow">Bid</a>
+      </li>`;
+    }).join('');
+    return `<div class="ddl-auction">
+      <div class="ddl-auction-head">
+        <span class="ddl-stat-l">${anyOpen ? 'AGS 10 auction' : 'AGS 10 auction closed'}</span>
+        <a href="${esc(auc.searchUrl)}" target="_blank" rel="noopener nofollow">All 5 on eBay</a>
+      </div>
+      <p class="ddl-muted">${anyOpen
+        ? 'These current bids are the AGS 10 value on each card until the auction closes. The last bid stays on the card after that.'
+        : 'The auction is over. Each card keeps its last bid as the AGS 10 value.'} ${esc(liveNote)}</p>
+      <ol>${rows}</ol>
+    </div>`;
   }
 
   function renderMarket() {
@@ -375,6 +423,7 @@
     });
     top.sort((a, b) => (b.row.usd || 0) - (a.row.usd || 0));
     $('ddlMarketGrid').innerHTML = `
+      ${auctionSpotlight()}
       <div class="ddl-stat"><span class="ddl-stat-l">Booster box</span><span class="ddl-stat-v">${priceLink(box.usd, box.url)}</span><span class="ddl-stat-s">${esc(boxSrc)}</span></div>
       <div class="ddl-stat"><span class="ddl-stat-l">Booster pack</span><span class="ddl-stat-v">${priceLink(pack.usd, pack.url)}</span><span class="ddl-stat-s">${esc(packSrc)}</span></div>
       <div class="ddl-stat"><span class="ddl-stat-l">eBay feed</span><span class="ddl-stat-v">${market.counts ? market.counts.activeListings : 0}</span><span class="ddl-stat-s">active · ${market.counts ? market.counts.matchedSold : 0} sold comps</span></div>
@@ -404,18 +453,16 @@
   }
 
   function countSlots(card) {
-    return card.chase ? ['base', 'fa'] : card.prints.slice();
+    return card.prints.slice();
   }
 
   function editablePrint(card, print) {
-    if (print === 'fa') return !!card.chase;
-    if (print === 'holo') return !card.chase;
-    return print === 'base';
+    return card.prints.includes(print);
   }
 
   function qtyEditor(card, print) {
     const o = owned(card.id, print);
-    const label = print === 'base' && card.chase ? 'non-full-art base' : (PRINT_LABEL[print] || print);
+    const label = PRINT_LABEL[print] || print;
     return `<span class="ddl-qty-edit" data-hold="${card.id}|${print}">
       <button type="button" data-step="-1" aria-label="One less ${esc(card.name)} ${esc(label)}">−</button>
       <b>${o.raw}</b>
@@ -429,7 +476,7 @@
     const n = ownedCount(card.id, print);
     const mc = marketCard(card.id);
     const row = mc && mc.prints ? mc.prints[print] : null;
-    const label = print === 'base' && card.chase ? 'Non-FA base' : PRINT_LABEL[print];
+    const label = PRINT_LABEL[print];
     const need = wanted(card.id, print);
     return `<td class="ddl-print${n ? ' is-owned' : ''}${need ? ' is-wanted' : ''}" data-label="${esc(label)}">
       ${qtyEditor(card, print)}
@@ -451,6 +498,7 @@
       if (own === 'owned' && !has) return false;
       if (own === 'missing' && c.prints.every((p) => ownedCount(c.id, p))) return false;
       if (own === 'want' && !c.prints.some((p) => wanted(c.id, p))) return false;
+      if (own === 'graded' && !c.prints.some((p) => owned(c.id, p).graded.length)) return false;
       return true;
     });
     if (sort === 'value') rows = rows.slice().sort((a, b) => cardValue(b) - cardValue(a));
@@ -462,7 +510,7 @@
         <td class="ddl-no">${String(c.no).padStart(3, '0')}</td>
         <td class="ddl-card">
           <button type="button" class="ddl-card-btn" data-card="${c.id}">
-            <img src="${esc(c.render)}" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">
+            <img src="${esc(c.render)}" alt="" loading="lazy" decoding="async" data-fallback-hide="1">
             <span><b>${esc(c.name)}</b><small class="ddl-tier ddl-tier-${c.tier}">${esc(c.tierLabel)}</small> <small>${esc(c.class)}</small></span>
           </button>
         </td>
@@ -478,7 +526,7 @@
     if (!rows || !rows.length) return `<p class="ddl-muted">${empty}</p>`;
     return `<ul class="ddl-comps">${rows.slice(0, 12).map((r) => `<li>
       <b>${money(r.usd)}</b>
-      <span>${esc(PRINT_LABEL[r.print] || '')}${r.grade && r.grade !== 'raw' ? ' · ' + esc(r.grade) : ''}${r.at ? ' · ' + esc(ago(r.at)) : ''}${r.source === 'manual' ? ' · manual' : ''}</span>
+      <span>${esc(PRINT_LABEL[r.print] || '')}${r.grade && r.grade !== 'raw' ? ' · ' + esc(r.grade) : ''}${r.at ? ' · ' + esc(ago(r.at)) : ''}${r.source === 'manual' ? ' · manual' : ''}${r.source === 'auction' ? ' · auction' : ''}</span>
       ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener nofollow">${esc(r.title).slice(0, 80)}</a>` : `<em>${esc(r.title).slice(0, 80)}</em>`}
     </li>`).join('')}</ul>`;
   }
@@ -516,7 +564,7 @@
     }).join('');
     const dogHtml = dogs.length
       ? dogs.map((d) => `<div class="ddl-art-dog">
-          <img src="/api/doginal-proxy.php?action=image&amp;dogNumber=${d.dogNumber}" alt="" onerror="this.onerror=null;this.src='/assets/collection-logo.png'">
+          <img src="/api/doginal-proxy.php?action=image&amp;dogNumber=${d.dogNumber}" alt="" data-fallback="/assets/collection-logo.png">
           <div><b>Doginal Dog #${d.dogNumber}</b>${d.handle ? ` · @${esc(d.handle)}` : ''}<br><span class="ddl-muted">${esc(d.note || 'Official art inspiration for this card.')} Owning this dog and the card stacks in the Doginal Dogs wallet estimate.</span></div>
           <button type="button" class="eval-mp-btn" data-dog="${d.dogNumber}">Evaluate dog</button>
         </div>`).join('')
@@ -527,7 +575,7 @@
         <button type="button" class="ddl-close" data-close aria-label="Close">×</button>
       </div>
       <div class="ddl-card-detail">
-        <img class="ddl-card-render" src="${esc(card.render)}" alt="${esc(card.name)} card" onerror="this.style.visibility='hidden'">
+        <img class="ddl-card-render" src="${esc(card.render)}" alt="${esc(card.name)} card" data-fallback-hide="1">
         <div>
           <p><span class="ddl-tier ddl-tier-${card.tier}">${esc(card.tierLabel)}</span> · ${esc(card.class)}${card.chase ? ` · Chase #${card.chaseNo} of 19` : ''}${card.note ? ` · ${esc(card.note)}` : ''}</p>
           <h4>Market</h4>${priceRows}
@@ -1269,7 +1317,7 @@
     const sync = (account.saving || account.savingWants) ? 'Saving…' : pending ? 'Unsaved changes' : account.savedAt ? `Saved to your account ${ago(new Date(account.savedAt).toISOString())}` : 'Saved to your account';
     const wantN = wantsList().length;
     box.innerHTML = `<div class="ddl-profile-card">
-      <img class="ddl-avatar" src="${esc(me.user.avatarUrl || '/assets/Kush.png')}" alt="" onerror="this.src='/assets/Kush.png'">
+      <img class="ddl-avatar" src="${esc(me.user.avatarUrl || '/assets/Kush.png')}" alt="" data-fallback="/assets/Kush.png">
       <div class="ddl-profile-main">
         <p class="eval-mp-kicker">Collector profile <span class="ddl-vis ${prof.isPublic ? 'is-public' : ''}">${prof.isPublic ? 'Public' : 'Private'}</span></p>
         <p class="ddl-profile-name">${esc(prof.displayName)}${me.user.discordUsername ? ` <small>@${esc(me.user.discordUsername)}</small>` : ''}</p>
@@ -1389,7 +1437,7 @@
         <button type="button" class="ddl-close" data-close aria-label="Close">×</button>
       </div>
       <div class="ddl-profile-card">
-        <img class="ddl-avatar" src="${esc(data.avatarUrl || '/assets/Kush.png')}" alt="" onerror="this.src='/assets/Kush.png'">
+        <img class="ddl-avatar" src="${esc(data.avatarUrl || '/assets/Kush.png')}" alt="" data-fallback="/assets/Kush.png">
         <div class="ddl-profile-main">
           <p class="ddl-profile-name">${esc(prof.displayName)}${data.discordUsername ? ` <small>@${esc(data.discordUsername)}</small>` : ''}</p>
           ${prof.bio ? `<p class="ddl-profile-bio">${esc(prof.bio)}</p>` : ''}
@@ -1460,7 +1508,7 @@
       const missing = s.missingPrints != null ? s.missingPrints : Math.max(0, (s.printsTotal || 0) - (s.prints || 0));
       const when = person.updatedAt ? ago(new Date(person.updatedAt).toISOString()) : '';
       return `<button type="button" class="ddl-person" data-collector="${esc(person.slug)}">
-        <img class="ddl-avatar" src="${esc(person.avatarUrl || '/assets/Kush.png')}" alt="" onerror="this.src='/assets/Kush.png'">
+        <img class="ddl-avatar" src="${esc(person.avatarUrl || '/assets/Kush.png')}" alt="" data-fallback="/assets/Kush.png">
         <span class="ddl-person-main">
           <b>${esc(person.displayName)}${person.discordUsername ? ` <small>@${esc(person.discordUsername)}</small>` : ''}</b>
           <small>${s.names || 0}/${s.namesTotal || CHECK.names} names · ${s.prints || 0}/${s.printsTotal || CHECK.master} prints · ${missing} missing${person.wantCount ? ` · looking for ${person.wantCount}` : ''}</small>
@@ -1566,6 +1614,34 @@
     }
   }
 
+  let auctionTimer = null;
+
+  function scheduleAuctionPoll() {
+    if (auctionTimer) {
+      clearInterval(auctionTimer);
+      auctionTimer = null;
+    }
+    const items = (market && market.auctions && market.auctions.items) || [];
+    const open = items.some((it) => Date.parse(it.endsAt) > Date.now());
+    if (!open) return;
+    auctionTimer = setInterval(() => {
+      if (document.body.dataset.evalMode && document.body.dataset.evalMode !== 'ddl') return;
+      refreshMarketQuiet();
+    }, 3 * 60 * 1000);
+  }
+
+  async function refreshMarketQuiet() {
+    try {
+      market = await api('/cards');
+    } catch (_err) {
+      return;
+    }
+    renderMarket();
+    renderCollection();
+    renderRows();
+    scheduleAuctionPoll();
+  }
+
   async function loadMarket() {
     renderCollection();
     renderRows();
@@ -1578,6 +1654,7 @@
     renderMarket();
     renderCollection();
     renderRows();
+    scheduleAuctionPoll();
   }
 
   /* ---------- events ---------- */

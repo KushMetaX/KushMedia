@@ -1177,6 +1177,68 @@ router.get('/activity', requireSnapshot, async (req, res) => {
   res.json({ sales: snap.recentSales.slice(0, limit), dogeUsd: snap.dogeUsd, snapshotAge: snap.builtAt });
 });
 
+function withUsd(row, dogeUsd) {
+  if (!row || typeof row !== 'object') return row;
+  const priceDoge = Number(row.priceDoge);
+  return {
+    ...row,
+    priceUsd: dogeUsd && Number.isFinite(priceDoge) ? +(priceDoge * dogeUsd).toFixed(2) : (row.priceUsd ?? null),
+  };
+}
+
+// GET /api/dd-evaluator/market-pulse?offers=20&sales=10
+router.get('/market-pulse', requireSnapshot, ddPaywall.mwTraitSearch(), async (req, res) => {
+  const ev = await loadEvaluator();
+  const snap = ev.getSnapshot();
+  const offersLimit = Math.min(50, Math.max(1, Number(req.query.offers) || 6));
+  const salesLimit = Math.min(50, Math.max(1, Number(req.query.sales) || 6));
+  const listings = Array.isArray(snap.listings) ? snap.listings : [];
+  const sales = (Array.isArray(snap.recentSales) ? snap.recentSales : [])
+    .filter((row) => row && row.dogNumber && Number(row.priceDoge) > 0);
+  const otc = (Array.isArray(snap.recentSales) ? snap.recentSales : [])
+    .filter((row) => row && row.dogNumber && (row.otc || !(Number(row.priceDoge) > 0)));
+  const floor = listings[0] || null;
+  const floorDoge = floor && Number(floor.priceDoge) > 0 ? Number(floor.priceDoge) : null;
+  res.set('Cache-Control', 'public, max-age=60');
+  res.json({
+    generatedAt: new Date().toISOString(),
+    dogeUsd: snap.dogeUsd || null,
+    freshness: { offersSource: 'snapshot', salesSource: 'snapshot', priceSource: 'snapshot' },
+    snapshot: {
+      ready: true,
+      builtAt: snap.builtAt || null,
+      totalListings: listings.length,
+      floorDoge,
+      floorUsd: snap.dogeUsd && floorDoge ? +(floorDoge * snap.dogeUsd).toFixed(2) : null,
+      medianDoge: snap.collectionStats && snap.collectionStats.median != null ? snap.collectionStats.median : null,
+      medianUsd: null,
+      refreshIntervalHours: null,
+    },
+    currentOffers: listings.slice(0, offersLimit).map((row) => withUsd(row, snap.dogeUsd)),
+    topSales: sales.slice(0, salesLimit).map((row) => withUsd(row, snap.dogeUsd)),
+    recentOtcSales: otc.slice(0, salesLimit).map((row) => withUsd(row, snap.dogeUsd)),
+  });
+});
+
+// GET /api/dd-evaluator/top-sales?limit=25
+router.get('/top-sales', requireSnapshot, ddPaywall.mwTraitSearch(), async (req, res) => {
+  const ev = await loadEvaluator();
+  const snap = ev.getSnapshot();
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+  const topSales = (Array.isArray(snap.recentSales) ? snap.recentSales : [])
+    .filter((row) => row && row.dogNumber && Number(row.priceDoge) > 0)
+    .slice()
+    .sort((a, b) => Number(b.priceDoge) - Number(a.priceDoge))
+    .slice(0, limit)
+    .map((row) => withUsd(row, snap.dogeUsd));
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({
+    generatedAt: new Date().toISOString(),
+    dogeUsd: snap.dogeUsd || null,
+    topSales,
+  });
+});
+
 // GET /api/dd-evaluator/price
 router.get('/price', requireSnapshot, async (req, res) => {
   const ev = await loadEvaluator();

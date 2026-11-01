@@ -72,9 +72,14 @@ ErrorDocument 404 /404.html
 # -----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # www to apex (also upgrades http://www in one hop).
+  RewriteCond %{HTTP_HOST} ^www\.kushmedia\.xyz$ [NC]
+  RewriteRule ^(.*)$ https://kushmedia.xyz/$1 [R=301,L]
   # Retired Plus pages.
   RewriteRule ^pricing\.html$ /dd-evaluator/ [R=301,L]
   RewriteRule ^legal/refund-policy\.html$ /dd-evaluator/ [R=301,L]
+  # Legacy PHP evaluator API. Node routes live at /api/dd-evaluator/*.
+  RewriteRule ^api/dd-evaluator\.php$ - [G,L]
   # Force HTTPS first so path-specific [L] rewrites never leave http:// "Not secure".
   # LiteSpeed/cPanel has no APISIX edge redirect; X-Forwarded-Proto avoids proxy loops.
   RewriteCond %{HTTPS} !=on
@@ -141,7 +146,7 @@ ErrorDocument 404 /404.html
 <IfModule mod_headers.c>
   # HTTPS-only forever (1 year, includeSubDomains).
   # Add `; preload` only after submitting to the HSTS preload list.
-  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
   # Disable MIME sniffing.
   Header always set X-Content-Type-Options "nosniff"
   # Click-jacking off (frame-ancestors in CSP also enforces this).
@@ -155,10 +160,8 @@ ErrorDocument 404 /404.html
   SetEnvIf Request_URI "(^|/)bracket/og\.jpg$" TOURNEY_SHARE_IMAGE
   Header always unset Cross-Origin-Resource-Policy env=TOURNEY_SHARE_IMAGE
   Header always set Cross-Origin-Resource-Policy "cross-origin" env=TOURNEY_SHARE_IMAGE
-  # Permissions-Policy is owned by Express (permissionsPolicyFor). Do not
-  # unset/replace it here: LiteSpeed never set TOURNEY_MEDIA after the
-  # /tourney → /__tourney_gate rewrite, so Apache sent camera=() and the
-  # IRL table could not show an Allow popup even when the padlock was on.
+  # Photo scan on /dd-evaluator/ uses the live camera. Microphone stays off.
+  Header always set Permissions-Policy "accelerometer=(), camera=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
   # Reduce server fingerprint where the runtime allows it.
   Header always unset X-Powered-By
   Header unset X-Powered-By
@@ -172,7 +175,7 @@ ErrorDocument 404 /404.html
   # (no eval / new Function in remaining apps). connect-src names the live
   # DogiDex Supabase project instead of https://*.supabase.co.
   # ---------------------------------------------------------------------------
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://api.mapbox.com https://cdn.jsdelivr.net https://ddltcg.kushmetax.com; script-src-elem 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://api.mapbox.com https://cdn.jsdelivr.net https://ddltcg.kushmetax.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://assets.coingecko.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://cdn.discordapp.com https://media.discordapp.net; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://market.doginaldogs.com https://tblktaifczarnesqucwz.supabase.co wss://tblktaifczarnesqucwz.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://cdn.jsdelivr.net https://storage.googleapis.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self' https://kick.com https://*.kick.com; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://api.mapbox.com https://challenges.cloudflare.com https://ddltcg.kushmetax.com; script-src-elem 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://api.mapbox.com https://challenges.cloudflare.com https://ddltcg.kushmetax.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://kushmedia.xyz https://ddltcg.kushmetax.com https://ddltcg.com https://market.doginaldogs.com https://doginaldogs.com https://assets.coingecko.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://cdn.discordapp.com https://media.discordapp.net; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://challenges.cloudflare.com https://market.doginaldogs.com https://tblktaifczarnesqucwz.supabase.co wss://tblktaifczarnesqucwz.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; media-src 'self' blob:; worker-src 'self' blob:; frame-src 'self' https://kick.com https://*.kick.com; frame-ancestors 'none'; form-action 'self' https://script.google.com; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
   # ---------------------------------------------------------------------------
   # 6b. STRICT Content-Security-Policy (DISABLED - flip on after refactor)
   # ---------------------------------------------------------------------------

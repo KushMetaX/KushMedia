@@ -48,6 +48,22 @@ const port = Number.parseInt(process.env.PORT || '3000', 10);
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
+app.use((request, response, next) => {
+	const origin = request.headers.origin;
+	if (origin === 'https://kushmedia.xyz') {
+		response.set('Access-Control-Allow-Origin', 'https://kushmedia.xyz');
+		response.set('Vary', 'Origin');
+		response.set('Access-Control-Allow-Credentials', 'true');
+		response.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+		response.set('Access-Control-Allow-Headers', 'Content-Type, Accept, x-dd-admin-password, x-dd-community-password');
+	}
+	if (request.method === 'OPTIONS') {
+		response.status(204).end();
+		return;
+	}
+	next();
+});
+
 /** Bypasses middleware stack — if this is not 200 text, Passenger/Node never reached Express. */
 app.get('/ping', (request, response) => {
 	response.status(200).type('txt').send('kushbrand-node-live');
@@ -66,8 +82,8 @@ function permissionsPolicyFor(request) {
 	const pathOnly = String((request && request.path) || '');
 	const tourneyMedia = /\/(tourney|__tourney_gate|bracket)(\/|$)/i.test(pathOnly);
 	const cardScanner = /^\/(dd-evaluator|ddl|__ddl_gate)(\/|$)/i.test(pathOnly) || isDdlTcgHost(request);
-	const mic = tourneyMedia ? '(self)' : '()';
-	const cam = tourneyMedia || cardScanner ? '(self)' : '()';
+	const mic = '()';
+	const cam = cardScanner ? '(self)' : '()';
 	return `accelerometer=(), camera=${cam}, geolocation=(), gyroscope=(), magnetometer=(), microphone=${mic}, payment=(), usb=()`;
 }
 
@@ -123,7 +139,7 @@ app.use((request, response, next) => {
 	const xfProto = request.get('x-forwarded-proto');
 	const secure = request.secure || xfProto === 'https';
 	if (secure) {
-		response.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+		response.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
 	}
 	response.set('Content-Security-Policy', contentSecurityPolicy());
 	next();

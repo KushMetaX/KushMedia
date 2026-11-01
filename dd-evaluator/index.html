@@ -2518,7 +2518,7 @@
               <p class="eval-dex-spotlight-desc">Your personal shelf of evaluated dogs &mdash; sorted by recency or rarity. Free when you sign in; evaluations you run here are saved automatically.</p>
             </div>
             <div class="eval-dex-spotlight-cta">
-              <img src="../assets/DogiDexLogo.png" alt="DogiDex" class="eval-dex-spotlight-logo" width="400" height="120" decoding="async" onerror="this.onerror=null;this.src='../assets/Kush.png'" />
+              <img src="../assets/DogiDexLogo.png" alt="DogiDex" class="eval-dex-spotlight-logo" width="400" height="120" decoding="async" data-fallback="../assets/Kush.png" />
               <button type="button" class="eval-dex-spotlight-btn" id="evalDexSpotlightBtn" aria-haspopup="dialog" aria-controls="evalDexDialog">Open DogiDex</button>
             </div>
           </div>
@@ -2828,7 +2828,7 @@
       <header class="eval-dex-topbar">
         <span class="eval-dex-all-dogs">ALL DOGS</span>
         <div class="eval-dex-brand">
-          <img src="../assets/DogiDexLogo.png" alt="DogiDex" class="eval-dex-brand-logo" id="evalDexDialogTitle" width="400" height="120" decoding="async" onerror="this.onerror=null;this.src='../assets/Kush.png'" />
+          <img src="../assets/DogiDexLogo.png" alt="DogiDex" class="eval-dex-brand-logo" id="evalDexDialogTitle" width="400" height="120" decoding="async" data-fallback="../assets/Kush.png" />
         </div>
         <div class="eval-dex-reg-meta" id="evalDexRegMeta"></div>
       </header>
@@ -2874,6 +2874,21 @@
     })();
   </script>
   <script>
+    document.addEventListener('error', function(ev) {
+      var img = ev.target;
+      if (!img || img.tagName !== 'IMG') return;
+      if (img.getAttribute('data-fallback-used') === '1') {
+        if (img.getAttribute('data-fallback-hide') === '1') img.style.display = 'none';
+        return;
+      }
+      var fallback = img.getAttribute('data-fallback');
+      if (fallback) {
+        img.setAttribute('data-fallback-used', '1');
+        img.src = fallback;
+        return;
+      }
+      if (img.getAttribute('data-fallback-hide') === '1') img.style.display = 'none';
+    }, true);
     const API_BASE = window.location.origin;
     /** Try `/dd-evaluator/auth` first on APISIX + LiteSpeed stacks that 503 `/kmx-auth` POST; see server `app.use('/dd-evaluator/auth', ...)`. */
     var KMX_AUTH_PREFIX_STORAGE_KEY = 'dogidex_kmx_auth_prefix_v1';
@@ -4123,7 +4138,14 @@
     }
     function fmtDoge(n) { return n != null ? fmt(n) + ' DOGE' : '\u2014'; }
     function fmtUsd(n)  { return n != null ? '$' + fmt(n, 2) : ''; }
-    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
     // Rarity Rank color band, mirroring market.doginaldogs.com f4(ceil(rank/100)).
     function rarityRankClass(rank) {
       var r = Number(rank);
@@ -4195,7 +4217,7 @@
         : '';
       var dn = d.dogNumber != null ? Number(d.dogNumber) : NaN;
       evalDexDetailBody.innerHTML =
-        '<div class="eval-dex-detail-img-wrap"><img class="eval-dex-detail-img" src="' + esc(d.imageUrl || '') + '" alt="" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" /></div>' +
+        '<div class="eval-dex-detail-img-wrap"><img class="eval-dex-detail-img" src="' + esc(d.imageUrl || '') + '" alt="" data-fallback="../assets/collection-logo.png" /></div>' +
         '<p class="eval-dex-detail-num">No. ' + esc(padDogDexNum(dn)) + '</p>' +
         '<p class="eval-dex-detail-name">' + esc(d.name || ('Dog #' + fmt(dn))) + '</p>' +
         (d.inscriptionId ? '<p class="eval-dex-detail-insc">Inscription ' + esc(d.inscriptionId) + '</p>' : '') +
@@ -4275,7 +4297,7 @@
         '</div>' +
         '<a class="eval-wallet-pfp-wrap" href="' + esc(marketUrl) + '" target="_blank" rel="noopener noreferrer" aria-label="Open market wallet profile">' +
           '<span class="eval-wallet-pfp-ring" style="' + ringStyle + '"></span>' +
-          '<span class="eval-wallet-pfp"><img src="' + esc(imageUrl) + '" alt="' + esc(displayName) + '" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" /></span>' +
+          '<span class="eval-wallet-pfp"><img src="' + esc(imageUrl) + '" alt="' + esc(displayName) + '" data-fallback="../assets/collection-logo.png" /></span>' +
         '</a>' +
       '</div>';
     }
@@ -4466,7 +4488,7 @@
           : (d.imageUrl ? String(d.imageUrl) : '../assets/DDSHOP.gif');
         officialLoreHtml =
           '<div class="eval-own-sale eval-official-lore">' +
-            '<div class="eval-own-sale-media"><img src="' + esc(olfImage) + '" alt="" onerror="this.onerror=null;this.src=\'../assets/DDSHOP.gif\'" /></div>' +
+            '<div class="eval-own-sale-media"><img src="' + esc(olfImage) + '" alt="" data-fallback="../assets/DDSHOP.gif" /></div>' +
             '<div class="eval-own-sale-copy">' +
               '<div class="eval-own-sale-label eval-official-lore-label">Official Lore Floor</div>' +
               '<div class="eval-own-sale-value">Minimum ' + fmtDoge(olfDoge) + '</div>' +
@@ -4486,7 +4508,7 @@
         }).join(' · ') : '';
         tcgInspirationHtml =
           '<div class="eval-own-sale eval-tcg-inspiration">' +
-            '<div class="eval-own-sale-media"><img src="../assets/ddl-tcg-mascot.png" alt="" onerror="this.onerror=null;this.src=\'../assets/DDSHOP.gif\'" /></div>' +
+            '<div class="eval-own-sale-media"><img src="../assets/ddl-tcg-mascot.png" alt="" data-fallback="../assets/DDSHOP.gif" /></div>' +
             '<div class="eval-own-sale-copy">' +
               '<div class="eval-own-sale-label eval-tcg-inspiration-label">Official DDL TCG Inspiration</div>' +
               '<div class="eval-own-sale-value">' + esc(tcgInsp.label) + '</div>' +
@@ -4498,7 +4520,7 @@
       resultEl.innerHTML =
         '<div class="eval-card">' +
           '<div class="eval-banner">' +
-            '<img src="' + esc(d.imageUrl) + '" alt="' + esc(d.name) + '" class="eval-dog-img" onerror="this.onerror=null;this.src=\'../assets/collection-logo.png\'" />' +
+            '<img src="' + esc(d.imageUrl) + '" alt="' + esc(d.name) + '" class="eval-dog-img" data-fallback="../assets/collection-logo.png" />' +
             '<div class="eval-dog-info">' +
               '<div class="eval-dog-name">' + esc(d.name) + '</div>' +
               (d.inscriptionId ? '<div class="eval-dog-id">' + esc(d.inscriptionId) + '</div>' : '') +
@@ -4595,7 +4617,7 @@
       var dogsHtml = dogNumbers.length
         ? '<div class="eval-owner-dogs">' + dogNumbers.slice(0, 48).map(function(n) {
             return '<button type="button" class="eval-owner-dog-chip" data-owner-dog="' + esc(String(n)) + '">' +
-              '<img src="https://market.doginaldogs.com/dogs/' + encodeURIComponent(n) + '.png" alt="" onerror="this.style.display=\'none\'" />' +
+              '<img src="https://market.doginaldogs.com/dogs/' + encodeURIComponent(n) + '.png" alt="" data-fallback-hide="1" />' +
               '#' + fmt(n) +
             '</button>';
           }).join('') +
@@ -4993,8 +5015,7 @@
     function getOwnerSearchUrls(query) {
       var q = encodeURIComponent(query);
       return [
-        API_BASE + '/api/dd-evaluator/owner-search?q=' + q,
-        API_BASE + '/api/dd-evaluator.php?action=owner-search&q=' + q
+        API_BASE + '/api/dd-evaluator/owner-search?q=' + q
       ];
     }
 
@@ -5024,7 +5045,6 @@
     async function fetchCommunityLoreSupplement(dogNumber) {
       var u = encodeURIComponent(dogNumber);
       var urls = [
-        API_BASE + '/api/dd-evaluator.php?action=community-lore&dogNumber=' + u,
         API_BASE + '/api/dd-evaluator/community/lore/' + u
       ];
       for (var i = 0; i < urls.length; i++) {
@@ -5165,8 +5185,7 @@
     /* ---------- rank lookup ---------- */
     async function lookupRank(rank) {
       var urls = [
-        API_BASE + '/api/dd-evaluator/rank-lookup/' + encodeURIComponent(rank),
-        API_BASE + '/api/dd-evaluator.php?action=rank-lookup&rank=' + encodeURIComponent(rank)
+        API_BASE + '/api/dd-evaluator/rank-lookup/' + encodeURIComponent(rank)
       ];
       var lastError = null;
       for (var i = 0; i < urls.length; i++) {
@@ -5205,9 +5224,7 @@
       if (traitCatalog) return Promise.resolve(traitCatalog);
       if (traitCatalogPromise) return traitCatalogPromise;
       traitCatalogPromise = (async function() {
-        // Prefer explicit PHP action first on hybrid hosts; Node path second.
         var urls = [
-          API_BASE + '/api/dd-evaluator.php?action=trait-catalog',
           API_BASE + '/api/dd-evaluator/trait-catalog'
         ];
         var lastError = null;
@@ -5458,10 +5475,8 @@
       }
 
       var query = qs.toString();
-      // Node first (Passenger), then PHP fallback.
       var urls = [
-        API_BASE + '/api/dd-evaluator/trait-search?' + query,
-        API_BASE + '/api/dd-evaluator.php?action=trait-search&' + query
+        API_BASE + '/api/dd-evaluator/trait-search?' + query
       ];
       var lastError = null;
       for (var i = 0; i < urls.length; i++) {
@@ -5483,7 +5498,7 @@
       }
       var msg = (lastError && lastError.message) || 'Trait search unavailable.';
       if (/unknown action/i.test(msg)) {
-        throw new Error('Trait search is not live on the server yet. Deploy api/dd-evaluator.php (and api/.htaccess), then retry.');
+        throw new Error('Trait search is not available on this server yet.');
       }
       throw lastError || new Error('Trait search unavailable.');
     }
@@ -5974,7 +5989,7 @@
       }
       mpAllTimeLoading = true;
       mpRenderSections(mpLastPulse.floorRows, mpLastPulse.salesRows, mpLastPulse.otcRows, mpLastPulse.allTimeRows, mpLastPulse.metaLine);
-      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=top-sales&limit=' + MP_ALL_TIME_MAX);
+      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator/top-sales?limit=' + MP_ALL_TIME_MAX);
       mpAllTimeLoading = false;
       if (atr.ok && atr.data && atr.data.topSales) {
         mpAllTimeFetchedMax = true;
@@ -6021,10 +6036,8 @@
       var allTimeRows = [];
       var metaLine = '';
 
-      // All-time top sales come from the PHP feed, which scans the full global
-      // activity history (the Node feed only carries the recent window).
       var allTimeLimit = mpAllTimeExpanded ? MP_ALL_TIME_MAX : MP_ALL_TIME_PREVIEW;
-      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=top-sales&limit=' + allTimeLimit);
+      var atr = await mpFetchJson(API_BASE + '/api/dd-evaluator/top-sales?limit=' + allTimeLimit);
       if (atr.ok && atr.data && atr.data.topSales) {
         allTimeRows = atr.data.topSales.filter(function(x) { return x && x.dogNumber && Number(x.priceDoge) > 0; });
         if (allTimeLimit >= MP_ALL_TIME_MAX) mpAllTimeFetchedMax = true;
@@ -6039,7 +6052,7 @@
       }
 
       if (!nodeUsable || (!floorRows.length && !salesRows.length && !otcRows.length)) {
-        var rPhp = await mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=market-pulse&offers=20&sales=10');
+        var rPhp = await mpFetchJson(API_BASE + '/api/dd-evaluator/market-pulse?offers=20&sales=10');
         if (rPhp.ok && rPhp.data) {
           var p = rPhp.data;
           floorRows = (p.currentOffers || []).filter(function(x) { return x && x.dogNumber; });
@@ -6148,10 +6161,6 @@
       if (!lorePwRow) return;
       mpFetchJson(API_BASE + '/api/dd-evaluator/community/status')
         .then(function(r) {
-          if (r.ok && r.data) return r;
-          return mpFetchJson(API_BASE + '/api/dd-evaluator.php?action=community-status');
-        })
-        .then(function(r) {
           lorePwRequired = !!(r && r.ok && r.data && r.data.communityPasswordRequired);
           lorePwRow.hidden = !lorePwRequired;
         })
@@ -6160,17 +6169,7 @@
 
     function lorePostSuggestion(body, headers) {
       var opts = { method: 'POST', headers: headers, body: JSON.stringify(body) };
-      return fetch(API_BASE + '/api/dd-evaluator/community/suggestions', opts)
-        .then(function(res) {
-          // Fall back to the PHP endpoint only when the Node route is absent.
-          if (res.status === 404 || res.status === 501) {
-            return fetch(API_BASE + '/api/dd-evaluator.php?action=community-suggestions', opts);
-          }
-          return res;
-        })
-        .catch(function() {
-          return fetch(API_BASE + '/api/dd-evaluator.php?action=community-suggestions', opts);
-        });
+      return fetch(API_BASE + '/api/dd-evaluator/community/suggestions', opts);
     }
 
     if (loreForm) {
