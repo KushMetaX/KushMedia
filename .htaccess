@@ -72,6 +72,9 @@ ErrorDocument 404 /404.html
 # -----------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # Retired Plus pages.
+  RewriteRule ^pricing\.html$ /dd-evaluator/ [R=301,L]
+  RewriteRule ^legal/refund-policy\.html$ /dd-evaluator/ [R=301,L]
   # Force HTTPS first so path-specific [L] rewrites never leave http:// "Not secure".
   # LiteSpeed/cPanel has no APISIX edge redirect; X-Forwarded-Proto avoids proxy loops.
   RewriteCond %{HTTPS} !=on

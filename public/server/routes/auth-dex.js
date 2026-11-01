@@ -7,7 +7,6 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const { resolveSessionSecret: cookieSecret } = require('../session-secret');
-const cryptoPay = require('../lib/crypto-pay-provider');
 const router = express.Router();
 
 /** Session cookie signing only — never used as a user password. */
@@ -529,7 +528,7 @@ function payCurrenciesAllowed() {
 	return list.length ? list : ['btc', 'eth', 'sol', 'doge'];
 }
 function cryptoBillingReady() {
-	return Boolean(cryptoPay.apiKey() && cryptoPay.ipnSecret());
+	return false;
 }
 
 /** Public HTTPS origin for success/cancel URLs (no trailing slash). */
@@ -600,52 +599,21 @@ function subscriptionRowActive(row) {
 	return end > Date.now();
 }
 
-function userHasActiveDdSubscription(database, userId) {
-	const row = database
-		.prepare('SELECT email, subscription_status, subscription_current_period_end FROM users WHERE id = ?')
-		.get(userId);
-	if (!row) {
-		return false;
-	}
-	if (emailHasComplimentaryPlus(row.email)) {
-		return true;
-	}
-	return subscriptionRowActive(row);
+function userHasActiveDdSubscription() {
+	return true;
 }
 
-function subscriptionJsonForUser(database, userId) {
-	const row = database
-		.prepare(
-			`SELECT email, subscription_status, subscription_current_period_end
-			 FROM users WHERE id = ?`,
-		)
-		.get(userId);
-	const complimentary = Boolean(row && emailHasComplimentaryPlus(row.email));
-	const paidActive = subscriptionRowActive(row);
-	const active = complimentary || paidActive;
-	let statusDisp = null;
-	if (complimentary && !paidActive) {
-		statusDisp = 'complimentary';
-	} else if (active) {
-		statusDisp = 'active';
-	} else if (row && row.subscription_current_period_end != null) {
-		statusDisp = 'expired';
-	} else {
-		statusDisp = 'none';
-	}
+/** Features are free. Entitlement tables stay in SQLite; request paths do not read them. */
+function subscriptionJsonForUser() {
 	return {
-		active,
-		status: statusDisp,
-		complimentary,
-		currentPeriodEnd:
-			row && row.subscription_current_period_end != null ? Number(row.subscription_current_period_end) : null,
-		billingConfigured: cryptoBillingReady(),
-		paymentProvider: 'nowpayments',
-		canRenew: cryptoBillingReady(),
-		pricingCopy: {
-			monthlyUsd: fiatMonthlyUsd(),
-			yearlyUsd: fiatYearlyUsd(),
-		},
+		active: true,
+		status: 'free',
+		complimentary: false,
+		currentPeriodEnd: null,
+		billingConfigured: false,
+		paymentProvider: null,
+		canRenew: false,
+		features: 'all',
 	};
 }
 
@@ -752,55 +720,10 @@ function applyRemotePaymentPayload(database, payload) {
 	return fresh;
 }
 
-function syncPendingCryptoEntitlementsForUser(database, normalizedEmail, userId) {
-	const rows = database
-		.prepare(
-			`SELECT id FROM dd_crypto_payments
-			 WHERE email = ? AND LOWER(status) = 'finished' AND entitlement_applied_at IS NULL
-			 ORDER BY COALESCE(completed_at, updated_at, created_at) ASC, id ASC`,
-		)
-		.all(normalizedEmail);
-	for (const r of rows) {
-		applyCryptoLedgerEntitlement(database, r.id, userId);
-	}
+function syncPendingCryptoEntitlementsForUser() {
+	return;
 }
 
-async function handleCryptoPayIpn(req, res) {
-	const secret = cryptoPay.ipnSecret();
-	if (!cryptoPay.apiKey() || !secret) {
-		console.error('[auth-dex] crypto IPN skipped: CRYPTO_PAY_API_KEY or CRYPTO_PAY_IPN_SECRET unset.');
-		return res.status(503).send('Billing not configured');
-	}
-	const raw = Buffer.isBuffer(req.body)
-		? req.body
-		: Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body), 'utf8');
-	const rawUtf8 = raw.toString('utf8');
-	const sig = req.headers['x-nowpayments-sig'] || req.headers['X-Nowpayments-Sig'];
-	if (!cryptoPay.verifyIpnSignature(rawUtf8, sig, secret)) {
-		console.error('[auth-dex] crypto IPN: invalid signature');
-		return res.status(400).send('Invalid signature');
-	}
-	let payload;
-	try {
-		payload = JSON.parse(rawUtf8);
-	} catch (errParse) {
-		console.error('[auth-dex] crypto IPN: bad JSON', errParse && errParse.message ? errParse.message : errParse);
-		return res.status(400).send('Invalid JSON');
-	}
-	let db;
-	try {
-		db = getDb();
-	} catch (_e2) {
-		return res.status(503).json({ ok: false, error: 'Database unavailable.' });
-	}
-	try {
-		applyRemotePaymentPayload(db, payload);
-		return res.json({ ok: true });
-	} catch (err2) {
-		console.error('[auth-dex] crypto IPN handling:', err2 && err2.message ? err2.message : err2);
-		return res.status(500).json({ ok: false, error: 'Webhook handler failed.' });
-	}
-}
 
 function tierFromUniqueCount(count) {
 	const c = Math.max(0, Math.floor(Number(count) || 0));
@@ -851,7 +774,7 @@ function setSessionCookie(res, sessionId) {
 		httpOnly: true,
 		signed: true,
 		sameSite: 'lax',
-		secure,
+		secure: true,
 		maxAge: SESSION_MAX_AGE_MS,
 		path: '/',
 	});
@@ -866,7 +789,7 @@ function clearSessionCookie(res) {
 		httpOnly: true,
 		signed: true,
 		sameSite: 'lax',
-		secure,
+		secure: true,
 		path: '/',
 	});
 }
@@ -1339,173 +1262,6 @@ router.get('/me', (req, res) => {
 	});
 });
 
-/**
- * Crypto prepay (NOWPayments-style) for Doginal Dogs Plus.
- */
-router.get('/billing/pricing', (req, res) => {
-	res.json({
-		ok: true,
-		currency: 'usd',
-		monthlyUsd: fiatMonthlyUsd(),
-		yearlyUsd: fiatYearlyUsd(),
-		billingConfigured: cryptoBillingReady(),
-		payCurrencies: payCurrenciesAllowed(),
-		paymentProvider: 'nowpayments',
-	});
-});
-
-router.post('/billing/create-checkout-session', strictLimiter, async (req, res) => {
-	if (!cryptoBillingReady()) {
-		res.status(503).json({
-			error: 'Crypto billing is not configured (set CRYPTO_PAY_API_KEY and CRYPTO_PAY_IPN_SECRET).',
-		});
-		return;
-	}
-	const plan = String((req.body && req.body.plan) || 'month').toLowerCase() === 'year' ? 'year' : 'month';
-	let payCurrency = String((req.body && req.body.payCurrency) || 'btc').trim().toLowerCase();
-	const allowed = payCurrenciesAllowed();
-	if (!allowed.includes(payCurrency)) {
-		res.status(400).json({ error: 'Unsupported cryptocurrency. Choose one of: ' + allowed.join(', ') });
-		return;
-	}
-	const priceUsd = plan === 'year' ? fiatYearlyUsd() : fiatMonthlyUsd();
-	const origin = publicSiteOriginForBilling();
-	const db = req._authDb;
-	const sessUser = getUserForSession(db, req.signedCookies);
-	let email = '';
-	let userId = null;
-	if (sessUser) {
-		const row = db.prepare('SELECT email FROM users WHERE id = ?').get(sessUser.user_id);
-		email = row && row.email ? normalizeEmail(row.email) : '';
-		userId = sessUser.user_id;
-	} else {
-		email = normalizeEmail(req.body && req.body.email);
-	}
-	if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-		res.status(400).json({ error: 'Enter a valid email, or sign in first.' });
-		return;
-	}
-	const orderId = `ddp_${crypto.randomBytes(16).toString('hex')}`;
-	const successUrl = `${origin}/dd-evaluator?orderId=${encodeURIComponent(orderId)}`;
-	const cancelUrl = `${origin}/dd-evaluator`;
-	const ipnUrl = `${origin}/api/webhooks/crypto-payments`;
-	const now = Date.now();
-	try {
-		db.prepare(
-			`INSERT INTO dd_crypto_payments (
-				provider, order_id, email, user_id, plan, status, fiat_usd, created_at, updated_at
-			) VALUES ('nowpayments', ?, ?, ?, ?, 'new', ?, ?, ?)`,
-		).run(orderId, email, userId, plan, priceUsd, now, now);
-	} catch (insErr) {
-		console.error('[auth-dex] crypto insert order:', insErr && insErr.message ? insErr.message : insErr);
-		res.status(500).json({ error: 'Could not start payment.' });
-		return;
-	}
-	let npRes;
-	try {
-		npRes = await cryptoPay.createPayment({
-			priceUsd,
-			payCurrency,
-			orderId,
-			orderDescription: `KushMetaX Plus ${plan} (${email})`,
-			ipnCallbackUrl: ipnUrl,
-			successUrl,
-			cancelUrl,
-		});
-	} catch (err) {
-		db.prepare('DELETE FROM dd_crypto_payments WHERE order_id = ?').run(orderId);
-		console.error('[auth-dex] crypto create payment:', err && err.message ? err.message : err);
-		res.status(502).json({ error: 'Payment provider unavailable. Try again shortly.' });
-		return;
-	}
-	const pid = npRes && npRes.payment_id != null ? String(npRes.payment_id) : null;
-	const pstat = npRes && npRes.payment_status != null ? String(npRes.payment_status) : 'waiting';
-	try {
-		db.prepare(
-			`UPDATE dd_crypto_payments SET
-				provider_payment_id = ?,
-				pay_address = ?,
-				pay_amount_crypto = ?,
-				pay_currency = ?,
-				status = ?,
-				raw_status = ?,
-				updated_at = ?
-			WHERE order_id = ?`,
-		).run(
-			pid,
-			npRes.pay_address != null ? String(npRes.pay_address) : null,
-			npRes.pay_amount != null ? String(npRes.pay_amount) : null,
-			npRes.pay_currency != null ? String(npRes.pay_currency) : payCurrency,
-			pstat,
-			pstat,
-			Date.now(),
-			orderId,
-		);
-	} catch (upErr) {
-		console.error('[auth-dex] crypto update order:', upErr && upErr.message ? upErr.message : upErr);
-	}
-	if (!pid || !npRes.pay_address) {
-		res.status(500).json({ error: 'Could not create payment (missing address).' });
-		return;
-	}
-	res.json({
-		ok: true,
-		orderId,
-		paymentId: pid,
-		payAddress: String(npRes.pay_address),
-		payAmount: npRes.pay_amount != null ? String(npRes.pay_amount) : '',
-		payCurrency: npRes.pay_currency != null ? String(npRes.pay_currency) : payCurrency,
-		paymentStatus: pstat,
-	});
-});
-
-router.post('/billing/refresh-crypto-payment', strictLimiter, async (req, res) => {
-	if (!cryptoPay.apiKey()) {
-		res.status(503).json({ error: 'Billing is not configured.' });
-		return;
-	}
-	const paymentId = String((req.body && req.body.paymentId) || '').trim();
-	const orderId = String((req.body && req.body.orderId) || '').trim();
-	let db;
-	try {
-		db = getDb();
-	} catch (_e3) {
-		res.status(503).json({ error: 'Database unavailable.' });
-		return;
-	}
-	let remote;
-	try {
-		if (paymentId) {
-			remote = await cryptoPay.getPaymentStatus(paymentId);
-		} else if (orderId) {
-			const local = db.prepare('SELECT provider_payment_id FROM dd_crypto_payments WHERE order_id = ?').get(orderId);
-			if (!local || !local.provider_payment_id) {
-				res.json({ ok: true, pending: true, message: 'Payment not registered with provider yet.' });
-				return;
-			}
-			remote = await cryptoPay.getPaymentStatus(String(local.provider_payment_id));
-		} else {
-			res.status(400).json({ error: 'Provide paymentId or orderId.' });
-			return;
-		}
-	} catch (err3) {
-		console.error('[auth-dex] refresh crypto:', err3 && err3.message ? err3.message : err3);
-		res.status(502).json({ error: 'Could not reach payment provider.' });
-		return;
-	}
-	applyRemotePaymentPayload(db, remote);
-	const sessUser = getUserForSession(db, req.signedCookies);
-	if (sessUser) {
-		syncPendingCryptoEntitlementsForUser(db, normalizeEmail(sessUser.email), sessUser.user_id);
-	}
-	const st = remote && remote.payment_status != null ? String(remote.payment_status) : '';
-	res.json({
-		ok: true,
-		paymentStatus: st,
-		finished: normalizeSubscriptionStatus(st) === 'finished',
-	});
-});
-
 /** DogiDex sync: any authenticated KushMetaX account (Plus not required). */
 function requireDdDexSession(req, res, next) {
 	const db = req._authDb;
@@ -1692,7 +1448,6 @@ openAuthDatabase().catch((err) => {
 module.exports = router;
 module.exports.openAuthDatabase = openAuthDatabase;
 module.exports.tierFromUniqueCount = tierFromUniqueCount;
-module.exports.handleCryptoPayIpn = handleCryptoPayIpn;
 module.exports.tryGetDdDatabaseForPaywall = function tryGetDdDatabaseForPaywall() {
 	if (dbInstance) return dbInstance;
 	try {

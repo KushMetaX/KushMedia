@@ -207,8 +207,8 @@ function dd_paywall_quota_try_consume($bucketKey, $cap) {
 
     if ($cap === 0) {
         $msg = ($bucketKey === 'rarity')
-            ? 'Rarity valuations are gated for guests. KushMetaX Doginal Dogs Plus unlocks unlimited access.'
-            : 'Inscription valuations are gated for guests. KushMetaX Doginal Dogs Plus unlocks unlimited access.';
+            ? 'Too many rarity lookups from this network. Please wait and try again.'
+            : 'Too many inscription lookups from this network. Please wait and try again.';
         sendJson(array('code' => 'dd_guest_quota_exceeded', 'error' => $msg), 429, 0);
     }
 
@@ -244,8 +244,8 @@ function dd_paywall_quota_try_consume($bucketKey, $cap) {
         flock($fp, LOCK_UN);
         fclose($fp);
         $msg = ($bucketKey === 'rarity')
-            ? ('Free tier allows ' . $cap . ' rarity-rank valuations per UTC day at this IP (' . $ip . '). Subscribe for unlimited valuations and wallet estimates.')
-            : ('Free tier allows ' . $cap . ' inscription valuations per UTC day at this IP (' . $ip . '). Subscribe for unlimited valuations and wallet estimates.');
+            ? 'Too many rarity lookups from this network. Please wait a few minutes and try again.'
+            : 'Too many inscription lookups from this network. Please wait a few minutes and try again.';
         sendJson(array('code' => 'dd_guest_quota_exceeded', 'error' => $msg), 429, 0);
     }
 
@@ -1150,6 +1150,82 @@ function blend_rarest_trait_base_price_php(array $tb, $trendingConfig = null) {
         return $fallback > 0 ? $fallback : null;
     }
     return $blended;
+}
+
+/**
+ * Sale comps lag the live listing floor. Common-trait sale medians are the
+ * tape floor. Comps still under the live floor scale by floor/tape so the
+ * premium ratio (and the DOGE gap) rises with the floor. Mirrors evaluator.js.
+ */
+function dd_trait_category_label_php($key) {
+    if ($key === 'furColor') return 'Fur Color';
+    if ($key === 'furPattern') return 'Fur Pattern';
+    return ucfirst(strval($key));
+}
+
+function dd_percentile_php($values, $p) {
+    $sorted = array_values(array_filter($values, function ($v) {
+        return is_numeric($v) && floatval($v) > 0;
+    }));
+    if (count($sorted) === 0) return null;
+    sort($sorted, SORT_NUMERIC);
+    $idx = intval(ceil(($p / 100) * count($sorted))) - 1;
+    if ($idx < 0) $idx = 0;
+    return floatval($sorted[$idx]);
+}
+
+function infer_sale_tape_floor_php($saleTraitStats, $traitCounts, $recentSales) {
+    $commons = array();
+    $counts = is_array($traitCounts) ? $traitCounts : array();
+    if (is_array($saleTraitStats)) {
+        foreach ($saleTraitStats as $key => $values) {
+            if (!is_array($values)) continue;
+            $apiKey = dd_trait_category_label_php($key);
+            foreach ($values as $val => $stats) {
+                if (!is_array($stats)) continue;
+                $supply = isset($counts[$apiKey][$val]) ? $counts[$apiKey][$val] : null;
+                $saleCount = isset($stats['count']) ? intval($stats['count']) : 0;
+                $saleMedian = isset($stats['median']) ? normalizeNumber($stats['median']) : null;
+                if ($supply === null || intval($supply) <= 500) continue;
+                if ($saleCount < 8) continue;
+                if ($saleMedian === null || $saleMedian <= 0) continue;
+                $commons[] = $saleMedian;
+            }
+        }
+    }
+    if (count($commons) >= 3) {
+        return medianValue($commons);
+    }
+    $prices = array();
+    if (is_array($recentSales)) {
+        foreach ($recentSales as $sale) {
+            $price = isset($sale['priceDoge']) ? normalizeNumber($sale['priceDoge']) : null;
+            if ($price !== null && $price > 0) $prices[] = $price;
+        }
+    }
+    if (count($prices) >= 8) {
+        return dd_percentile_php($prices, 25);
+    }
+    return null;
+}
+
+function resolve_floor_scale_php($collectionFloor, $saleTapeFloor) {
+    if ($collectionFloor === null || $saleTapeFloor === null) return 1.0;
+    $floor = floatval($collectionFloor);
+    $tape = floatval($saleTapeFloor);
+    if ($floor <= 0 || $tape <= 0) return 1.0;
+    if ($floor <= $tape * 1.05) return 1.0;
+    return min(3.0, $floor / $tape);
+}
+
+function scale_stale_sale_price_php($price, $floorScale, $collectionFloor) {
+    $n = normalizeNumber($price);
+    if ($n === null || $n <= 0) return $price;
+    $scale = floatval($floorScale);
+    $floor = floatval($collectionFloor);
+    if ($scale <= 1 || $floor <= 0) return $n;
+    if ($n >= $floor) return $n;
+    return $n * $scale;
 }
 
 /** Rarest trait anchor trait count &lt;100 and no listing/sale rows in snapshot — matches Node evaluator. */
@@ -5320,6 +5396,47 @@ function evaluateDog($dogNumber) {
         }
     }
 
+    // Sale tape lags the live floor. Lift comps still under the floor so the
+    // premium ratio, and the DOGE gap, scale with the new floor.
+    $saleTapeFloor = infer_sale_tape_floor_php($saleTraitStats, $traitCounts, $recentSales);
+    $floorScale = resolve_floor_scale_php($collectionFloor, $saleTapeFloor);
+    $ownSaleAnchor = $ownTopSale;
+    if ($floorScale > 1 && $collectionFloor !== null) {
+        foreach ($traitBreakdown as &$tbScale) {
+            if (!empty($tbScale['isSynthetic'])) continue;
+            if (isset($tbScale['saleFloor']) && $tbScale['saleFloor'] !== null) {
+                $tbScale['saleFloor'] = scale_stale_sale_price_php($tbScale['saleFloor'], $floorScale, $collectionFloor);
+            }
+            if (isset($tbScale['saleMedian']) && $tbScale['saleMedian'] !== null) {
+                $tbScale['saleMedian'] = scale_stale_sale_price_php($tbScale['saleMedian'], $floorScale, $collectionFloor);
+            }
+            if (isset($tbScale['topSale']) && $tbScale['topSale'] !== null) {
+                $tbScale['topSale'] = scale_stale_sale_price_php($tbScale['topSale'], $floorScale, $collectionFloor);
+            }
+        }
+        unset($tbScale);
+        if ($ownSaleAnchor !== null && $ownSaleAnchor < $collectionFloor) {
+            $ownSaleAnchor = $ownSaleAnchor * $floorScale;
+        }
+        $scaledTop = 0;
+        foreach ($traitBreakdown as &$tbScale) {
+            $tbScale['isTopSale'] = false;
+            if (isset($tbScale['topSale']) && $tbScale['topSale'] !== null && $tbScale['topSale'] > $scaledTop) {
+                $scaledTop = $tbScale['topSale'];
+            }
+        }
+        unset($tbScale);
+        if ($scaledTop > 0) {
+            $scaledThreshold = $scaledTop * 0.5;
+            foreach ($traitBreakdown as &$tbScale) {
+                if (!in_array($tbScale['trait'], $topSaleExcluded, true) && isset($tbScale['topSale']) && $tbScale['topSale'] !== null && $tbScale['topSale'] >= $scaledThreshold) {
+                    $tbScale['isTopSale'] = true;
+                }
+            }
+            unset($tbScale);
+        }
+    }
+
     // --- Valuation logic ---
     // Compound anchor: max(blend) over top-N rarest traits (supply <= cap).
     $compoundResult = compute_compound_anchor_base_php($traitBreakdown, $trendingConfig);
@@ -5342,9 +5459,10 @@ function evaluateDog($dogNumber) {
         $rarestTraitThinMarketBoost = $thinBoost;
     }
 
-    // This inscription's own sale clears at least that price — floors base
-    if ($ownTopSale !== null) {
-        $basePriceDoge = $basePriceDoge !== null ? max($basePriceDoge, $ownTopSale) : $ownTopSale;
+    // This inscription's own sale clears at least that price — floors base.
+    // A print from before the floor moved is scaled with the tape.
+    if ($ownSaleAnchor !== null) {
+        $basePriceDoge = $basePriceDoge !== null ? max($basePriceDoge, $ownSaleAnchor) : $ownSaleAnchor;
     }
 
     // Other RARE traits can raise the value (skip common ones with count > 500; skip compound-anchor layers)
@@ -5400,9 +5518,11 @@ function evaluateDog($dogNumber) {
         }
     }
 
-    // Never estimate below collection floor
+    // Never estimate below collection floor. Rank and trending stay a premium
+    // on that floor so the DOGE gap rises when the floor rises.
     if ($estimatedDoge !== null && $collectionFloor !== null && $estimatedDoge < $collectionFloor) {
-        $estimatedDoge = intval($collectionFloor);
+        $floorPremium = ($rarityMultiplier > 0 ? $rarityMultiplier : 1.0) * ($trendingMultiplier > 0 ? $trendingMultiplier : 1.0);
+        $estimatedDoge = intval(round($collectionFloor * $floorPremium));
     }
 
     $unlistedTraits = 0;
@@ -5943,6 +6063,8 @@ function evaluateDog($dogNumber) {
                 'updatedBy' => isset($officialLoreFloor['updatedBy']) ? $officialLoreFloor['updatedBy'] : null,
             ) : null,
             'collectionFloor' => $collectionFloor,
+            'floorScale' => $floorScale > 1 ? round($floorScale, 2) : null,
+            'saleTapeFloor' => ($floorScale > 1 && $saleTapeFloor !== null) ? intval(round($saleTapeFloor)) : null,
             'dogeUsd' => $dogeUsd,
             'communityLore' => $communityLore,
             'comboMatch' => $matchedCombo !== null ? array(
@@ -5961,6 +6083,7 @@ function evaluateDog($dogNumber) {
             'specialMultiplierDetails' => count($specialMultiplierDetails) > 0 ? $specialMultiplierDetails : null,
             'method' => implode(' + ', array_filter(array(
                 'compound_rarest_trait_anchor + trait_bonus + rarity_multiplier',
+                $floorScale > 1 ? 'floor_scale' : null,
                 $valueMultiplier !== 1.0 ? 'one_of_one_multiplier' : null,
                 $colorMatch !== null ? 'color_match_multiplier' : null,
                 $isMinimalDog ? 'minimal_dog_multiplier' : null,

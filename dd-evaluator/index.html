@@ -26,7 +26,7 @@
   <link rel="icon" href="../assets/Kush.png" type="image/png">
   <link rel="apple-touch-icon" href="../assets/Kush.png">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant:ital,wght@0,500;0,600;0,700&family=Great+Vibes&family=Outfit:wght@400;500;600;700;800&family=Orbitron:wght@700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css">
+  <link rel="stylesheet" href="../brand.css?v=20261015b">
   <style>
     /* Avoid smooth-scroll fighting touch momentum / focused-field scroll corrections */
     html { scroll-behavior: auto; }
@@ -2297,7 +2297,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="ddl-tcg.css?v=ddl-eval-10">
+  <link rel="stylesheet" href="ddl-tcg.css?v=ddl-eval-14">
 </head>
 <body>
 
@@ -2316,11 +2316,7 @@
   <nav class="nav-overlay" aria-label="Main navigation">
     <ul class="nav-list">
       <li><a href="../index.html" class="nav-link">Home</a></li>
-      <li><a href="../about.html" class="nav-link">About</a></li>
-      <li><a href="../gallery.html" class="nav-link">Gallery</a></li>
-      <li><a href="../services.html" class="nav-link">Services</a></li>
       <li><a href="../dd-evaluator/" class="nav-link">DD Evaluator</a></li>
-      <li><a href="../ddl-tourney.html" class="nav-link">DDL Tourney - Legends Bracket</a></li>
       <li><a href="../voyager.html" class="nav-link">Voyager</a></li>
       <li><a href="../contact.html" class="nav-link">Connect</a></li>
     </ul>
@@ -2394,7 +2390,7 @@
               <div>
                 <p class="eval-mp-kicker">My collection</p>
                 <p class="ddl-collection-value" id="ddlCollectionValue">$0</p>
-                <p class="ddl-muted" id="ddlCollectionSub">Set how many copies you own with − and +. Chase cards use Base for a non-full-art copy. Download the PDF, type 1x / 2x / 3x over each dash, save, and import that file.</p>
+                <p class="ddl-muted" id="ddlCollectionSub">Set how many copies you own with − and +. Full art cards are full art only. Download the PDF, type 1x / 2x / 3x over each dash, save, and import that file.</p>
               </div>
               <div class="ddl-collection-actions">
                 <button type="button" class="eval-mp-btn eval-mp-btn-primary" id="ddlScanBtn">Scan cards</button>
@@ -2417,7 +2413,7 @@
             <ul class="ddl-group-list" id="ddlGroupList" aria-label="How many you still need"></ul>
           </div>
 
-          <div class="eval-glass-panel eval-block-card ddl-panel">
+          <div class="eval-glass-panel eval-block-card ddl-panel ddl-sheet">
             <div class="ddl-toolbar">
               <input type="search" id="ddlSearch" class="eval-input ddl-search" placeholder="Search card or #" autocomplete="off" aria-label="Search cards">
               <select id="ddlTier" aria-label="Rarity">
@@ -2436,6 +2432,7 @@
                 <option value="owned">Owned</option>
                 <option value="missing">Missing</option>
                 <option value="want">Looking for</option>
+                <option value="graded">AGS graded</option>
               </select>
               <select id="ddlSort" aria-label="Sort">
                 <option value="no">Set #</option>
@@ -2649,7 +2646,8 @@
 
             <h4>Step 6 &mdash; Floors and scarcity bump</h4>
             <ul>
-              <li><strong>Collection floor:</strong> the estimate is not left <strong>below</strong> the collection listing floor.</li>
+              <li><strong>Floor scale:</strong> If the live collection floor has run ahead of the sale tape (median sale of common traits), sale comps that still print <strong>below</strong> that floor are multiplied by <strong>live floor ÷ sale-tape floor</strong> (capped at 3×). A trait that cleared at 1.5× the old tape stays at 1.5× the new floor, so the DOGE gap above the floor rises with the floor. Comps already at or above the live floor are left as-is. Listing floors are already live and are not scaled.</li>
+              <li><strong>Collection floor:</strong> the estimate is not left <strong>below</strong> the collection listing floor. Rank and trending premiums are applied <strong>on</strong> that floor, so a top-15% dog stays about 1.1× the floor instead of being flattened onto it.</li>
               <li><strong>Many thin trait books:</strong> if <strong>three or more</strong> trait values have <strong>zero listings and zero sales</strong> in the snapshot, the estimate is multiplied by <strong>1.15</strong> (illiquidity / thin-tape adjustment).</li>
             </ul>
 
@@ -2698,10 +2696,8 @@
         <div class="footer-links">
           <a href="https://doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Doginal Dogs</a>
           <a href="https://market.doginaldogs.com" target="_blank" rel="noopener noreferrer" class="footer-link">Marketplace</a>
-          <a href="../pricing.html" class="footer-link">Pricing</a>
           <a href="../legal/terms-of-service.html" class="footer-link">Terms</a>
           <a href="../legal/privacy-policy.html" class="footer-link">Privacy</a>
-          <a href="../legal/refund-policy.html" class="footer-link">Refunds</a>
         </div>
         <p class="footer-copy">&copy; 2026 KushMetaX. All rights reserved.</p>
       </div>
@@ -2855,13 +2851,13 @@
     </div>
   </dialog>
 
-  <script src="../brand.js?v=ddl-tourney"></script>
+  <script src="../brand.js?v=20261015b"></script>
   <!-- Anon URL + key injected by Express from env (GET config.js). Never put service_role here. -->
   <script src="config.js"></script>
   <script src="dogidex-supabase.js"></script>
   <script src="ddl-checklist.js?v=ddl-eval-4"></script>
   <script src="ddl-checklist-pdf.js?v=cl1"></script>
-  <script src="ddl-tcg.js?v=ddl-eval-14"></script>
+  <script src="ddl-tcg.js?v=ddl-eval-18"></script>
   <script>
     (function () {
       try {
@@ -3186,7 +3182,7 @@
     }
 
     /** Merges the DogiDex shelf onto a Supabase-shaped session using bridge JSON or /me fallback. */
-    function attachKushPlusAfterBridge(sb, br) {
+    function mergeDexAfterBridge(sb, br) {
       if (!sb || !sb.user) return Promise.resolve(sb);
       if (br && br.ok && br.data && br.data.dex) {
         sb.dex = sb.dex || br.data.dex;
@@ -3277,13 +3273,13 @@
 
     function refreshAuthSession() {
       if (dogidexUseSupabase()) {
-        /** Supabase-first: old km_sid-only shortcut hid Supabase login + bridge (complimentary Plus). */
+        /** Supabase-first: a km_sid-only shortcut hid the Supabase login and cookie bridge. */
         return DogidexSupabase.refreshAuthSession()
           .then(function(sb) {
             if (sb && sb.user) {
               return bridgeKushFromSupabaseAccessToken()
                 .then(function(br) {
-                  return attachKushPlusAfterBridge(sb, br).then(dogidexAuthRedirectBonus);
+                  return mergeDexAfterBridge(sb, br).then(dogidexAuthRedirectBonus);
                 })
                 .catch(function() {
                   setAuthUiFromSession(sb);
@@ -3902,7 +3898,7 @@
             if (r && r.user) {
               return bridgeKushFromSupabaseAccessToken()
                 .then(function(br) {
-                  return attachKushPlusAfterBridge(r, br).then(function() {
+                  return mergeDexAfterBridge(r, br).then(function() {
                     msg.textContent = 'Logged in.';
                     msg.classList.add('ok');
                     evalAuthDialog.close();
@@ -3967,7 +3963,7 @@
             if (r && r.user) {
               return bridgeKushFromSupabaseAccessToken()
                 .then(function(br) {
-                  return attachKushPlusAfterBridge(r, br).then(function() {
+                  return mergeDexAfterBridge(r, br).then(function() {
                     msg.textContent = 'Welcome!';
                     msg.classList.add('ok');
                     evalAuthDialog.close();
@@ -4542,6 +4538,7 @@
               (est.rarestTrait ? '<span>Rarest layer: ' + esc(est.rarestTrait.value) + ' ' + esc(est.rarestTrait.trait) + ' (' + est.rarestTrait.count + '/10k)</span>' : '') +
               (est.compoundAnchor && est.compoundAnchor.traits && est.compoundAnchor.traits.length ? '<span>Compound anchor: max blend over up to ' + esc(String(est.compoundAnchor.maxTraits)) + ' layers (each ≤' + esc(String(est.compoundAnchor.maxSupply)) + '/10k)' + (est.compoundAnchor.winningTrait ? ' · strongest: ' + esc(est.compoundAnchor.winningTrait.value) + ' ' + esc(est.compoundAnchor.winningTrait.trait) : '') + '</span>' : '') +
               (est.basePriceDoge ? '<span>Base price: ' + fmtDoge(est.basePriceDoge) + '</span>' : '') +
+              (est.floorScale > 1 ? '<span>Floor scale: ' + est.floorScale + 'x · sale tape ' + fmtDoge(est.saleTapeFloor) + ' lifted with the live floor</span>' : '') +
               (est.traitBonus > 0 ? '<span>Trait bonus: +' + fmtDoge(est.traitBonus) + '</span>' : '') +
               (est.valueMultiplier ? '<span>1/1 multiplier: ' + est.valueMultiplier + 'x</span>' : '') +
               (est.trendingMultiplier ? '<span>🔥 Trending: ' + est.trendingMultiplier + 'x</span>' : '') +

@@ -1136,7 +1136,7 @@ router.get('/trait-catalog', async (_req, res) => {
 });
 
 // GET /api/dd-evaluator/trait-search?q=Cowboy | ?trait=head&value=Cowboy
-router.get('/trait-search', async (req, res) => {
+router.get('/trait-search', ddPaywall.mwTraitSearch(), async (req, res) => {
   try {
     const result = await ddTraitCatalog.searchCatalogByTrait({
       q: req.query.q || req.query.query,
@@ -1168,7 +1168,7 @@ router.get('/trait-search', async (req, res) => {
 });
 
 // GET /api/dd-evaluator/rank-lookup/:rank
-router.get('/rank-lookup/:rank', requireSnapshot, async (req, res) => {
+router.get('/rank-lookup/:rank', requireSnapshot, ddPaywall.mwEvaluateDog(), async (req, res) => {
   const ev = await loadEvaluator();
   const snap = ev.getSnapshot();
   const rank = Number(req.params.rank);

@@ -41,19 +41,6 @@ const port = Number.parseInt(process.env.PORT || '3000', 10);
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
-app.post(
-	'/api/webhooks/crypto-payments',
-	express.raw({ type: 'application/json', limit: '512kb' }),
-	(req, res) => {
-		Promise.resolve(authDexRouter.handleCryptoPayIpn(req, res)).catch((err) => {
-			console.error('[crypto-payments webhook]', err && err.message ? err.message : err);
-			if (!res.headersSent) {
-				res.status(500).send('Webhook handler error');
-			}
-		});
-	},
-);
-
 app.use((req, res, next) => {
 	const pathOnly = String(req.path || '').split('?')[0];
 	if (pathOnly === '/api/dd-evaluator/admin/lore-media') {
