@@ -15,8 +15,10 @@ const DECK_SIZE = 40;
 
 let cardsById = null;
 
+const SITE_ROOT = require('../site-root');
+
 function catalogPath() {
-	return path.join(__dirname, '../../../bracket/ddl-cards.js');
+	return path.join(SITE_ROOT, 'bracket', 'ddl-cards.js');
 }
 
 function loadCards() {

@@ -21,7 +21,8 @@ const ebay = require('../services/ddl-ebay');
 const shop = require('../services/ddl-shop');
 const { classifyTitle } = require('../lib/ddl-market-match');
 const { priceCatalog } = require('../lib/ddl-market-value');
-const checklist = require('../../../dd-evaluator/ddl-checklist.js');
+const SITE_ROOT = require('../site-root');
+const checklist = require(path.join(SITE_ROOT, 'dd-evaluator', 'ddl-checklist.js'));
 
 const router = express.Router();
 const serverDataDir = path.resolve(__dirname, '..', 'data');

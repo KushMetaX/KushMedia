@@ -3,9 +3,18 @@
 const fs = require('fs');
 const path = require('path');
 
-const dotenv = require('dotenv');
 const express = require('express');
 const cookieParser = require('cookie-parser');
+
+require('./site-root');
+
+function resolveSiteRoot() {
+	const fromEnv = String(process.env.SITE_ROOT || '').trim();
+	if (fromEnv) return path.resolve(fromEnv);
+	return '/home/kushmetax/public_html';
+}
+
+const siteRoot = resolveSiteRoot();
 
 const { curateDiscoveredPois } = require('./voyager-curate');
 
@@ -21,27 +30,7 @@ const { contentSecurityPolicy } = require('./csp-policy');
 const { sendConfigJs } = require('./dogidex-public-config');
 const { createAdminHtmlGate } = require('./admin-html-gate');
 
-(function loadDotenvFromStandardRoots() {
-	const roots = new Set([
-		path.resolve(__dirname, '..'),
-		path.resolve(__dirname, '..', '..'),
-		process.cwd(),
-		path.resolve(process.cwd(), 'public'),
-	]);
-	for (const root of roots) {
-		const fp = path.join(root, '.env');
-		if (fs.existsSync(fp)) {
-			dotenv.config({ path: fp, override: false });
-		}
-	}
-})();
-
 const app = express();
-const rootDir = path.resolve(__dirname, '..');
-/** Document root (parent of `public/` when Passenger runs the app from `public/`). */
-const siteRoot = fs.existsSync(path.join(rootDir, 'index.html'))
-	? rootDir
-	: path.resolve(rootDir, '..');
 const host = process.env.HOST || '0.0.0.0';
 const port = Number.parseInt(process.env.PORT || '3000', 10);
 
@@ -251,16 +240,23 @@ app.get('/healthz', (request, response) => {
 
 // DDL Tourney — static files in /bracket, JSON API on this same Node process.
 // No Vite and no extra port. Apache may rewrite /tourney → /__tourney_gate.
+// Missing bracket files must not stop the evaluator or collector routes.
 const bracketDir = path.join(siteRoot, 'bracket');
 const tourneyDataDir = path.join(__dirname, 'data');
-const createTourneyRouter = require('./routes/tourney-bracket');
-const tourneyApi = createTourneyRouter({
-	dataDir: tourneyDataDir,
-	bracketDir,
-	dogeWatch: { enabled: !/^(0|false|off|no)$/i.test(String(process.env.DOGE_WATCH || '1')) },
-});
+let createTourneyRouter = null;
+let tourneyApi = null;
+try {
+	createTourneyRouter = require('./routes/tourney-bracket');
+	tourneyApi = createTourneyRouter({
+		dataDir: tourneyDataDir,
+		bracketDir,
+		dogeWatch: { enabled: !/^(0|false|off|no)$/i.test(String(process.env.DOGE_WATCH || '1')) },
+	});
+} catch (err) {
+	console.error('[tourney] left offline so the rest of the app can start:', err && err.message ? err.message : err);
+}
 function sendBracketPage(request, response) {
-	if (typeof createTourneyRouter.sendAppPage === 'function') {
+	if (createTourneyRouter && typeof createTourneyRouter.sendAppPage === 'function') {
 		createTourneyRouter.sendAppPage({
 			bracketDir,
 			dataDir: tourneyDataDir,
@@ -269,19 +265,36 @@ function sendBracketPage(request, response) {
 		});
 		return;
 	}
-	response.sendFile(path.join(bracketDir, 'index.html'), {
-		headers: { 'Cache-Control': 'no-store, private' },
-	});
+	const indexPath = path.join(bracketDir, 'index.html');
+	if (fs.existsSync(indexPath)) {
+		response.sendFile(indexPath, {
+			headers: { 'Cache-Control': 'no-store, private' },
+		});
+		return;
+	}
+	response.status(404).type('html').send('Not found');
 }
 const rtcRouter = require('./routes/rtc-signaling').createRouter({
-	canClaimSeat: createTourneyRouter.createIrlSeatGuard(tourneyDataDir),
+	canClaimSeat: createTourneyRouter
+		? createTourneyRouter.createIrlSeatGuard(tourneyDataDir)
+		: function denyIrlSeat() { return false; },
 });
 app.use('/api/rtc', rtcRouter);
 app.use('/kmx-rtc', rtcRouter);
 app.use('/kk-rtc', rtcRouter);
-app.use('/tourney-api', tourneyApi);
-app.use('/kmx-tourney', tourneyApi);
-app.use('/kk-tourney', tourneyApi);
+if (tourneyApi) {
+	app.use('/tourney-api', tourneyApi);
+	app.use('/kmx-tourney', tourneyApi);
+	app.use('/kk-tourney', tourneyApi);
+} else {
+	const tourneyDown = express.Router();
+	tourneyDown.use((_request, response) => {
+		response.status(503).json({ error: 'Tournaments are unavailable.' });
+	});
+	app.use('/tourney-api', tourneyDown);
+	app.use('/kmx-tourney', tourneyDown);
+	app.use('/kk-tourney', tourneyDown);
+}
 app.get('/__tourney_status', (_request, response) => {
 	response.json({ ok: true, mode: 'static', proxy: false });
 });
@@ -615,11 +628,9 @@ app.get('/api/voyager/config', voyagerGate, (request, response) => {
 // curated set.
 const VOYAGER_DISCOVERED_PATHS = [
 	path.join(siteRoot, '_tools', 'voyager-scraper', 'data', 'out', 'pois-discovered.json'),
-	path.resolve(rootDir, '..', '_tools', 'voyager-scraper', 'data', 'out', 'pois-discovered.json'),
 ];
 const VOYAGER_CURATED_PATHS = [
 	path.join(siteRoot, 'map', 'pois.js'),
-	path.resolve(rootDir, '..', 'map', 'pois.js'),
 ];
 
 /**

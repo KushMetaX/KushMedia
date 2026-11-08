@@ -5,7 +5,9 @@
  * Phase is what the lobby shows: Registration → Check-in → Live → Complete.
  */
 
-const { eventStartMs, DEFAULT_TIMEZONE } = require('../../../bracket/event-time');
+const path = require('path');
+const SITE_ROOT = require('../site-root');
+const { eventStartMs, DEFAULT_TIMEZONE } = require(path.join(SITE_ROOT, 'bracket', 'event-time'));
 
 function nowMs(now) {
 	if (now instanceof Date) return now.getTime();

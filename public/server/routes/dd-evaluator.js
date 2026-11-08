@@ -3,6 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const SITE_ROOT = require('../site-root');
 const { pathToFileURL } = require('url');
 const express = require('express');
 const { timingSafeEqualString } = require('../security-utils');
@@ -665,13 +666,7 @@ function appendTipIntentRecord(record) {
  *  We load them via dynamic import() from CJS.
  * ----------------------------------------------------------------- */
 
-const ddRoot = (() => {
-  const a = path.resolve(__dirname, '..', '..', '_tools', 'dd-scraper');
-  if (fs.existsSync(path.join(a, 'evaluator.js'))) {
-    return a;
-  }
-  return path.resolve(__dirname, '..', '..', '..', '_tools', 'dd-scraper');
-})();
+const ddRoot = path.join(SITE_ROOT, '_tools', 'dd-scraper');
 const evaluatorUrl = pathToFileURL(path.join(ddRoot, 'evaluator.js')).href;
 const apiUrl = pathToFileURL(path.join(ddRoot, 'api.js')).href;
 
@@ -1386,17 +1381,7 @@ const LORE_MEDIA_MIME = {
 };
 
 function resolveLoreMediaDir() {
-  const candidates = [
-    path.resolve(__dirname, '..', '..', 'assets', 'lore-media'),
-    path.resolve(__dirname, '..', '..', '..', 'assets', 'lore-media'),
-  ];
-  for (const dir of candidates) {
-    const assetsParent = path.dirname(dir);
-    if (fs.existsSync(assetsParent) && fs.statSync(assetsParent).isDirectory()) {
-      return dir;
-    }
-  }
-  return candidates[0];
+  return path.join(SITE_ROOT, 'assets', 'lore-media');
 }
 
 router.post('/admin/lore-media', (req, res) => {

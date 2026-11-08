@@ -18,8 +18,10 @@ const UNPLAYABLE_SERIALS = { V029: 1 };
 let cardsById = null;
 let serialByName = null;
 
+const SITE_ROOT = require('../site-root');
+
 function catalogPath() {
-	return path.join(__dirname, '../../../bracket/ddl-cards.js');
+	return path.join(SITE_ROOT, 'bracket', 'ddl-cards.js');
 }
 
 function loadCards() {

@@ -1779,6 +1779,61 @@ function percentile(arr, p) {
   return sorted[Math.max(0, idx)];
 }
 
+/**
+ * Sale comps lag the live listing floor. Common-trait sale medians are the
+ * tape's floor. When the live floor has run ahead of that tape, comps still
+ * printing below the floor are multiplied by (live floor / tape floor) so a
+ * trait that cleared at 1.5× the old tape stays 1.5× the new floor — the
+ * DOGE gap rises with the floor instead of getting clamped away.
+ */
+const FLOOR_SCALE_MIN_RATIO = 1.05;
+const FLOOR_SCALE_MAX = 3;
+const SALE_TAPE_COMMON_SUPPLY = 500;
+const SALE_TAPE_MIN_SALES = 8;
+
+function inferSaleTapeFloor(saleTraitStats, traitCounts, recentSales) {
+  const commons = [];
+  const counts = traitCounts || {};
+  for (const [key, values] of Object.entries(saleTraitStats || {})) {
+    const apiKey = traitCategoryLabel(key);
+    for (const [val, stats] of Object.entries(values || {})) {
+      const supply = counts[apiKey]?.[val];
+      const saleCount = Math.max(0, Math.floor(Number(stats?.count) || 0));
+      const saleMedian = Number(stats?.median);
+      if (supply == null || Number(supply) <= SALE_TAPE_COMMON_SUPPLY) continue;
+      if (saleCount < SALE_TAPE_MIN_SALES) continue;
+      if (!Number.isFinite(saleMedian) || saleMedian <= 0) continue;
+      commons.push(saleMedian);
+    }
+  }
+  if (commons.length >= 3) return median(commons);
+
+  const prices = (Array.isArray(recentSales) ? recentSales : [])
+    .map(sale => Number(sale?.priceDoge))
+    .filter(price => Number.isFinite(price) && price > 0);
+  if (prices.length >= SALE_TAPE_MIN_SALES) return percentile(prices, 25);
+  return null;
+}
+
+function resolveFloorScale(collectionFloor, saleTapeFloor) {
+  const floor = Number(collectionFloor);
+  const tape = Number(saleTapeFloor);
+  if (!Number.isFinite(floor) || floor <= 0 || !Number.isFinite(tape) || tape <= 0) return 1;
+  if (floor <= tape * FLOOR_SCALE_MIN_RATIO) return 1;
+  return Math.min(FLOOR_SCALE_MAX, floor / tape);
+}
+
+/** Leave prints that already clear the live floor alone. Lift only stale comps. */
+function scaleStaleSalePrice(price, floorScale, collectionFloor) {
+  const n = Number(price);
+  if (!Number.isFinite(n) || n <= 0) return price;
+  const scale = Number(floorScale);
+  const floor = Number(collectionFloor);
+  if (!Number.isFinite(scale) || scale <= 1 || !Number.isFinite(floor) || floor <= 0) return n;
+  if (n >= floor) return n;
+  return n * scale;
+}
+
 async function mapWithConcurrency(items, concurrency, mapper) {
   if (items.length === 0) return [];
 
@@ -2406,6 +2461,35 @@ async function evaluateDog(dogNumber) {
     }
   }
 
+  // Sale tape lags the live floor. Lift comps that still print under the floor
+  // so their premium ratio (and the DOGE gap) scales with the new floor.
+  const collectionFloor = collectionStats.floor ?? null;
+  const saleTapeFloor = inferSaleTapeFloor(saleTraitStats, traitCounts, recentSales);
+  const floorScale = resolveFloorScale(collectionFloor, saleTapeFloor);
+  let ownSaleAnchor = ownTopSale;
+  if (floorScale > 1) {
+    for (const tb of traitBreakdown) {
+      if (tb.isSynthetic) continue;
+      if (tb.saleFloor != null) tb.saleFloor = scaleStaleSalePrice(tb.saleFloor, floorScale, collectionFloor);
+      if (tb.saleMedian != null) tb.saleMedian = scaleStaleSalePrice(tb.saleMedian, floorScale, collectionFloor);
+      if (tb.topSale != null) tb.topSale = scaleStaleSalePrice(tb.topSale, floorScale, collectionFloor);
+    }
+    if (ownSaleAnchor != null && ownSaleAnchor < collectionFloor) {
+      ownSaleAnchor = ownSaleAnchor * floorScale;
+    }
+    let scaledTop = 0;
+    for (const tb of traitBreakdown) {
+      tb.isTopSale = false;
+      if (tb.topSale != null && tb.topSale > scaledTop) scaledTop = tb.topSale;
+    }
+    const scaledThreshold = scaledTop * 0.5;
+    for (const tb of traitBreakdown) {
+      if (!topSaleExcluded.has(tb.trait) && tb.topSale != null && tb.topSale >= scaledThreshold && scaledTop > 0) {
+        tb.isTopSale = true;
+      }
+    }
+  }
+
   // --- Valuation logic ---
   // Compound anchor: max(blend) over the top-N rarest non-synthetic traits (supply ≤ cap).
   const compound = computeCompoundAnchorBase(traitBreakdown, trendingConfig);
@@ -2425,9 +2509,11 @@ async function evaluateDog(dogNumber) {
 
   const compoundAnchorSkip = new Set(compound.compoundAnchorRefs);
 
-  // This inscription's own sale clears at least that price — anchors base (floors valuation)
-  if (ownTopSale != null) {
-    basePriceDoge = basePriceDoge != null ? Math.max(basePriceDoge, ownTopSale) : ownTopSale;
+  // This inscription's own sale clears at least that price — anchors base (floors valuation).
+  // A print from before the floor moved is scaled with the tape; a print already
+  // at or above the live floor is used as-is.
+  if (ownSaleAnchor != null) {
+    basePriceDoge = basePriceDoge != null ? Math.max(basePriceDoge, ownSaleAnchor) : ownSaleAnchor;
   }
 
   // Other RARE traits can raise the value (skip common ones with count > 500; skip compound-anchor layers)
@@ -2462,10 +2548,12 @@ async function evaluateDog(dogNumber) {
     }
   }
 
-  // Never estimate below collection floor
-  const collectionFloor = collectionStats.floor ?? null;
+  // Never estimate below collection floor. Rank and trending are a premium
+  // on the floor, so the DOGE gap rises when the floor rises instead of
+  // being flattened away by the clamp.
   if (estimatedDoge != null && collectionFloor != null && estimatedDoge < collectionFloor) {
-    estimatedDoge = Math.round(collectionFloor);
+    const floorPremium = (rarityMultiplier > 0 ? rarityMultiplier : 1) * (trendingMultiplier > 0 ? trendingMultiplier : 1);
+    estimatedDoge = Math.round(collectionFloor * floorPremium);
   }
 
   // Scarcity bonus for dogs with many unlisted/unsold trait values
@@ -2866,11 +2954,14 @@ async function evaluateDog(dogNumber) {
         updatedBy: officialLoreFloor.updatedBy || null,
       } : null,
       collectionFloor: collectionStats.floor,
+      floorScale: floorScale > 1 ? +floorScale.toFixed(2) : null,
+      saleTapeFloor: floorScale > 1 && saleTapeFloor != null ? Math.round(saleTapeFloor) : null,
       dogeUsd,
       communityLore: communityLore || null,
       communityLoreMultiplier: communityLoreMultiplierFactor,
       method: [
         'compound_rarest_trait_anchor + trait_bonus + rarity_multiplier',
+        floorScale > 1 ? 'floor_scale' : null,
         valueMultiplier !== 1 ? 'one_of_one_multiplier' : null,
         colorMatch ? 'color_match_multiplier' : null,
         isMinimalDog ? 'minimal_dog_multiplier' : null,
@@ -3060,6 +3151,9 @@ export {
   stopRefreshLoop,
   traitAttributionSlots,
   blendRarestTraitBasePrice,
+  inferSaleTapeFloor,
+  resolveFloorScale,
+  scaleStaleSalePrice,
   applyTcgWalletSynergy,
   COMPOUND_ANCHOR_MAX_SUPPLY,
 };

@@ -1,0 +1,10 @@
+Options -Indexes
+DirectoryIndex index.html
+# Same policy as the root .htaccess, plus the RPCs the app reads Pyth prices from
+# (Solana push feeds + Arbitrum DOGE/USD). Keep in sync with the root CSP.
+<IfModule mod_headers.c>
+  <Files "og-image.png">
+    Header always set Cross-Origin-Resource-Policy "cross-origin"
+  </Files>
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-elem 'self' 'unsafe-inline'; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://solana-rpc.publicnode.com https://api.mainnet-beta.solana.com https://arb1.arbitrum.io; media-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; form-action 'self'; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+</IfModule>

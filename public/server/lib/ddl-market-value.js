@@ -5,7 +5,9 @@
  * Order of trust: sold comps → active asks (discounted) → pack-math estimate.
  */
 
-const checklist = require('../../../dd-evaluator/ddl-checklist.js');
+const path = require('path');
+const SITE_ROOT = require('../site-root');
+const checklist = require(path.join(SITE_ROOT, 'dd-evaluator', 'ddl-checklist.js'));
 
 const SOLD_WINDOW_DAYS = 120;
 const SEALED_WINDOW_DAYS = 60;

@@ -6,7 +6,9 @@
  * a multi-card lot, or something we should not price (accessories, customs, other sets).
  */
 
-const checklist = require('../../../dd-evaluator/ddl-checklist.js');
+const path = require('path');
+const SITE_ROOT = require('../site-root');
+const checklist = require(path.join(SITE_ROOT, 'dd-evaluator', 'ddl-checklist.js'));
 
 const SET_HINT = /\bdoginal\b|\bddl\b|rise of the pack|legends tcg/;
 

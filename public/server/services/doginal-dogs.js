@@ -3,6 +3,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
+const SITE_ROOT = require('../site-root');
 
 const MARKET_BASE = 'https://market.doginaldogs.com';
 const BRAND_BASE = 'https://doginaldogs.com';
@@ -25,7 +26,7 @@ const DEFAULT_BRAND_COLORS = Object.freeze({
 const CATALOG_CANDIDATE_PATHS = Object.freeze([
   process.env.DD_CATALOG_PATH ? path.resolve(process.cwd(), process.env.DD_CATALOG_PATH) : null,
   path.resolve(__dirname, '..', 'data', 'DoginalDogsCatalog.json'),
-  path.resolve(__dirname, '..', '..', 'assets', 'DoginalDogsCatalog.json')
+  path.join(SITE_ROOT, 'assets', 'DoginalDogsCatalog.json')
 ].filter(Boolean));
 const CATALOG_DISABLED = /^(1|true|yes)$/i.test(String(process.env.DD_DISABLE_CATALOG || ''));
 
@@ -862,7 +863,7 @@ async function getDogImage(dogNumber) {
     const remoteUrl = searchResult.imageUrl ? `${MARKET_BASE}${searchResult.imageUrl}` : `${MARKET_BASE}/dogs/${dogNumber}.png`;
     return fetchBinary(remoteUrl);
   } catch (error) {
-    const fallbackPath = path.resolve(__dirname, '..', '..', 'assets', 'Kush.png');
+    const fallbackPath = path.join(SITE_ROOT, 'assets', 'Kush.png');
     return {
       buffer: await fs.readFile(fallbackPath),
       contentType: 'image/png'
@@ -888,7 +889,7 @@ async function getBrandAsset(assetName) {
         return fetchBinary(BRAND_ASSET_MAP['collection-logo']);
       }
 
-      const fallbackPath = path.resolve(__dirname, '..', '..', 'assets', 'Kush.png');
+      const fallbackPath = path.join(SITE_ROOT, 'assets', 'Kush.png');
       return {
         buffer: await fs.readFile(fallbackPath),
         contentType: 'image/png'

@@ -29,7 +29,8 @@ const playDecks = require('../lib/play-decks');
 const classQuota = require('../lib/ddl-class-quota');
 const authDex = require('./auth-dex');
 const tourneyOg = require('../lib/tourney-og');
-const { sanitizeKickStream } = require('../../../bracket/kick-url');
+const SITE_ROOT = require('../site-root');
+const { sanitizeKickStream } = require(path.join(SITE_ROOT, 'bracket', 'kick-url'));
 const dogePayWatch = require('../lib/doge-pay-watch');
 const arenaChat = require('../lib/arena-chat');
 
@@ -2996,7 +2997,7 @@ function createRouter(options) {
 	records = require('../lib/tourney-records');
 	const dataDir = options.dataDir;
 	const storeFile = path.join(dataDir, 'tourney-store.json');
-	const bracketDir = options.bracketDir || path.join(__dirname, '..', '..', '..', 'bracket');
+	const bracketDir = options.bracketDir || path.join(SITE_ROOT, 'bracket');
 	const irlAssets = path.join(bracketDir, 'irl', 'og-assets');
 	const assetsDir = fs.existsSync(path.join(irlAssets, 'base.rgba.gz'))
 		? irlAssets

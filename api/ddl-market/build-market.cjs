@@ -286,12 +286,25 @@ async function main() {
   });
 
   function bookProduct(rows, fallback) {
-    const sold = rows.filter((r) => r.status === 'sold' && Number(r.usd) > 0);
-    const asks = rows.filter((r) => r.status === 'ask' && Number(r.usd) > 0);
-    const msrp = rows.filter((r) => r.status === 'msrp' && Number(r.usd) > 0);
-    if (sold.length) return { usd: round2(median(sold.map((r) => Number(r.usd)))), source: 'sold', n: sold.length, msrpUsd: BOX_MSRP };
-    if (asks.length) return { usd: round2(Math.min(...asks.map((r) => Number(r.usd)))), source: 'asks', n: asks.length, msrpUsd: BOX_MSRP };
-    if (msrp.length) return { usd: round2(Number(msrp[0].usd)), source: 'msrp', n: 0, msrpUsd: round2(Number(msrp[0].usd)) };
+    const priced = (status) => rows.filter((r) => r.status === status && Number(r.usd) > 0);
+    const pick = (list, source) => {
+      const best = list.reduce((a, b) => (Number(a.usd) <= Number(b.usd) ? a : b));
+      return {
+        usd: round2(Number(best.usd)),
+        source,
+        n: source === 'msrp' ? 0 : list.length,
+        url: best.url || null,
+        msrpUsd: round2(Number(best.usd)),
+      };
+    };
+    const sold = priced('sold');
+    const shop = priced('shop');
+    const asks = priced('ask');
+    const msrp = priced('msrp');
+    if (sold.length) return { ...pick(sold, 'sold'), msrpUsd: BOX_MSRP };
+    if (shop.length) return pick(shop, 'shop');
+    if (asks.length) return { ...pick(asks, 'asks'), msrpUsd: BOX_MSRP };
+    if (msrp.length) return pick(msrp, 'msrp');
     return fallback;
   }
 

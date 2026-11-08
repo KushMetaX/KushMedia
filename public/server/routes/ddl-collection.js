@@ -7,10 +7,12 @@
  * /dd-evaluator/?collector=<slug>#ddl-tcg. /searching is the public want board.
  */
 
+const path = require('path');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const authDex = require('./auth-dex');
-const checklist = require('../../../dd-evaluator/ddl-checklist.js');
+const SITE_ROOT = require('../site-root');
+const checklist = require(path.join(SITE_ROOT, 'dd-evaluator', 'ddl-checklist.js'));
 
 const router = express.Router();
 

@@ -1047,6 +1047,7 @@
           credentials: 'include',
           headers: body ? { 'Content-Type': 'application/json', Accept: 'application/json' } : { Accept: 'application/json' },
           body: body ? JSON.stringify(body) : undefined,
+          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined,
         });
         const type = res.headers.get('content-type') || '';
         if (!type.includes('json')) throw new Error(`HTTP ${res.status}`);
@@ -1540,20 +1541,46 @@
     }
   }
 
+  function showCollectorDialog() {
+    const dlg = $('ddlCollectorDialog');
+    if (!dlg) return null;
+    let node = dlg.parentElement;
+    while (node && node !== document.body) {
+      if (node.hidden) node.hidden = false;
+      node = node.parentElement;
+    }
+    if (dlg.open) return dlg;
+    document.querySelectorAll('dialog[open]').forEach((other) => {
+      if (other !== dlg) other.close();
+    });
+    try {
+      dlg.showModal();
+    } catch (_err) {
+      try { dlg.show(); } catch (_e2) { /* leave the error state in the dialog body */ }
+    }
+    return dlg;
+  }
+
   async function openCollector(slug) {
     const dlg = $('ddlCollectorDialog');
+    const body = $('ddlCollectorBody');
+    if (!dlg || !body) return;
     collectorData = null;
     collectorMode = 'have';
-    $('ddlCollectorBody').innerHTML = `<div class="ddl-dialog-head"><h3 id="ddlCollectorTitle">Collector profile</h3><button type="button" class="ddl-close" data-close aria-label="Close">×</button></div><p class="ddl-muted">Loading…</p>`;
-    if (!dlg.open) dlg.showModal();
+    body.innerHTML = `<div class="ddl-dialog-head"><h3 id="ddlCollectorTitle">Collector profile</h3><button type="button" class="ddl-close" data-close aria-label="Close">×</button></div><p class="ddl-muted">Loading…</p>`;
+    showCollectorDialog();
     try {
       const data = await accountRequest('/u/' + encodeURIComponent(slug));
-      if (data.profile.showValue) await marketReady;
       collectorData = data;
-      $('ddlCollectorBody').innerHTML = collectorHtml(data);
+      body.innerHTML = collectorHtml(data);
+      if (data.profile && data.profile.showValue && !market) {
+        marketReady.then(() => {
+          if (collectorData === data && dlg.open) body.innerHTML = collectorHtml(data);
+        }).catch(() => {});
+      }
     } catch (err) {
       collectorData = null;
-      $('ddlCollectorBody').innerHTML = `<div class="ddl-dialog-head"><h3 id="ddlCollectorTitle">Collector profile</h3><button type="button" class="ddl-close" data-close aria-label="Close">×</button></div><p class="ddl-muted">${esc(err.message || 'This profile could not be loaded.')}</p>`;
+      body.innerHTML = `<div class="ddl-dialog-head"><h3 id="ddlCollectorTitle">Collector profile</h3><button type="button" class="ddl-close" data-close aria-label="Close">×</button></div><p class="ddl-muted">${esc(err.message || 'This profile could not be loaded.')}</p>`;
     }
   }
 

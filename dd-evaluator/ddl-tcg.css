@@ -94,8 +94,15 @@ body[data-eval-mode="ddl"] .eval-shell > :not(#evalHero):not(#ddlEval) { display
   flex: 0 1 auto; padding: .5rem .6rem; border-radius: 10px;
   border: 1px solid rgba(232, 197, 71, .22); background: rgba(0, 0, 0, .5); color: #eae4d4; font: inherit; font-size: .82rem;
 }
-.ddl-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .06); }
-.ddl-table { width: 100%; border-collapse: collapse; font-size: .84rem; min-width: 640px; }
+.ddl-sheet {
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+.ddl-sheet > :not(.ddl-table-wrap) { width: 0; min-width: 100%; }
+.ddl-table-wrap { overflow-x: auto; max-width: 100%; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .06); }
+.ddl-table { width: max-content; border-collapse: collapse; font-size: .84rem; }
 .ddl-table th {
   position: sticky; top: 0; text-align: left; padding: .55rem .6rem;
   font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #a39e94;
@@ -133,6 +140,19 @@ body[data-eval-mode="ddl"] .eval-shell > :not(#evalHero):not(#ddlEval) { display
 .ddl-src-shop { color: #f0d78c; background: rgba(212, 175, 55, .14); border: 1px solid rgba(240, 200, 90, .35); }
 .ddl-src-asks { color: #ffd479; background: rgba(255, 190, 60, .1); border: 1px solid rgba(255, 190, 60, .3); }
 .ddl-src-model { color: #a39e94; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); }
+.ddl-src-auction { color: #ffb4a2; background: rgba(255, 90, 60, .12); border: 1px solid rgba(255, 120, 80, .4); }
+.ddl-auction { grid-column: 1 / -1; display: flex; flex-direction: column; gap: .35rem; padding: .85rem .95rem; border-radius: 12px; border: 1px solid rgba(255, 120, 80, .45); background: linear-gradient(180deg, rgba(255, 90, 40, .12), rgba(0, 0, 0, .35)); }
+.ddl-auction-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
+.ddl-auction-head a { color: var(--eval-gold, #e8c547); font-size: .8rem; }
+.ddl-auction ol { margin: .2rem 0 0; padding: 0; list-style: none; display: grid; gap: .35rem; }
+.ddl-auction li { display: grid; grid-template-columns: minmax(8rem, 1.2fr) minmax(10rem, 1.6fr) auto auto; align-items: center; gap: .55rem; font-size: .88rem; }
+.ddl-auction b { color: var(--eval-gold, #e8c547); }
+.ddl-auc-meta { color: #c8c2b6; font-size: .78rem; }
+.ddl-auc-go { color: #ffb4a2; font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; }
+@media (max-width: 640px) {
+  .ddl-auction li { grid-template-columns: 1fr auto; }
+  .ddl-auc-meta { grid-column: 1 / -1; }
+}
 .ddl-dog-chip {
   appearance: none; margin: 1px 3px 1px 0; padding: 2px 7px; border-radius: 999px; cursor: pointer;
   font: 600 .72rem/1.4 inherit; color: #f0d78c; background: rgba(212, 175, 55, .12); border: 1px solid rgba(240, 200, 90, .35);
@@ -346,8 +366,9 @@ body[data-eval-mode="ddl"] .eval-shell > :not(#evalHero):not(#ddlEval) { display
   .ddl-toolbar .ddl-search { flex-basis: 100%; }
   .ddl-toolbar select { flex: 1 1 calc(50% - .25rem); min-width: 0; }
 
+  .ddl-sheet { width: auto; max-width: none; margin-left: 0; transform: none; }
   .ddl-table-wrap { overflow: visible; border: 0; border-radius: 0; }
-  .ddl-table { min-width: 0; display: block; }
+  .ddl-table { width: 100%; min-width: 0; display: block; }
   .ddl-table thead { display: none; }
   .ddl-table tbody { display: grid; gap: .6rem; }
   .ddl-table tr {

@@ -2,9 +2,10 @@
 
 const path = require('path');
 const { unlockFor } = require('./tourney-achievements');
+const SITE_ROOT = require('../site-root');
 
 function loadBadgeCatalog() {
-	const catalogPath = path.join(__dirname, '../../../bracket/badges/catalog.js');
+	const catalogPath = path.join(SITE_ROOT, 'bracket', 'badges', 'catalog.js');
 	try {
 		return require(catalogPath);
 	} catch (err) {

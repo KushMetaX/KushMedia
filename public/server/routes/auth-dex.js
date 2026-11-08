@@ -952,9 +952,11 @@ router.get('/discord/start', strictLimiter, (req, res) => {
 		client_id: String(process.env.DISCORD_CLIENT_ID).trim(),
 		redirect_uri: discordRedirectUri(req),
 		response_type: 'code',
-		scope: 'identify email',
+		scope: 'identify',
 		state,
 	});
+	res.set('Cache-Control', 'no-store, private');
+	res.set('X-LiteSpeed-Cache-Control', 'no-cache');
 	res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
 });
 
@@ -1017,9 +1019,27 @@ router.get('/discord/callback', strictLimiter, async (req, res) => {
 		return;
 	}
 	issueSession(db, res, userId);
-	const dest = safeReturnTo(returnTo);
-	res.redirect(dest);
+	sendLoginLanding(res, safeReturnTo(returnTo));
 });
+
+/** Document response so the browser stores km_sid before leaving the callback. */
+function sendLoginLanding(res, dest) {
+	const next = String(dest || '/tourney/');
+	res.set('Cache-Control', 'no-store, private');
+	res.set('X-LiteSpeed-Cache-Control', 'no-cache');
+	res.status(200).type('html');
+	res.send(
+		'<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+		'<title>Signed in</title>' +
+		'<meta http-equiv="refresh" content="0;url=' + escapeHtmlAttr(next) + '">' +
+		'</head><body><script>location.replace(' + JSON.stringify(next) + ')</script>' +
+		'<p><a href="' + escapeHtmlAttr(next) + '">Continue</a></p></body></html>'
+	);
+}
+
+function escapeHtmlAttr(value) {
+	return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
 
 router.post('/me/handle', strictLimiter, (req, res) => {
 	const db = req._authDb;

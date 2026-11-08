@@ -8,6 +8,7 @@
 
 const fs = require('fs/promises');
 const path = require('path');
+const SITE_ROOT = require('../site-root');
 
 const TRAIT_KEYS = Object.freeze([
   'background', 'furColor', 'furPattern', 'head',
@@ -17,8 +18,7 @@ const TRAIT_KEYS = Object.freeze([
 const CATALOG_CANDIDATE_PATHS = Object.freeze([
   process.env.DD_CATALOG_PATH ? path.resolve(process.cwd(), process.env.DD_CATALOG_PATH) : null,
   path.resolve(__dirname, '..', 'data', 'DoginalDogsCatalog.json'),
-  path.resolve(__dirname, '..', '..', 'assets', 'DoginalDogsCatalog.json'),
-  path.resolve(__dirname, '..', '..', 'server', 'data', 'DoginalDogsCatalog.json')
+  path.join(SITE_ROOT, 'assets', 'DoginalDogsCatalog.json')
 ].filter(Boolean));
 
 const CATALOG_DISABLED = /^(1|true|yes)$/i.test(String(process.env.DD_DISABLE_CATALOG || ''));

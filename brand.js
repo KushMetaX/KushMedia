@@ -38,23 +38,48 @@
     var overlay = document.querySelector('.nav-overlay');
     if (!btn || !overlay) return;
 
-    // Toggle menu
+    if (!overlay.id) overlay.id = 'site-nav';
+    btn.setAttribute('aria-controls', overlay.id);
+
+    if (!btn.querySelector('.hamburger-bars')) {
+      var bars = document.createElement('span');
+      bars.className = 'hamburger-bars';
+      bars.setAttribute('aria-hidden', 'true');
+      Array.prototype.slice.call(btn.childNodes).forEach(function (node) {
+        if (node.nodeType === 1) bars.appendChild(node);
+        else node.remove();
+      });
+      btn.appendChild(bars);
+    }
+
+    var label = btn.querySelector('.hamburger-label');
+    if (!label) {
+      label = document.createElement('span');
+      label.className = 'hamburger-label';
+      btn.appendChild(label);
+    }
+
+    function setOpen(open) {
+      document.body.classList.toggle('menu-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      label.textContent = open ? 'Close' : 'Menu';
+    }
+
+    setOpen(false);
+
     btn.addEventListener('click', function () {
-      document.body.classList.toggle('menu-open');
+      setOpen(!document.body.classList.contains('menu-open'));
     });
 
-    // Close on nav link click
+    // Let the link navigate. Closing the overlay in the click handler
+    // hides the link before the browser follows it.
     var links = overlay.querySelectorAll('.nav-link');
-    links.forEach(function (link) {
-      link.addEventListener('click', function () {
-        document.body.classList.remove('menu-open');
-      });
-    });
 
     // Close on Escape
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && document.body.classList.contains('menu-open')) {
-        document.body.classList.remove('menu-open');
+        setOpen(false);
         btn.focus();
       }
     });
@@ -62,7 +87,7 @@
     // Click outside menu content closes it
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) {
-        document.body.classList.remove('menu-open');
+        setOpen(false);
       }
     });
 

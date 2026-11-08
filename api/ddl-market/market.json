@@ -2,8 +2,8 @@
   "configured": true,
   "set": "Rise of the Pack",
   "edition": "1st Edition",
-  "refreshedAt": "2026-10-09T20:17:18.814Z",
-  "nextRefreshAt": "2026-10-10T02:17:18.814Z",
+  "refreshedAt": "2026-10-10T00:28:56.051Z",
+  "nextRefreshAt": "2026-10-10T06:28:56.051Z",
   "refreshHours": 6,
   "askDiscount": 0.85,
   "sources": {
@@ -14,16 +14,18 @@
     }
   },
   "box": {
-    "usd": 179,
-    "source": "msrp",
-    "n": 0,
-    "msrpUsd": 179
+    "usd": 310,
+    "source": "shop",
+    "n": 1,
+    "url": "https://shop.doginaldogs.com/products/doginal-dogs-legends-rise-of-the-pack-booster-box",
+    "msrpUsd": 310
   },
   "pack": {
-    "usd": 7.46,
-    "source": "model",
-    "n": 0,
-    "msrpUsd": 7.46
+    "usd": 17,
+    "source": "shop",
+    "n": 1,
+    "url": "https://shop.doginaldogs.com/products/doginal-dogs-legends-rise-of-the-pack-booster-pack",
+    "msrpUsd": 17
   },
   "counts": {
     "activeListings": 2,

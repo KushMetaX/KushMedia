@@ -1,0 +1,317 @@
+[
+ {
+  "inputs": [
+   {
+    "internalType": "address",
+    "name": "entropyAddress",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "nonpayable",
+  "type": "constructor"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "uint256",
+    "name": "required",
+    "type": "uint256"
+   }
+  ],
+  "name": "InsufficientFee",
+  "type": "error"
+ },
+ {
+  "inputs": [],
+  "name": "NotOrganizer",
+  "type": "error"
+ },
+ {
+  "anonymous": false,
+  "inputs": [
+   {
+    "indexed": true,
+    "internalType": "uint64",
+    "name": "sequenceNumber",
+    "type": "uint64"
+   },
+   {
+    "indexed": false,
+    "internalType": "enum OracleMadnessEntropy.Purpose",
+    "name": "purpose",
+    "type": "uint8"
+   },
+   {
+    "indexed": true,
+    "internalType": "uint64",
+    "name": "tournamentId",
+    "type": "uint64"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint32",
+    "name": "matchId",
+    "type": "uint32"
+   }
+  ],
+  "name": "RandomnessRequested",
+  "type": "event"
+ },
+ {
+  "anonymous": false,
+  "inputs": [
+   {
+    "indexed": true,
+    "internalType": "uint64",
+    "name": "tournamentId",
+    "type": "uint64"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint64",
+    "name": "sequenceNumber",
+    "type": "uint64"
+   },
+   {
+    "indexed": false,
+    "internalType": "bytes32",
+    "name": "randomNumber",
+    "type": "bytes32"
+   }
+  ],
+  "name": "SeedingDrawn",
+  "type": "event"
+ },
+ {
+  "anonymous": false,
+  "inputs": [
+   {
+    "indexed": true,
+    "internalType": "uint64",
+    "name": "tournamentId",
+    "type": "uint64"
+   },
+   {
+    "indexed": true,
+    "internalType": "uint32",
+    "name": "matchId",
+    "type": "uint32"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint64",
+    "name": "sequenceNumber",
+    "type": "uint64"
+   },
+   {
+    "indexed": false,
+    "internalType": "bytes32",
+    "name": "randomNumber",
+    "type": "bytes32"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint8",
+    "name": "winnerSide",
+    "type": "uint8"
+   }
+  ],
+  "name": "SuddenDeathResolved",
+  "type": "event"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "uint64",
+    "name": "sequence",
+    "type": "uint64"
+   },
+   {
+    "internalType": "address",
+    "name": "provider",
+    "type": "address"
+   },
+   {
+    "internalType": "bytes32",
+    "name": "randomNumber",
+    "type": "bytes32"
+   }
+  ],
+  "name": "_entropyCallback",
+  "outputs": [],
+  "stateMutability": "nonpayable",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "entropy",
+  "outputs": [
+   {
+    "internalType": "contract IEntropyV2",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "fee",
+  "outputs": [
+   {
+    "internalType": "uint256",
+    "name": "",
+    "type": "uint256"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "organizer",
+  "outputs": [
+   {
+    "internalType": "address",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "uint64",
+    "name": "tournamentId",
+    "type": "uint64"
+   }
+  ],
+  "name": "requestSeeding",
+  "outputs": [
+   {
+    "internalType": "uint64",
+    "name": "seq",
+    "type": "uint64"
+   }
+  ],
+  "stateMutability": "payable",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "uint64",
+    "name": "tournamentId",
+    "type": "uint64"
+   },
+   {
+    "internalType": "uint32",
+    "name": "matchId",
+    "type": "uint32"
+   }
+  ],
+  "name": "requestSuddenDeath",
+  "outputs": [
+   {
+    "internalType": "uint64",
+    "name": "seq",
+    "type": "uint64"
+   }
+  ],
+  "stateMutability": "payable",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "uint64",
+    "name": "",
+    "type": "uint64"
+   }
+  ],
+  "name": "requests",
+  "outputs": [
+   {
+    "internalType": "enum OracleMadnessEntropy.Purpose",
+    "name": "purpose",
+    "type": "uint8"
+   },
+   {
+    "internalType": "uint64",
+    "name": "tournamentId",
+    "type": "uint64"
+   },
+   {
+    "internalType": "uint32",
+    "name": "matchId",
+    "type": "uint32"
+   },
+   {
+    "internalType": "bool",
+    "name": "fulfilled",
+    "type": "bool"
+   },
+   {
+    "internalType": "bytes32",
+    "name": "randomNumber",
+    "type": "bytes32"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "uint64",
+    "name": "",
+    "type": "uint64"
+   }
+  ],
+  "name": "seedingRandom",
+  "outputs": [
+   {
+    "internalType": "bytes32",
+    "name": "",
+    "type": "bytes32"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "address",
+    "name": "next",
+    "type": "address"
+   }
+  ],
+  "name": "setOrganizer",
+  "outputs": [],
+  "stateMutability": "nonpayable",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "bytes32",
+    "name": "",
+    "type": "bytes32"
+   }
+  ],
+  "name": "suddenDeathWinner",
+  "outputs": [
+   {
+    "internalType": "uint8",
+    "name": "",
+    "type": "uint8"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ }
+]

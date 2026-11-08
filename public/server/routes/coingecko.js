@@ -51,10 +51,7 @@ function readKeyFromDotenvFiles() {
 	}
 	try {
 		const roots = new Set([
-			path.resolve(__dirname, '..'),
 			path.resolve(__dirname, '..', '..'),
-			process.cwd(),
-			path.resolve(process.cwd(), 'public'),
 		]);
 		for (const root of roots) {
 			try {

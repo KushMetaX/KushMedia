@@ -1,0 +1,69 @@
+{
+  "searchUrl": "https://www.ebay.com/sch/i.html?_nkw=doginal+dogs+ags&LH_Auction=1&_sacat=0",
+  "refreshedAt": "2026-10-12T16:06:00Z",
+  "live": false,
+  "liveError": "",
+  "endsAt": "2026-10-18T22:00:00Z",
+  "items": [
+    {
+      "itemId": "257793119122",
+      "cardId": "V022",
+      "name": "Helios",
+      "print": "fa",
+      "grade": "AGS 10",
+      "title": "2026 Legends Rise of The Pack - Helios #V022 AGS 10",
+      "url": "https://www.ebay.com/itm/257793119122",
+      "bidUsd": 830,
+      "bids": 58,
+      "endsAt": "2026-10-18T22:00:00Z"
+    },
+    {
+      "itemId": "257793114784",
+      "cardId": "V055",
+      "name": "Turbo",
+      "print": "fa",
+      "grade": "AGS 10",
+      "title": "2026 Legends Rise of The Pack - Turbo #V055 AGS 10",
+      "url": "https://www.ebay.com/itm/257793114784",
+      "bidUsd": 510,
+      "bids": 81,
+      "endsAt": "2026-10-18T22:00:00Z"
+    },
+    {
+      "itemId": "257793118910",
+      "cardId": "V052",
+      "name": "Renza",
+      "print": "fa",
+      "grade": "AGS 10",
+      "title": "2026 Legends Rise of The Pack - Renza #V052 AGS 10",
+      "url": "https://www.ebay.com/itm/257793118910",
+      "bidUsd": 590,
+      "bids": 30,
+      "endsAt": "2026-10-18T22:00:00Z"
+    },
+    {
+      "itemId": "257793117922",
+      "cardId": "V067",
+      "name": "Wiggles",
+      "print": "fa",
+      "grade": "AGS 10",
+      "title": "2026 Legends Rise of The Pack - Wiggles #V067 AGS 10",
+      "url": "https://www.ebay.com/itm/257793117922",
+      "bidUsd": 1025,
+      "bids": 53,
+      "endsAt": "2026-10-18T22:00:00Z"
+    },
+    {
+      "itemId": "257793118635",
+      "cardId": "V044",
+      "name": "Boogie",
+      "print": "fa",
+      "grade": "AGS 10",
+      "title": "2026 Legends Rise of The Pack - Boogie #V044 AGS 10",
+      "url": "https://www.ebay.com/itm/257793118635",
+      "bidUsd": 465,
+      "bids": 67,
+      "endsAt": "2026-10-18T22:00:00Z"
+    }
+  ]
+}
